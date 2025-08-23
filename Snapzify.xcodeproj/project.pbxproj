@@ -1,0 +1,631 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3D9B1A001234567890123456 /* SnapzifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A011234567890123456 /* SnapzifyApp.swift */; };
+		3D9B1A021234567890123456 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A031234567890123456 /* Theme.swift */; };
+		3D9B1A041234567890123456 /* DataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A051234567890123456 /* DataModels.swift */; };
+		3D9B1A061234567890123456 /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A071234567890123456 /* ServiceProtocols.swift */; };
+		3D9B1A081234567890123456 /* OCRServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A091234567890123456 /* OCRServiceImpl.swift */; };
+		3D9B1A0A1234567890123456 /* ScriptConversionServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0B1234567890123456 /* ScriptConversionServiceImpl.swift */; };
+		3D9B1A0C1234567890123456 /* SentenceSegmentationServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */; };
+		3D9B1A0E1234567890123456 /* PinyinServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */; };
+		3D9B1A101234567890123456 /* TranslationServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */; };
+		3D9B1A121234567890123456 /* TTSServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */; };
+		3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A151234567890123456 /* ConfigServiceImpl.swift */; };
+		3D9B1A161234567890123456 /* PlecoLinkServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */; };
+		3D9B1A181234567890123456 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A191234567890123456 /* HomeView.swift */; };
+		3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1B1234567890123456 /* DocumentView.swift */; };
+		3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1D1234567890123456 /* SentenceRowView.swift */; };
+		3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123456 /* SettingsView.swift */; };
+		3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A211234567890123456 /* HomeViewModel.swift */; };
+		3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A231234567890123456 /* DocumentViewModel.swift */; };
+		3D9B1A241234567890123456 /* SentenceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A251234567890123456 /* SentenceViewModel.swift */; };
+		3D9B1A261234567890123456 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A271234567890123456 /* SettingsViewModel.swift */; };
+		3D9B1A281234567890123456 /* SnapzifyConfig.json in Resources */ = {isa = PBXBuildFile; fileRef = 3D9B1A291234567890123456 /* SnapzifyConfig.json */; };
+		3D9B1A2A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D9B1A2B1234567890123456 /* Assets.xcassets */; };
+		D298523E2E595F5D007795D3 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D29852342E595F5D007795D3 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D298523C2E595F5D007795D3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3D9B1A3D1234567890123456 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D29852332E595F5D007795D3;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D29852432E595F5D007795D3 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D298523E2E595F5D007795D3 /* ShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		3D9B1A001234567890123457 /* Snapzify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Snapzify.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3D9B1A011234567890123456 /* SnapzifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapzifyApp.swift; sourceTree = "<group>"; };
+		3D9B1A031234567890123456 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		3D9B1A051234567890123456 /* DataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataModels.swift; sourceTree = "<group>"; };
+		3D9B1A071234567890123456 /* ServiceProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceProtocols.swift; sourceTree = "<group>"; };
+		3D9B1A091234567890123456 /* OCRServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRServiceImpl.swift; sourceTree = "<group>"; };
+		3D9B1A0B1234567890123456 /* ScriptConversionServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptConversionServiceImpl.swift; sourceTree = "<group>"; };
+		3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceSegmentationServiceImpl.swift; sourceTree = "<group>"; };
+		3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceImpl.swift; sourceTree = "<group>"; };
+		3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationServiceOpenAI.swift; sourceTree = "<group>"; };
+		3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSServiceOpenAI.swift; sourceTree = "<group>"; };
+		3D9B1A151234567890123456 /* ConfigServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigServiceImpl.swift; sourceTree = "<group>"; };
+		3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlecoLinkServiceImpl.swift; sourceTree = "<group>"; };
+		3D9B1A191234567890123456 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		3D9B1A1B1234567890123456 /* DocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentView.swift; sourceTree = "<group>"; };
+		3D9B1A1D1234567890123456 /* SentenceRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceRowView.swift; sourceTree = "<group>"; };
+		3D9B1A1F1234567890123456 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		3D9B1A211234567890123456 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		3D9B1A231234567890123456 /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
+		3D9B1A251234567890123456 /* SentenceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceViewModel.swift; sourceTree = "<group>"; };
+		3D9B1A271234567890123456 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		3D9B1A291234567890123456 /* SnapzifyConfig.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = SnapzifyConfig.json; sourceTree = "<group>"; };
+		3D9B1A2B1234567890123456 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3D9B1A2D1234567890123456 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		3D9B1A2E1234567890123456 /* Snapzify.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Snapzify.entitlements; sourceTree = "<group>"; };
+		D29852342E595F5D007795D3 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D298523F2E595F5D007795D3 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D29852332E595F5D007795D3 /* ShareExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		D29852352E595F5D007795D3 /* ShareExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (D298523F2E595F5D007795D3 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShareExtension; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3D9B1A2F1234567890123456 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D29852312E595F5D007795D3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3D9B1A301234567890123456 = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A311234567890123456 /* Snapzify */,
+				D29852352E595F5D007795D3 /* ShareExtension */,
+				3D9B1A321234567890123456 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3D9B1A311234567890123456 /* Snapzify */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A011234567890123456 /* SnapzifyApp.swift */,
+				3D9B1A331234567890123456 /* Models */,
+				3D9B1A341234567890123456 /* Services */,
+				3D9B1A351234567890123456 /* Views */,
+				3D9B1A361234567890123456 /* ViewModels */,
+				3D9B1A371234567890123456 /* Utils */,
+				3D9B1A381234567890123456 /* Resources */,
+				3D9B1A2D1234567890123456 /* Info.plist */,
+				3D9B1A2E1234567890123456 /* Snapzify.entitlements */,
+			);
+			path = Snapzify;
+			sourceTree = "<group>";
+		};
+		3D9B1A321234567890123456 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A001234567890123457 /* Snapzify.app */,
+				D29852342E595F5D007795D3 /* ShareExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3D9B1A331234567890123456 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A051234567890123456 /* DataModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		3D9B1A341234567890123456 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A071234567890123456 /* ServiceProtocols.swift */,
+				3D9B1A091234567890123456 /* OCRServiceImpl.swift */,
+				3D9B1A0B1234567890123456 /* ScriptConversionServiceImpl.swift */,
+				3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */,
+				3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */,
+				3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */,
+				3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */,
+				3D9B1A151234567890123456 /* ConfigServiceImpl.swift */,
+				3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		3D9B1A351234567890123456 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A191234567890123456 /* HomeView.swift */,
+				3D9B1A1B1234567890123456 /* DocumentView.swift */,
+				3D9B1A1D1234567890123456 /* SentenceRowView.swift */,
+				3D9B1A1F1234567890123456 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		3D9B1A361234567890123456 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A211234567890123456 /* HomeViewModel.swift */,
+				3D9B1A231234567890123456 /* DocumentViewModel.swift */,
+				3D9B1A251234567890123456 /* SentenceViewModel.swift */,
+				3D9B1A271234567890123456 /* SettingsViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		3D9B1A371234567890123456 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A031234567890123456 /* Theme.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		3D9B1A381234567890123456 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				3D9B1A291234567890123456 /* SnapzifyConfig.json */,
+				3D9B1A2B1234567890123456 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3D9B1A391234567890123456 /* Snapzify */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3D9B1A3A1234567890123456 /* Build configuration list for PBXNativeTarget "Snapzify" */;
+			buildPhases = (
+				3D9B1A3B1234567890123456 /* Sources */,
+				3D9B1A2F1234567890123456 /* Frameworks */,
+				3D9B1A3C1234567890123456 /* Resources */,
+				D29852432E595F5D007795D3 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D298523D2E595F5D007795D3 /* PBXTargetDependency */,
+			);
+			name = Snapzify;
+			productName = Snapzify;
+			productReference = 3D9B1A001234567890123457 /* Snapzify.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D29852332E595F5D007795D3 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D29852402E595F5D007795D3 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				D29852302E595F5D007795D3 /* Sources */,
+				D29852312E595F5D007795D3 /* Frameworks */,
+				D29852322E595F5D007795D3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D29852352E595F5D007795D3 /* ShareExtension */,
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+			);
+			productName = ShareExtension;
+			productReference = D29852342E595F5D007795D3 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3D9B1A3D1234567890123456 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					3D9B1A391234567890123456 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+					D29852332E595F5D007795D3 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+				};
+			};
+			buildConfigurationList = 3D9B1A3E1234567890123456 /* Build configuration list for PBXProject "Snapzify" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 3D9B1A301234567890123456;
+			productRefGroup = 3D9B1A321234567890123456 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3D9B1A391234567890123456 /* Snapzify */,
+				D29852332E595F5D007795D3 /* ShareExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3D9B1A3C1234567890123456 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3D9B1A2A1234567890123456 /* Assets.xcassets in Resources */,
+				3D9B1A281234567890123456 /* SnapzifyConfig.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D29852322E595F5D007795D3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3D9B1A3B1234567890123456 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3D9B1A001234567890123456 /* SnapzifyApp.swift in Sources */,
+				3D9B1A021234567890123456 /* Theme.swift in Sources */,
+				3D9B1A041234567890123456 /* DataModels.swift in Sources */,
+				3D9B1A061234567890123456 /* ServiceProtocols.swift in Sources */,
+				3D9B1A081234567890123456 /* OCRServiceImpl.swift in Sources */,
+				3D9B1A0A1234567890123456 /* ScriptConversionServiceImpl.swift in Sources */,
+				3D9B1A0C1234567890123456 /* SentenceSegmentationServiceImpl.swift in Sources */,
+				3D9B1A0E1234567890123456 /* PinyinServiceImpl.swift in Sources */,
+				3D9B1A101234567890123456 /* TranslationServiceOpenAI.swift in Sources */,
+				3D9B1A121234567890123456 /* TTSServiceOpenAI.swift in Sources */,
+				3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */,
+				3D9B1A161234567890123456 /* PlecoLinkServiceImpl.swift in Sources */,
+				3D9B1A181234567890123456 /* HomeView.swift in Sources */,
+				3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */,
+				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
+				3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */,
+				3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */,
+				3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */,
+				3D9B1A241234567890123456 /* SentenceViewModel.swift in Sources */,
+				3D9B1A261234567890123456 /* SettingsViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D29852302E595F5D007795D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D298523D2E595F5D007795D3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D29852332E595F5D007795D3 /* ShareExtension */;
+			targetProxy = D298523C2E595F5D007795D3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3D9B1A3F1234567890123456 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		3D9B1A401234567890123456 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		3D9B1A411234567890123456 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Snapzify/Snapzify.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8FN3F53SM8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snapzify/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture screenshots for text recognition.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app accesses photos to process screenshots containing Chinese text.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3D9B1A421234567890123456 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Snapzify/Snapzify.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8FN3F53SM8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snapzify/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to capture screenshots for text recognition.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app accesses photos to process screenshots containing Chinese text.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D29852412E595F5D007795D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8FN3F53SM8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D29852422E595F5D007795D3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8FN3F53SM8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3D9B1A3A1234567890123456 /* Build configuration list for PBXNativeTarget "Snapzify" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3D9B1A411234567890123456 /* Debug */,
+				3D9B1A421234567890123456 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3D9B1A3E1234567890123456 /* Build configuration list for PBXProject "Snapzify" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3D9B1A3F1234567890123456 /* Debug */,
+				3D9B1A401234567890123456 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D29852402E595F5D007795D3 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D29852412E595F5D007795D3 /* Debug */,
+				D29852422E595F5D007795D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3D9B1A3D1234567890123456 /* Project object */;
+}
