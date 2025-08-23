@@ -4,6 +4,8 @@ import PhotosUI
 struct HomeView: View {
     @StateObject var vm: HomeViewModel
     @State private var selectedPhoto: PhotosPickerItem?
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var lastRefreshTime = Date()
     
     var body: some View {
         RootBackground {
@@ -19,6 +21,18 @@ struct HomeView: View {
                         
                         if let errorMessage = vm.errorMessage {
                             errorBanner(message: errorMessage)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                    removal: .move(edge: .top).combined(with: .opacity)
+                                ))
+                                .onAppear {
+                                    // Auto-dismiss after 5 seconds
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            vm.errorMessage = nil
+                                        }
+                                    }
+                                }
                         }
                         
                         quickActions
@@ -35,9 +49,21 @@ struct HomeView: View {
                 .scrollIndicators(.hidden)
             }
         }
-        .navigationTitle("Snapzify")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    Text("Snapzify")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundStyle(T.C.ink)
+                    
+                    Image("logo_header")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 64)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     vm.openSettings()
@@ -70,6 +96,26 @@ struct HomeView: View {
         }
         .task {
             await vm.loadDocuments()
+        }
+        .onAppear {
+            // Refresh saved documents when view appears
+            // Add a small delay to ensure navigation has completed
+            Task {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                await vm.refreshSavedDocuments()
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                // Refresh when scene becomes active
+                let now = Date()
+                if now.timeIntervalSince(lastRefreshTime) > 0.5 {
+                    Task {
+                        await vm.refreshSavedDocuments()
+                    }
+                    lastRefreshTime = now
+                }
+            }
         }
     }
     
@@ -291,7 +337,9 @@ struct HomeView: View {
             Spacer()
             
             Button("Dismiss") {
-                vm.errorMessage = nil
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    vm.errorMessage = nil
+                }
             }
             .foregroundStyle(.red)
             .font(.caption.weight(.medium))

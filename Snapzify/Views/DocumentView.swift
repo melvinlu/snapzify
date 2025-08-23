@@ -7,7 +7,7 @@ struct DocumentView: View {
     
     var body: some View {
         RootBackground {
-            ScrollView {
+            ScrollView(.vertical) {
                 VStack(spacing: T.S.md) {
                     if vm.showOriginalImage, let imageData = vm.document.imageData {
                         imageSection(imageData: imageData)

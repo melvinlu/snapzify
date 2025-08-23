@@ -118,6 +118,7 @@ struct ContentView: View {
                 ))
             }
         }
+        .tint(.white)
         .sheet(isPresented: $showSettings) {
             SettingsView(vm: SettingsViewModel(
                 configService: configService,
@@ -130,8 +131,13 @@ struct ContentView: View {
                 // Create and open new document with shared image
                 if let sharedImage = appState.sharedImage {
                     Task {
-                        let document = await createDocumentFromImage(sharedImage)
-                        selectedDocument = document
+                        if let document = await createDocumentFromImage(sharedImage) {
+                            selectedDocument = document
+                        } else {
+                            // Show error message if no Chinese detected
+                            print("Cannot create document: No Chinese content detected")
+                            // Note: You may want to show an alert or error message here
+                        }
                         appState.shouldOpenNewDocument = false
                         appState.sharedImage = nil
                     }
@@ -140,7 +146,24 @@ struct ContentView: View {
         }
     }
     
-    private func createDocumentFromImage(_ image: UIImage) async -> Document {
+    private func containsChinese(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            // Check for CJK Unified Ideographs ranges
+            if (0x4E00...0x9FFF).contains(scalar.value) ||
+               (0x3400...0x4DBF).contains(scalar.value) ||
+               (0x20000...0x2A6DF).contains(scalar.value) ||
+               (0x2A700...0x2B73F).contains(scalar.value) ||
+               (0x2B740...0x2B81F).contains(scalar.value) ||
+               (0x2B820...0x2CEAF).contains(scalar.value) ||
+               (0x2CEB0...0x2EBEF).contains(scalar.value) ||
+               (0x30000...0x3134F).contains(scalar.value) {
+                return true
+            }
+        }
+        return false
+    }
+    
+    private func createDocumentFromImage(_ image: UIImage) async -> Document? {
         // Process the image and create a new document
         let ocrService = OCRServiceImpl()
         let scriptConversionService = ScriptConversionServiceImpl()
@@ -155,23 +178,36 @@ struct ContentView: View {
             let sentencesWithBbox = await segmentationService.segmentIntoSentences(from: ocrLines)
             
             var processedSentences: [Sentence] = []
+            var hasChineseContent = false
+            
             for (sentenceText, bbox) in sentencesWithBbox {
-                // Convert to simplified for consistency
-                let simplifiedText = scriptConversionService.toSimplified(sentenceText)
-                
-                // Get pinyin
-                let pinyin = await pinyinService.getPinyin(for: simplifiedText, script: .simplified)
-                
-                // Create sentence
-                let sentence = Sentence(
-                    text: simplifiedText,
-                    rangeInImage: bbox,
-                    pinyin: pinyin,
-                    english: nil,
-                    status: .ocrOnly,
-                    isSaved: false
-                )
-                processedSentences.append(sentence)
+                // Check if this sentence contains Chinese
+                if containsChinese(sentenceText) {
+                    hasChineseContent = true
+                    
+                    // Convert to simplified for consistency
+                    let simplifiedText = scriptConversionService.toSimplified(sentenceText)
+                    
+                    // Get pinyin
+                    let pinyin = await pinyinService.getPinyin(for: simplifiedText, script: .simplified)
+                    
+                    // Create sentence
+                    let sentence = Sentence(
+                        text: simplifiedText,
+                        rangeInImage: bbox,
+                        pinyin: pinyin,
+                        english: nil,
+                        status: .ocrOnly,
+                        isSaved: false
+                    )
+                    processedSentences.append(sentence)
+                }
+            }
+            
+            // If no Chinese content found, return nil
+            if !hasChineseContent {
+                print("No Chinese content detected in shared image")
+                return nil
             }
             
             // Convert image to data
@@ -188,15 +224,8 @@ struct ContentView: View {
             try? await store.save(document)
             return document
         } catch {
-            // Return empty document on error
-            let imageData = image.jpegData(compressionQuality: 0.9)
-            return Document(
-                source: .shareExtension,
-                script: .simplified,
-                sentences: [],
-                imageData: imageData,
-                isSaved: false
-            )
+            print("Error processing shared image: \(error)")
+            return nil
         }
     }
 }

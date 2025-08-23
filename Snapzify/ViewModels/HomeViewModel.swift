@@ -15,6 +15,7 @@ class HomeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var expandedSentenceIds: Set<UUID> = []
     
+    private var hasLoadedDocuments = false
     private let store: DocumentStore
     private let ocrService: OCRService
     private let scriptConversionService: ScriptConversionService
@@ -48,6 +49,24 @@ class HomeViewModel: ObservableObject {
     }
     
     func loadDocuments() async {
+        // Only load if we haven't loaded yet
+        guard !hasLoadedDocuments else { return }
+        
+        isLoading = true
+        do {
+            documents = try await store.fetchAll()
+            savedDocuments = try await store.fetchSaved()
+            savedSentences = try await store.fetchSavedSentences()
+            await checkForLatestScreenshot()
+            hasLoadedDocuments = true
+        } catch {
+            print("Failed to load documents: \(error)")
+        }
+        isLoading = false
+    }
+    
+    func refreshDocuments() async {
+        // Force refresh documents (for when we actually need to reload)
         isLoading = true
         do {
             documents = try await store.fetchAll()
@@ -58,6 +77,17 @@ class HomeViewModel: ObservableObject {
             print("Failed to load documents: \(error)")
         }
         isLoading = false
+    }
+    
+    func refreshSavedDocuments() async {
+        // Refresh only saved documents and sentences (for when returning from document view)
+        do {
+            documents = try await store.fetchAll()
+            savedDocuments = try await store.fetchSaved()
+            savedSentences = try await store.fetchSavedSentences()
+        } catch {
+            print("Failed to refresh saved documents: \(error)")
+        }
     }
     
     func checkForLatestScreenshot() async {
@@ -116,13 +146,19 @@ class HomeViewModel: ObservableObject {
                 
                 // Update documents list after navigation
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
-                await loadDocuments()
+                await refreshDocuments()
             } catch {
                 print("Failed to snapzify screenshot: \(error)")
-                if error is TimeoutError {
-                    await MainActor.run {
+                await MainActor.run {
+                    if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
+                    } else if let processingError = error as? ProcessingError {
+                        errorMessage = processingError.errorDescription ?? "Failed to process image"
+                        print("Setting error message: \(errorMessage ?? "")")
+                    } else {
+                        errorMessage = "Failed to snapzify screenshot: \(error.localizedDescription)"
                     }
+                    print("Error message set to: \(errorMessage ?? "nil")")
                 }
             }
         }
@@ -148,13 +184,19 @@ class HomeViewModel: ObservableObject {
                 
                 // Update documents list after navigation
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
-                await loadDocuments()
+                await refreshDocuments()
             } catch {
                 print("Failed to snapzify pasted image: \(error)")
-                if error is TimeoutError {
-                    await MainActor.run {
+                await MainActor.run {
+                    if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
+                    } else if let processingError = error as? ProcessingError {
+                        errorMessage = processingError.errorDescription ?? "Failed to process image"
+                        print("Setting error message for pasted image: \(errorMessage ?? "")")
+                    } else {
+                        errorMessage = "Failed to paste image: \(error.localizedDescription)"
                     }
+                    print("Error message set to: \(errorMessage ?? "nil")")
                 }
             }
         }
@@ -199,16 +241,20 @@ class HomeViewModel: ObservableObject {
                 // Update documents list after navigation
                 print("Waiting for navigation...")
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
-                await loadDocuments()
+                await refreshDocuments()
                 print("Documents reloaded")
             } catch {
                 print("Failed to snapzify picked image: \(error)")
                 await MainActor.run {
                     if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
+                    } else if let processingError = error as? ProcessingError {
+                        errorMessage = processingError.errorDescription ?? "Failed to process image"
+                        print("Setting error message for picked image: \(errorMessage ?? "")")
                     } else {
                         errorMessage = "Failed to snapzify image: \(error.localizedDescription)"
                     }
+                    print("Error message set to: \(errorMessage ?? "nil")")
                 }
             }
         }
@@ -248,6 +294,23 @@ class HomeViewModel: ObservableObject {
         }
     }
     
+    private func containsChinese(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            // Check for CJK Unified Ideographs ranges
+            if (0x4E00...0x9FFF).contains(scalar.value) ||
+               (0x3400...0x4DBF).contains(scalar.value) ||
+               (0x20000...0x2A6DF).contains(scalar.value) ||
+               (0x2A700...0x2B73F).contains(scalar.value) ||
+               (0x2B740...0x2B81F).contains(scalar.value) ||
+               (0x2B820...0x2CEAF).contains(scalar.value) ||
+               (0x2CEB0...0x2EBEF).contains(scalar.value) ||
+               (0x30000...0x3134F).contains(scalar.value) {
+                return true
+            }
+        }
+        return false
+    }
+    
     private func processImage(_ image: UIImage, source: DocumentSource) async throws -> Document {
         let script = ChineseScript(rawValue: selectedScript) ?? .simplified
         
@@ -256,6 +319,7 @@ class HomeViewModel: ObservableObject {
         print("ProcessImage: OCR completed, got \(ocrLines.count) lines")
         
         var sentences: [Sentence] = []
+        var hasChineseContent = false
         
         for (index, line) in ocrLines.enumerated() {
             print("ProcessImage: Processing line \(index + 1)/\(ocrLines.count)")
@@ -269,38 +333,54 @@ class HomeViewModel: ObservableObject {
                 let pinyin = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
                 let english = components[2].trimmingCharacters(in: .whitespacesAndNewlines)
                 
-                print("ProcessImage: Found parsed data - Chinese: \(chinese.prefix(20))...")
-                
-                // Apply script conversion if needed
-                let normalizedChinese = script == .simplified ?
-                    scriptConversionService.toSimplified(chinese) :
-                    scriptConversionService.toTraditional(chinese)
-                
-                sentences.append(Sentence(
-                    text: normalizedChinese,
-                    rangeInImage: nil,
-                    tokens: [],  // No tokens needed
-                    pinyin: [pinyin],  // Already formatted pinyin
-                    english: english,  // Already have English translation
-                    status: .translated  // Mark as translated since we have English
-                ))
+                // Check if this line contains Chinese
+                if containsChinese(chinese) {
+                    hasChineseContent = true
+                    
+                    print("ProcessImage: Found parsed data - Chinese: \(chinese.prefix(20))...")
+                    
+                    // Apply script conversion if needed
+                    let normalizedChinese = script == .simplified ?
+                        scriptConversionService.toSimplified(chinese) :
+                        scriptConversionService.toTraditional(chinese)
+                    
+                    sentences.append(Sentence(
+                        text: normalizedChinese,
+                        rangeInImage: nil,
+                        tokens: [],  // No tokens needed
+                        pinyin: [pinyin],  // Already formatted pinyin
+                        english: english,  // Already have English translation
+                        status: .translated  // Mark as translated since we have English
+                    ))
+                }
             } else {
-                // Fallback for basic OCR text
-                print("ProcessImage: Processing fallback text: \(line.text.prefix(20))...")
-                
-                let normalizedText = script == .simplified ?
-                    scriptConversionService.toSimplified(line.text) :
-                    scriptConversionService.toTraditional(line.text)
-                
-                sentences.append(Sentence(
-                    text: normalizedText,
-                    rangeInImage: nil,
-                    tokens: [],
-                    pinyin: [],  // No pinyin in fallback
-                    english: nil,  // No English in fallback
-                    status: .ocrOnly
-                ))
+                // Check if this line contains Chinese
+                if containsChinese(line.text) {
+                    hasChineseContent = true
+                    
+                    // Fallback for basic OCR text
+                    print("ProcessImage: Processing fallback text: \(line.text.prefix(20))...")
+                    
+                    let normalizedText = script == .simplified ?
+                        scriptConversionService.toSimplified(line.text) :
+                        scriptConversionService.toTraditional(line.text)
+                    
+                    sentences.append(Sentence(
+                        text: normalizedText,
+                        rangeInImage: nil,
+                        tokens: [],
+                        pinyin: [],  // No pinyin in fallback
+                        english: nil,  // No English in fallback
+                        status: .ocrOnly
+                    ))
+                }
             }
+        }
+        
+        // If no Chinese content found, throw an error
+        if !hasChineseContent {
+            print("ProcessImage: No Chinese content detected, throwing error")
+            throw ProcessingError.noChineseDetected
         }
         
         print("ProcessImage: Created document with \(sentences.count) sentences")
@@ -344,6 +424,16 @@ func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws 
     }
 }
 
-enum ProcessingError: Error {
+enum ProcessingError: Error, LocalizedError {
     case imageLoadFailed
+    case noChineseDetected
+    
+    var errorDescription: String? {
+        switch self {
+        case .imageLoadFailed:
+            return "Failed to load image"
+        case .noChineseDetected:
+            return "Unsnapzify-able!"
+        }
+    }
 }

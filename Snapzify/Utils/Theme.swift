@@ -2,19 +2,19 @@ import SwiftUI
 
 enum T {
     enum C {
-        static let bg = Color(hex: 0x0B0F14)
-        static let card = Color(hex: 0x121823)
-        static let cardElevated = Color(hex: 0x171F2B)
-        static let divider = Color(hex: 0x263041)
-        static let brandStart = Color(hex: 0x6A8DFF)
-        static let brandEnd = Color(hex: 0x4E5FEA)
-        static let accent = Color(hex: 0x22D1B2)
-        static let accentAlt = Color(hex: 0xB07CFF)
-        static let ink = Color(hex: 0xE9EDF6)
-        static let ink2 = Color(hex: 0xA8B0C0)
-        static let warning = Color(hex: 0xF2B45A)
-        static let danger = Color(hex: 0xFF6B6B)
-        static let outline = Color.white.opacity(0.08)
+        static let bg = Color(hex: 0x000000)  // Pure black
+        static let card = Color(hex: 0x0A0A0A)  // Very dark gray
+        static let cardElevated = Color(hex: 0x141414)  // Slightly lighter dark gray
+        static let divider = Color(hex: 0x1F1F1F)  // Dark divider
+        static let brandStart = Color(hex: 0x3B82F6)  // Modern blue
+        static let brandEnd = Color(hex: 0x8B5CF6)  // Modern purple
+        static let accent = Color(hex: 0x10B981)  // Modern emerald
+        static let accentAlt = Color(hex: 0xA855F7)  // Modern violet
+        static let ink = Color(hex: 0xF5F5F5)  // Off-white
+        static let ink2 = Color(hex: 0x9CA3AF)  // Muted gray
+        static let warning = Color(hex: 0xF59E0B)  // Modern amber
+        static let danger = Color(hex: 0xEF4444)  // Modern red
+        static let outline = Color.white.opacity(0.05)  // Very subtle outline
     }
     
     enum S {
@@ -30,7 +30,13 @@ enum T {
 extension LinearGradient {
     static var appBg: LinearGradient {
         LinearGradient(
-            colors: [T.C.brandStart, T.C.brandEnd, Color(hex: 0x2B3550)],
+            colors: [
+                Color(hex: 0x8B5CF6),  // Light purple at top-left
+                Color(hex: 0x6366F1),  // Purple-blue blend
+                Color(hex: 0x3B82F6),  // Cyan-blue hint
+                Color(hex: 0x312E81),  // Dark purple-blue
+                Color(hex: 0x1E1B4B)   // Very dark purple at bottom-right
+            ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -38,7 +44,7 @@ extension LinearGradient {
     
     static var cta: LinearGradient {
         LinearGradient(
-            colors: [Color(hex: 0x69F0DE), T.C.accent],
+            colors: [T.C.brandStart, T.C.brandEnd],  // Blue to purple gradient
             startPoint: .leading,
             endPoint: .trailing
         )
@@ -62,7 +68,7 @@ struct RootBackground<Content: View>: View {
     
     var body: some View {
         ZStack {
-            LinearGradient.appBg.ignoresSafeArea()
+            Color(hex: 0x1C1C1E).ignoresSafeArea()  // Dark modern steel gray
             content
         }
     }
@@ -75,7 +81,7 @@ struct CardModifier: ViewModifier {
                 T.C.card.overlay(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.06),
+                            Color.white.opacity(0.02),  // Very subtle gradient
                             Color.white.opacity(0.0)
                         ],
                         startPoint: .top,
@@ -84,11 +90,11 @@ struct CardModifier: ViewModifier {
                 )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12)  // Slightly smaller radius
+                    .stroke(Color.white.opacity(0.03), lineWidth: 0.5)  // More subtle border
             )
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color.black.opacity(0.6), radius: 24, x: 0, y: 8)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .shadow(color: Color.black.opacity(0.8), radius: 16, x: 0, y: 4)  // Darker, tighter shadow
     }
 }
 
@@ -102,19 +108,20 @@ struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundStyle(Color.black.opacity(0.9))
+            .foregroundStyle(Color.white)  // White text on gradient
             .padding(.vertical, 12)
             .padding(.horizontal, 18)
             .background(LinearGradient.cta)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .stroke(
-                        Color.white.opacity(configuration.isPressed ? 0.2 : 0.1),
-                        lineWidth: 1
+                        Color.white.opacity(configuration.isPressed ? 0.1 : 0.05),
+                        lineWidth: 0.5
                     )
             )
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
@@ -127,11 +134,13 @@ struct SecondaryButtonStyle: ButtonStyle {
             .padding(.vertical, 10)
             .padding(.horizontal, 14)
             .background(T.C.card)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(T.C.outline, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(T.C.outline, lineWidth: 0.5)
             )
-            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
