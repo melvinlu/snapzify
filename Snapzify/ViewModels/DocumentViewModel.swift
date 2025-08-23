@@ -9,6 +9,8 @@ class DocumentViewModel: ObservableObject {
     @Published var selectedSentenceId: UUID?
     @Published var isTranslatingBatch = false
     @Published var expandedSentenceIds: Set<UUID> = []
+    @Published var showDeleteImageAlert = false
+    @Published var shouldDismiss = false
     
     private let translationService: TranslationService
     private let ttsService: TTSService
@@ -143,6 +145,20 @@ class DocumentViewModel: ObservableObject {
         document.sentences[index].isSaved.toggle()
         Task {
             try? await store.update(document)
+        }
+    }
+    
+    func deleteImage() {
+        Task {
+            // Delete the entire document from storage
+            try? await store.delete(id: document.id)
+            
+            // Notify that we should go back
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    self.shouldDismiss = true
+                }
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct DocumentView: View {
     @StateObject var vm: DocumentViewModel
     @State private var showFullScreenImage = false
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         RootBackground {
@@ -30,8 +31,21 @@ struct DocumentView: View {
                 FullScreenImageView(image: uiImage, isPresented: $showFullScreenImage)
             }
         }
+        .alert("Delete Document", isPresented: $vm.showDeleteImageAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                vm.deleteImage()
+            }
+        } message: {
+            Text("This will delete the entire document and remove it from your recents. This action cannot be undone.")
+        }
         .task {
             await vm.translateAllPending()
+        }
+        .onChange(of: vm.shouldDismiss) { shouldDismiss in
+            if shouldDismiss {
+                dismiss()
+            }
         }
     }
     
@@ -130,6 +144,19 @@ struct DocumentView: View {
                     .padding(.horizontal, 12)
                     .background(T.C.card.opacity(0.8))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            
+            if vm.document.imageData != nil {
+                Button {
+                    vm.showDeleteImageAlert = true
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                        .frame(height: 32)
+                        .padding(.horizontal, 12)
+                        .background(T.C.card.opacity(0.8))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
             }
         }
     }
