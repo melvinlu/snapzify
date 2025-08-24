@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject var vm: SettingsViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showVersionHistory = false
     
     var body: some View {
         NavigationStack {
@@ -28,6 +29,9 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .fullScreenCover(isPresented: $showVersionHistory) {
+            VersionHistoryView()
+        }
     }
     
     
@@ -40,10 +44,25 @@ struct SettingsView: View {
                 .foregroundStyle(T.C.ink)
             
             VStack(spacing: T.S.sm) {
+                Button {
+                    showVersionHistory = true
+                } label: {
+                    HStack {
+                        Label("Snapzify v1.0", systemImage: "camera.viewfinder")
+                            .foregroundStyle(T.C.ink)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(T.C.ink2)
+                            .font(.caption)
+                    }
+                }
+                
                 HStack {
-                    Label("Snapzify v1.0", systemImage: "camera.viewfinder")
-                        .foregroundStyle(T.C.ink)
-                    
+                    Text("Easily extract and study Chinese from images!")
+                        .font(.caption)
+                        .foregroundStyle(T.C.ink2)
                     Spacer()
                 }
                 

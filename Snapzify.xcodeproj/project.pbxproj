@@ -15,9 +15,6 @@
 		3D9B1A0A1234567890123456 /* ScriptConversionServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0B1234567890123456 /* ScriptConversionServiceImpl.swift */; };
 		3D9B1A0C1234567890123456 /* SentenceSegmentationServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */; };
 		3D9B1A0E1234567890123456 /* PinyinServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */; };
-		3D9B1A211234567890123458 /* PinyinServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */; };
-		3D9B1A311234567890123461 /* ChineseProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A301234567890123460 /* ChineseProcessingService.swift */; };
-		3D9B1A331234567890123463 /* StreamingChineseProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A321234567890123462 /* StreamingChineseProcessingService.swift */; };
 		3D9B1A101234567890123456 /* TranslationServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */; };
 		3D9B1A121234567890123456 /* TTSServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */; };
 		3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A151234567890123456 /* ConfigServiceImpl.swift */; };
@@ -25,14 +22,18 @@
 		3D9B1A181234567890123456 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A191234567890123456 /* HomeView.swift */; };
 		3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1B1234567890123456 /* DocumentView.swift */; };
 		3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1D1234567890123456 /* SentenceRowView.swift */; };
-		3D9B1A341234567890123464 /* ShimmerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A351234567890123465 /* ShimmerView.swift */; };
 		3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123456 /* SettingsView.swift */; };
 		3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A211234567890123456 /* HomeViewModel.swift */; };
+		3D9B1A211234567890123458 /* PinyinServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */; };
 		3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A231234567890123456 /* DocumentViewModel.swift */; };
 		3D9B1A241234567890123456 /* SentenceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A251234567890123456 /* SentenceViewModel.swift */; };
 		3D9B1A261234567890123456 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A271234567890123456 /* SettingsViewModel.swift */; };
 		3D9B1A281234567890123456 /* SnapzifyConfig.json in Resources */ = {isa = PBXBuildFile; fileRef = 3D9B1A291234567890123456 /* SnapzifyConfig.json */; };
 		3D9B1A2A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D9B1A2B1234567890123456 /* Assets.xcassets */; };
+		3D9B1A311234567890123461 /* ChineseProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A301234567890123460 /* ChineseProcessingService.swift */; };
+		3D9B1A331234567890123463 /* StreamingChineseProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A321234567890123462 /* StreamingChineseProcessingService.swift */; };
+		3D9B1A341234567890123464 /* ShimmerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A351234567890123465 /* ShimmerView.swift */; };
+		3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A371234567890123467 /* VersionHistoryView.swift */; };
 		D298523E2E595F5D007795D3 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D29852342E595F5D007795D3 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -70,9 +71,6 @@
 		3D9B1A0B1234567890123456 /* ScriptConversionServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptConversionServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceSegmentationServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceImpl.swift; sourceTree = "<group>"; };
-		3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceOpenAI.swift; sourceTree = "<group>"; };
-		3D9B1A301234567890123460 /* ChineseProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChineseProcessingService.swift; sourceTree = "<group>"; };
-		3D9B1A321234567890123462 /* StreamingChineseProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingChineseProcessingService.swift; sourceTree = "<group>"; };
 		3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationServiceOpenAI.swift; sourceTree = "<group>"; };
 		3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSServiceOpenAI.swift; sourceTree = "<group>"; };
 		3D9B1A151234567890123456 /* ConfigServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigServiceImpl.swift; sourceTree = "<group>"; };
@@ -80,8 +78,8 @@
 		3D9B1A191234567890123456 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		3D9B1A1B1234567890123456 /* DocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentView.swift; sourceTree = "<group>"; };
 		3D9B1A1D1234567890123456 /* SentenceRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceRowView.swift; sourceTree = "<group>"; };
-		3D9B1A351234567890123465 /* ShimmerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShimmerView.swift; sourceTree = "<group>"; };
 		3D9B1A1F1234567890123456 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceOpenAI.swift; sourceTree = "<group>"; };
 		3D9B1A211234567890123456 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		3D9B1A231234567890123456 /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
 		3D9B1A251234567890123456 /* SentenceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceViewModel.swift; sourceTree = "<group>"; };
@@ -90,6 +88,10 @@
 		3D9B1A2B1234567890123456 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3D9B1A2D1234567890123456 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3D9B1A2E1234567890123456 /* Snapzify.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Snapzify.entitlements; sourceTree = "<group>"; };
+		3D9B1A301234567890123460 /* ChineseProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChineseProcessingService.swift; sourceTree = "<group>"; };
+		3D9B1A321234567890123462 /* StreamingChineseProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingChineseProcessingService.swift; sourceTree = "<group>"; };
+		3D9B1A351234567890123465 /* ShimmerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShimmerView.swift; sourceTree = "<group>"; };
+		3D9B1A371234567890123467 /* VersionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionHistoryView.swift; sourceTree = "<group>"; };
 		D29852342E595F5D007795D3 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -193,6 +195,7 @@
 				3D9B1A1B1234567890123456 /* DocumentView.swift */,
 				3D9B1A1D1234567890123456 /* SentenceRowView.swift */,
 				3D9B1A351234567890123465 /* ShimmerView.swift */,
+				3D9B1A371234567890123467 /* VersionHistoryView.swift */,
 				3D9B1A1F1234567890123456 /* SettingsView.swift */,
 			);
 			path = Views;
@@ -350,6 +353,7 @@
 				3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */,
 				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
 				3D9B1A341234567890123464 /* ShimmerView.swift in Sources */,
+				3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */,
 				3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */,
 				3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */,
 				3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */,
@@ -500,6 +504,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Snapzify/Snapzify.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -532,6 +537,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Snapzify/Snapzify.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
