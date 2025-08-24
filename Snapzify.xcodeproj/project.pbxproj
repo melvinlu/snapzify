@@ -25,6 +25,7 @@
 		3D9B1A181234567890123456 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A191234567890123456 /* HomeView.swift */; };
 		3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1B1234567890123456 /* DocumentView.swift */; };
 		3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1D1234567890123456 /* SentenceRowView.swift */; };
+		3D9B1A341234567890123464 /* ShimmerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A351234567890123465 /* ShimmerView.swift */; };
 		3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123456 /* SettingsView.swift */; };
 		3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A211234567890123456 /* HomeViewModel.swift */; };
 		3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A231234567890123456 /* DocumentViewModel.swift */; };
@@ -79,6 +80,7 @@
 		3D9B1A191234567890123456 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		3D9B1A1B1234567890123456 /* DocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentView.swift; sourceTree = "<group>"; };
 		3D9B1A1D1234567890123456 /* SentenceRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceRowView.swift; sourceTree = "<group>"; };
+		3D9B1A351234567890123465 /* ShimmerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShimmerView.swift; sourceTree = "<group>"; };
 		3D9B1A1F1234567890123456 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3D9B1A211234567890123456 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		3D9B1A231234567890123456 /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 				3D9B1A191234567890123456 /* HomeView.swift */,
 				3D9B1A1B1234567890123456 /* DocumentView.swift */,
 				3D9B1A1D1234567890123456 /* SentenceRowView.swift */,
+				3D9B1A351234567890123465 /* ShimmerView.swift */,
 				3D9B1A1F1234567890123456 /* SettingsView.swift */,
 			);
 			path = Views;
@@ -346,6 +349,7 @@
 				3D9B1A181234567890123456 /* HomeView.swift in Sources */,
 				3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */,
 				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
+				3D9B1A341234567890123464 /* ShimmerView.swift in Sources */,
 				3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */,
 				3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */,
 				3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */,

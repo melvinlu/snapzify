@@ -295,17 +295,78 @@ struct HomeView: View {
     
     @ViewBuilder
     private var loadingView: some View {
-        VStack(spacing: T.S.lg) {
-            ProgressView()
-                .scaleEffect(1.2)
-                .tint(T.C.accent)
-            
-            Text("Loading...")
-                .foregroundStyle(T.C.ink2)
-                .font(.subheadline)
+        ScrollView {
+            VStack(spacing: T.S.lg) {
+                // Quick actions placeholder
+                HStack(spacing: T.S.md) {
+                    ShimmerView()
+                        .frame(height: 44)
+                        .cornerRadius(8)
+                    
+                    ShimmerView()
+                        .frame(height: 44)
+                        .cornerRadius(8)
+                }
+                .padding(.horizontal, 20)
+                
+                // Saved section placeholder
+                VStack(alignment: .leading, spacing: T.S.sm) {
+                    HStack {
+                        ShimmerView()
+                            .frame(width: 60, height: 20)
+                            .cornerRadius(4)
+                        Spacer()
+                    }
+                    .padding(.horizontal, T.S.xs)
+                    
+                    ShimmerView()
+                        .frame(height: 100)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 20)
+                
+                // Recent section placeholder
+                VStack(alignment: .leading, spacing: T.S.sm) {
+                    HStack {
+                        ShimmerView()
+                            .frame(width: 60, height: 20)
+                            .cornerRadius(4)
+                        Spacer()
+                    }
+                    .padding(.horizontal, T.S.xs)
+                    
+                    VStack(spacing: 0) {
+                        ForEach(0..<3) { index in
+                            HStack(spacing: T.S.md) {
+                                ShimmerView()
+                                    .frame(width: 60, height: 60)
+                                    .cornerRadius(10)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    ShimmerView()
+                                        .frame(width: 150, height: 16)
+                                        .cornerRadius(3)
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, T.S.md)
+                            .padding(.vertical, T.S.md)
+                            
+                            if index < 2 {
+                                Divider()
+                                    .background(T.C.divider.opacity(0.6))
+                                    .padding(.leading, 78)
+                            }
+                        }
+                    }
+                    .card()
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.vertical, 24)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(T.C.bg)
+        .scrollIndicators(.hidden)
     }
     
     @ViewBuilder
@@ -400,8 +461,10 @@ struct HomeView: View {
                         sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
                         sharedDefaults.synchronize()
                         
-                        // Process the image
-                        vm.processPickedImage(image)
+                        // Process the image in background without opening
+                        Task {
+                            await vm.processSharedImage(image)
+                        }
                         
                         // Clean up the file
                         try? FileManager.default.removeItem(at: fileURL)
