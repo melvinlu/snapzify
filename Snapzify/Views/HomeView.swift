@@ -123,11 +123,11 @@ struct HomeView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
+                // Check for shared images IMMEDIATELY when app becomes active
+                checkForSharedImages()
+                
                 // Resume polling when app becomes active
                 startPhotoPolling()
-                
-                // Check for shared images when app becomes active
-                checkForSharedImages()
                 
                 // Refresh when scene becomes active
                 let now = Date()
@@ -217,6 +217,16 @@ struct HomeView: View {
                 Text("Recent")
                     .font(.title3)
                     .foregroundStyle(T.C.ink)
+                
+                if vm.isProcessingSharedImage {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Snapzifying shared image...")
+                            .font(.caption)
+                            .foregroundStyle(T.C.ink2)
+                    }
+                }
                 
                 Spacer()
             }
@@ -425,10 +435,27 @@ struct HomeView: View {
             await vm.checkForLatestScreenshot()
         }
         
-        // Then check every 2 seconds
-        photoCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            Task {
-                await vm.checkForLatestScreenshot()
+        // Check for shared images more frequently (every 0.5 seconds for first 5 seconds, then every 2 seconds)
+        var checkCount = 0
+        photoCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            checkCount += 1
+            
+            // Check for shared images every time
+            self.checkForSharedImages()
+            
+            // After 10 checks (5 seconds), slow down to every 2 seconds
+            if checkCount >= 10 {
+                timer.invalidate()
+                self.photoCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                    Task {
+                        await self.vm.checkForLatestScreenshot()
+                    }
+                    self.checkForSharedImages()
+                }
+            } else {
+                Task {
+                    await self.vm.checkForLatestScreenshot()
+                }
             }
         }
     }
@@ -444,37 +471,31 @@ struct HomeView: View {
         
         // Check if we should process a shared image
         if let fileName = sharedDefaults.string(forKey: "pendingSharedImage") {
-            // Check timestamp to ensure it's recent (within last 60 seconds)
-            let timestamp = sharedDefaults.double(forKey: "sharedImageTimestamp")
-            let timeDiff = Date().timeIntervalSince1970 - timestamp
-            
-            if timeDiff < 60 {
-                // Load and process the shared image
-                if let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") {
-                    let imagesDirectory = sharedContainerURL.appendingPathComponent("SharedImages")
-                    let fileURL = imagesDirectory.appendingPathComponent(fileName)
+            // Load and process the shared image (no time restriction)
+            if let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") {
+                let imagesDirectory = sharedContainerURL.appendingPathComponent("SharedImages")
+                let fileURL = imagesDirectory.appendingPathComponent(fileName)
+                
+                if let imageData = try? Data(contentsOf: fileURL),
+                   let image = UIImage(data: imageData) {
+                    // Clear the pending image flag
+                    sharedDefaults.removeObject(forKey: "pendingSharedImage")
+                    sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
+                    sharedDefaults.synchronize()
                     
-                    if let imageData = try? Data(contentsOf: fileURL),
-                       let image = UIImage(data: imageData) {
-                        // Clear the pending image flag
-                        sharedDefaults.removeObject(forKey: "pendingSharedImage")
-                        sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
-                        sharedDefaults.synchronize()
-                        
-                        // Process the image in background without opening
-                        Task {
-                            await vm.processSharedImage(image)
-                        }
-                        
-                        // Clean up the file
-                        try? FileManager.default.removeItem(at: fileURL)
+                    // Process the image in background without opening
+                    Task {
+                        await vm.processSharedImage(image)
                     }
+                    
+                    // Clean up the file
+                    try? FileManager.default.removeItem(at: fileURL)
+                } else {
+                    // If file doesn't exist, clear the pending flag
+                    sharedDefaults.removeObject(forKey: "pendingSharedImage")
+                    sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
+                    sharedDefaults.synchronize()
                 }
-            } else {
-                // Clear old pending image
-                sharedDefaults.removeObject(forKey: "pendingSharedImage")
-                sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
-                sharedDefaults.synchronize()
             }
         }
     }

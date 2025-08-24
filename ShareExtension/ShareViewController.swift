@@ -86,11 +86,11 @@ class ShareViewController: UIViewController {
                     }
                     
                     if let image = image {
-                        // Save the image and dismiss
+                        // Save the image first
                         self?.saveImageToSharedContainer(image)
                         
-                        // Auto-dismiss after 1 second
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        // Auto-dismiss after 0.3 seconds (very fast)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
                         }
                     } else {
@@ -122,11 +122,11 @@ class ShareViewController: UIViewController {
             NSLog("ShareExtension: Error creating directory: \(error)")
         }
         
-        // Save image with timestamp
+        // Save image with timestamp - use lower compression for faster saving
         let fileName = "shared_\(Date().timeIntervalSince1970).jpg"
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
         
-        if let imageData = image.jpegData(compressionQuality: 0.9) {
+        if let imageData = image.jpegData(compressionQuality: 0.7) {
             do {
                 try imageData.write(to: fileURL)
                 NSLog("ShareExtension: Successfully saved image to: \(fileURL.path)")

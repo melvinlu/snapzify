@@ -11,6 +11,7 @@ class HomeViewModel: ObservableObject {
     @Published var shouldSuggestLatest = false
     @Published var latestInfo: LatestScreenshotInfo?
     @Published var isProcessing = false
+    @Published var isProcessingSharedImage = false
     @Published var isLoading = true
     @Published var showPhotoPicker = false
     @Published var errorMessage: String?
@@ -69,8 +70,7 @@ class HomeViewModel: ObservableObject {
     }
     
     func refreshDocuments() async {
-        // Force refresh documents (for when we actually need to reload)
-        isLoading = true
+        // Force refresh documents WITHOUT showing loading state
         do {
             documents = try await store.fetchAll()
             savedDocuments = try await store.fetchSaved()
@@ -78,7 +78,6 @@ class HomeViewModel: ObservableObject {
         } catch {
             print("Failed to load documents: \(error)")
         }
-        isLoading = false
     }
     
     func refreshSavedDocuments() async {
@@ -129,7 +128,7 @@ class HomeViewModel: ObservableObject {
         
         Task {
             isProcessing = true
-            defer { isProcessing = false }
+            // Note: isProcessing is cleared in processImage after document is created
             
             do {
                 let image = try await loadImage(from: info.asset)
@@ -151,6 +150,7 @@ class HomeViewModel: ObservableObject {
             } catch {
                 print("Failed to snapzify screenshot: \(error)")
                 await MainActor.run {
+                    isProcessing = false  // Clear on error
                     if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
                     } else if let processingError = error as? ProcessingError {
@@ -189,6 +189,7 @@ class HomeViewModel: ObservableObject {
             } catch {
                 logger.error("Failed to snapzify pasted image: \(error.localizedDescription)")
                 await MainActor.run {
+                    isProcessing = false  // Clear on error
                     if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
                     } else if let processingError = error as? ProcessingError {
@@ -213,13 +214,7 @@ class HomeViewModel: ObservableObject {
                 isProcessing = true
                 errorMessage = nil
             }
-            
-            defer {
-                Task { @MainActor in
-                    logger.debug("Snapzifying completed, updating UI")
-                    isProcessing = false
-                }
-            }
+            // Note: isProcessing is cleared in processImage after document is created
             
             do {
                 logger.info("Starting image snapzifying")
@@ -240,6 +235,7 @@ class HomeViewModel: ObservableObject {
             } catch {
                 logger.error("Failed to snapzify picked image: \(error.localizedDescription)")
                 await MainActor.run {
+                    isProcessing = false  // Clear on error
                     if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
                     } else if let processingError = error as? ProcessingError {
@@ -255,22 +251,29 @@ class HomeViewModel: ObservableObject {
     }
     
     func processSharedImage(_ image: UIImage) async {
-        // Process shared image in background without navigation
-        do {
-            logger.info("Processing shared image from extension")
-            
-            let script = ChineseScript(rawValue: selectedScript) ?? .simplified
-            
-            // Process the image using the same logic but without navigation
-            _ = try await processImageWithoutNavigation(image, source: .shareExtension, script: script)
-            
-            logger.info("Shared image processed successfully")
-            
-            // Refresh documents list to show the new one
-            await refreshDocuments()
-        } catch {
-            logger.error("Failed to process shared image: \(error.localizedDescription)")
-        }
+        // Process shared image with high priority
+        await Task(priority: .high) {
+            do {
+                await MainActor.run {
+                    logger.info("Processing shared image from extension")
+                    isProcessingSharedImage = true
+                }
+                
+                let script = ChineseScript(rawValue: selectedScript) ?? .simplified
+                
+                // Process the image - isProcessingSharedImage is cleared inside processImageWithoutNavigation
+                _ = try await processImageWithoutNavigation(image, source: .shareExtension, script: script)
+                
+                await MainActor.run {
+                    logger.info("Shared image processed successfully")
+                }
+            } catch {
+                await MainActor.run {
+                    logger.error("Failed to process shared image: \(error.localizedDescription)")
+                    isProcessingSharedImage = false
+                }
+            }
+        }.value
     }
     
     private func processImageWithoutNavigation(_ image: UIImage, source: DocumentSource, script: ChineseScript) async throws -> Document {
@@ -350,6 +353,16 @@ class HomeViewModel: ObservableObject {
         // Save document without navigation
         try await store.save(document)
         let savedDocument = document
+        
+        // IMMEDIATELY refresh documents to show in recents
+        await refreshDocuments()
+        
+        // Clear processing flag for shared images since document is now visible
+        if source == .shareExtension {
+            await MainActor.run {
+                isProcessingSharedImage = false
+            }
+        }
         
         // Second pass: stream process Chinese lines with concurrent requests
         if !chineseLinesToProcess.isEmpty {
@@ -548,9 +561,11 @@ class HomeViewModel: ObservableObject {
         try await store.save(document)
         let savedDocument = document
         
-        // Navigate to document view
+        // Navigate to document view and clear processing flag
         await MainActor.run {
             self.onOpenDocument(savedDocument)
+            // Clear processing flag since document is now created and visible
+            self.isProcessing = false
         }
         
         // Second pass: stream process Chinese lines with concurrent requests
