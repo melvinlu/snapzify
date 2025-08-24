@@ -2,6 +2,15 @@ import Foundation
 import UIKit
 import os.log
 
+// Helper structures for better OCR token handling
+struct OCRToken {
+    let text: String
+    let minX: CGFloat
+    let maxX: CGFloat
+    let minY: CGFloat
+    let maxY: CGFloat
+}
+
 class OCRServiceImpl: OCRService {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "OCR")
     private let googleCloudVisionURL = "https://vision.googleapis.com/v1/images:annotate"
@@ -98,99 +107,155 @@ class OCRServiceImpl: OCRService {
                     for block in blocks {
                         if let paragraphs = block["paragraphs"] as? [[String: Any]] {
                             for paragraph in paragraphs {
-                                var currentLineText = ""
-                                var lineTexts: [String] = []
                                 var paragraphBbox: CGRect?
-                                var currentLineMinY: Int?
-                                var currentLineMaxY: Int?
                                 
-                                // Get bounding box for paragraph first
+                                // Get bounding box for paragraph
                                 if let boundingBox = paragraph["boundingBox"] as? [String: Any],
-                                   let vertices = boundingBox["vertices"] as? [[String: Any]],
-                                   vertices.count >= 4 {
-                                    
-                                    let minX = vertices.compactMap { ($0["x"] as? Int) ?? 0 }.min() ?? 0
-                                    let minY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.min() ?? 0
-                                    let maxX = vertices.compactMap { ($0["x"] as? Int) ?? 0 }.max() ?? 0
-                                    let maxY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.max() ?? 0
-                                    
+                                   let bbox = bboxFrom(boundingBox) {
                                     paragraphBbox = CGRect(
-                                        x: Double(minX),
-                                        y: Double(minY),
-                                        width: Double(maxX - minX),
-                                        height: Double(maxY - minY)
+                                        x: bbox.minX,
+                                        y: bbox.minY,
+                                        width: bbox.maxX - bbox.minX,
+                                        height: bbox.maxY - bbox.minY
                                     )
                                 }
                                 
+                                // Collect tokens from this paragraph
+                                var tokens: [OCRToken] = []
+                                
                                 if let words = paragraph["words"] as? [[String: Any]] {
                                     for word in words {
-                                        // Get word bounding box to track vertical position
-                                        var wordMinY: Int?
-                                        var wordMaxY: Int?
-                                        if let wordBbox = word["boundingBox"] as? [String: Any],
-                                           let vertices = wordBbox["vertices"] as? [[String: Any]],
-                                           vertices.count >= 4 {
-                                            wordMinY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.min()
-                                            wordMaxY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.max()
-                                        }
+                                        guard let wordBox = word["boundingBox"] as? [String: Any],
+                                              let bb = bboxFrom(wordBox) else { continue }
                                         
-                                        // Check if this word is on a new line (significant Y position change)
-                                        if let currentY = currentLineMinY,
-                                           let wordY = wordMinY,
-                                           abs(wordY - currentY) > 10 {  // Threshold for detecting new line
-                                            // Save current line
-                                            let trimmedLine = currentLineText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                            if !trimmedLine.isEmpty {
-                                                lineTexts.append(trimmedLine)
-                                            }
-                                            currentLineText = ""
-                                            currentLineMinY = wordMinY
-                                            currentLineMaxY = wordMaxY
-                                        } else if currentLineMinY == nil {
-                                            currentLineMinY = wordMinY
-                                            currentLineMaxY = wordMaxY
-                                        }
-                                        
+                                        var buffer = ""
                                         if let symbols = word["symbols"] as? [[String: Any]] {
-                                            for symbol in symbols {
-                                                if let text = symbol["text"] as? String {
-                                                    currentLineText += text
+                                            for sym in symbols {
+                                                if let t = sym["text"] as? String { 
+                                                    buffer += t 
                                                 }
-                                                // Check for breaks after symbol
-                                                if let property = symbol["property"] as? [String: Any],
-                                                   let detectedBreak = property["detectedBreak"] as? [String: Any],
-                                                   let breakType = detectedBreak["type"] as? String {
-                                                    if breakType == "SPACE" || breakType == "EOL_SURE_SPACE" {
-                                                        currentLineText += " "
-                                                    } else if breakType == "LINE_BREAK" || breakType == "EOL_SURE_BREAK" {
-                                                        // Explicit line break detected
-                                                        let trimmedLine = currentLineText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                                        if !trimmedLine.isEmpty {
-                                                            lineTexts.append(trimmedLine)
-                                                        }
-                                                        currentLineText = ""
-                                                        currentLineMinY = nil
-                                                        currentLineMaxY = nil
+                                                // Check symbol-level breaks
+                                                if let prop = sym["property"] as? [String: Any],
+                                                   let db = prop["detectedBreak"] as? [String: Any],
+                                                   let type = db["type"] as? String {
+                                                    if type == "SPACE" || type == "EOL_SURE_SPACE" { 
+                                                        buffer += " " 
+                                                    }
+                                                    if type == "LINE_BREAK" || type == "EOL_SURE_BREAK" { 
+                                                        buffer += "\n" 
                                                     }
                                                 }
                                             }
                                         }
+                                        
+                                        // Also check word-level breaks
+                                        if let prop = word["property"] as? [String: Any],
+                                           let db = prop["detectedBreak"] as? [String: Any],
+                                           let type = db["type"] as? String {
+                                            if type == "SPACE" || type == "EOL_SURE_SPACE" { 
+                                                buffer += " " 
+                                            }
+                                            if type == "LINE_BREAK" || type == "EOL_SURE_BREAK" { 
+                                                buffer += "\n" 
+                                            }
+                                        }
+                                        
+                                        if !buffer.isEmpty {
+                                            tokens.append(OCRToken(
+                                                text: buffer,
+                                                minX: bb.minX,
+                                                maxX: bb.maxX,
+                                                minY: bb.minY,
+                                                maxY: bb.maxY
+                                            ))
+                                        }
                                     }
                                 }
                                 
-                                // Add remaining text as final line
-                                let trimmedLine = currentLineText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                if !trimmedLine.isEmpty {
-                                    lineTexts.append(trimmedLine)
+                                // Group tokens into lines by Y overlap
+                                tokens.sort { ($0.minY + $0.maxY)/2 < ($1.minY + $1.maxY)/2 }
+                                
+                                var linesTokens: [[OCRToken]] = []
+                                for tok in tokens {
+                                    if var lastLine = linesTokens.last {
+                                        // Compare vertical overlap with last line's vertical span
+                                        let lMinY = lastLine.map(\.minY).min()!
+                                        let lMaxY = lastLine.map(\.maxY).max()!
+                                        let ov = overlapRatio(lMinY, lMaxY, tok.minY, tok.maxY)
+                                        if ov >= 0.35 { // Same line if 35% vertical overlap
+                                            lastLine.append(tok)
+                                            linesTokens[linesTokens.count - 1] = lastLine
+                                        } else {
+                                            linesTokens.append([tok])
+                                        }
+                                    } else {
+                                        linesTokens.append([tok])
+                                    }
                                 }
                                 
-                                // Add each line as a separate OCRLine
-                                for lineText in lineTexts {
-                                    ocrLines.append(OCRLine(
-                                        text: lineText,
-                                        bbox: paragraphBbox ?? CGRect(x: 0, y: 0, width: image.size.width, height: 50),
-                                        words: []
-                                    ))
+                                // Process each line: sort by X and split by gaps/punctuation
+                                let gapMultiplier: CGFloat = 1.5 // Threshold for "digital space"
+                                
+                                for line in linesTokens {
+                                    let sorted = line.sorted { $0.minX < $1.minX }
+                                    
+                                    // Estimate average character width on this line
+                                    let avgWidth: CGFloat = {
+                                        let widths = sorted.map { $0.maxX - $0.minX }
+                                        return max(1, widths.reduce(0, +) / CGFloat(max(1, widths.count)))
+                                    }()
+                                    
+                                    var segment = ""
+                                    var prev: OCRToken? = nil
+                                    
+                                    func flush() {
+                                        let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        if !trimmed.isEmpty {
+                                            ocrLines.append(OCRLine(
+                                                text: trimmed,
+                                                bbox: paragraphBbox ?? CGRect(x: 0, y: 0, width: image.size.width, height: 50),
+                                                words: []
+                                            ))
+                                        }
+                                        segment = ""
+                                    }
+                                    
+                                    for t in sorted {
+                                        // Check for explicit newlines or Chinese punctuation
+                                        if t.text.contains("\n") || t.text.contains("\u{3000}") {
+                                            segment += t.text.replacingOccurrences(of: "\n", with: "")
+                                                            .replacingOccurrences(of: "\u{3000}", with: " ")
+                                            flush()
+                                            prev = nil
+                                            continue
+                                        }
+                                        
+                                        // Check for Chinese sentence-ending punctuation
+                                        if containsChineseSentenceEnding(t.text) {
+                                            segment += t.text
+                                            flush()
+                                            prev = nil
+                                            continue
+                                        }
+                                        
+                                        // Check for gap-based splitting
+                                        if let p = prev {
+                                            let gap = t.minX - p.maxX
+                                            if gap > gapMultiplier * avgWidth {
+                                                // Big digital gap => new segment
+                                                flush()
+                                            } else if gap > 0.25 * avgWidth {
+                                                // Mild spacing => insert a space (helps CJK + Latin mixes)
+                                                segment += " "
+                                            }
+                                        }
+                                        
+                                        segment += t.text
+                                        prev = t
+                                    }
+                                    
+                                    // Flush any remaining segment
+                                    flush()
                                 }
                             }
                         }
@@ -235,6 +300,46 @@ class OCRServiceImpl: OCRService {
         }
         
         return ocrLines
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func bboxFrom(_ box: [String: Any]) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? {
+        // Prefer normalizedVertices if present (0..1 coordinates)
+        if let norm = box["normalizedVertices"] as? [[String: Any]], norm.count >= 4 {
+            let xs = norm.compactMap { ($0["x"] as? NSNumber)?.doubleValue }.map { CGFloat($0) }
+            let ys = norm.compactMap { ($0["y"] as? NSNumber)?.doubleValue }.map { CGFloat($0) }
+            guard !xs.isEmpty, !ys.isEmpty else { return nil }
+            // Scale normalized coords to image size if needed
+            return (xs.min()! * 1000, xs.max()! * 1000, ys.min()! * 1000, ys.max()! * 1000)
+        }
+        
+        // Fall back to regular vertices
+        if let verts = box["vertices"] as? [[String: Any]], verts.count >= 4 {
+            // Don't coerce nil to 0 - that ruins gap calculations
+            let xs = verts.compactMap { $0["x"] as? NSNumber }.map { CGFloat(truncating: $0) }
+            let ys = verts.compactMap { $0["y"] as? NSNumber }.map { CGFloat(truncating: $0) }
+            guard xs.count == verts.count, ys.count == verts.count else { return nil }
+            return (xs.min()!, xs.max()!, ys.min()!, ys.max()!)
+        }
+        return nil
+    }
+    
+    private func overlapRatio(_ aMin: CGFloat, _ aMax: CGFloat, _ bMin: CGFloat, _ bMax: CGFloat) -> CGFloat {
+        let inter = max(0, min(aMax, bMax) - max(aMin, bMin))
+        let denom = max(aMax - aMin, bMax - bMin)
+        return denom > 0 ? inter / denom : 0
+    }
+    
+    private func containsChineseSentenceEnding(_ text: String) -> Bool {
+        // Common Chinese sentence endings
+        let punctuation = "。！？；：…—】）」》〉〕〗】"
+        for char in text {
+            if punctuation.contains(char) {
+                return true
+            }
+        }
+        return false
     }
     
     private func containsChinese(_ text: String) -> Bool {
