@@ -2,6 +2,10 @@ import Foundation
 import SwiftUI
 import AVFoundation
 
+extension Notification.Name {
+    static let documentSavedStatusChanged = Notification.Name("documentSavedStatusChanged")
+}
+
 @MainActor
 class DocumentViewModel: ObservableObject {
     @Published var document: Document
@@ -144,6 +148,11 @@ class DocumentViewModel: ObservableObject {
     
     func toggleImageSave() {
         document.isSaved.toggle()
+        
+        // Post notification IMMEDIATELY for instant UI update
+        NotificationCenter.default.post(name: .documentSavedStatusChanged, object: document)
+        
+        // Then update the database in background
         Task {
             try? await store.update(document)
         }

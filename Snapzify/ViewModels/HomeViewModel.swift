@@ -90,6 +90,32 @@ class HomeViewModel: ObservableObject {
         }
     }
     
+    func updateDocumentSavedStatus(_ updatedDocument: Document) {
+        // Instantly update the local arrays without waiting for database
+        
+        // Update in documents array
+        if let index = documents.firstIndex(where: { $0.id == updatedDocument.id }) {
+            documents[index] = updatedDocument
+        }
+        
+        // Update saved documents array
+        if updatedDocument.isSaved {
+            // Add to saved if not already there
+            if !savedDocuments.contains(where: { $0.id == updatedDocument.id }) {
+                savedDocuments.append(updatedDocument)
+                savedDocuments.sort { $0.createdAt > $1.createdAt }
+            } else {
+                // Update existing
+                if let index = savedDocuments.firstIndex(where: { $0.id == updatedDocument.id }) {
+                    savedDocuments[index] = updatedDocument
+                }
+            }
+        } else {
+            // Remove from saved
+            savedDocuments.removeAll { $0.id == updatedDocument.id }
+        }
+    }
+    
     func checkForLatestScreenshot() async {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]

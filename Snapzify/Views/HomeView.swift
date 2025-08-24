@@ -117,6 +117,12 @@ struct HomeView: View {
                 await vm.refreshSavedDocuments()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .documentSavedStatusChanged)) { notification in
+            // Update saved documents immediately when pin status changes
+            if let document = notification.object as? Document {
+                vm.updateDocumentSavedStatus(document)
+            }
+        }
         .onDisappear {
             // Stop polling when view disappears
             stopPhotoPolling()
