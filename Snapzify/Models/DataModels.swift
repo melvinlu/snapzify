@@ -65,8 +65,9 @@ struct Document: Identifiable, Codable, Hashable {
     var sentences: [Sentence]
     var imageData: Data?
     var isSaved: Bool
+    var assetIdentifier: String?  // PHAsset localIdentifier for photo library deletion
     
-    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, script: ChineseScript = .simplified, sentences: [Sentence] = [], imageData: Data? = nil, isSaved: Bool = false) {
+    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, script: ChineseScript = .simplified, sentences: [Sentence] = [], imageData: Data? = nil, isSaved: Bool = false, assetIdentifier: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.source = source
@@ -74,6 +75,7 @@ struct Document: Identifiable, Codable, Hashable {
         self.sentences = sentences
         self.imageData = imageData
         self.isSaved = isSaved
+        self.assetIdentifier = assetIdentifier
     }
 }
 

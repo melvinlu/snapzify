@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import AVFoundation
+import Photos
 
 extension Notification.Name {
     static let documentSavedStatusChanged = Notification.Name("documentSavedStatusChanged")
@@ -223,6 +224,11 @@ class DocumentViewModel: ObservableObject {
     
     func deleteImage() {
         Task {
+            // First, try to delete from photo library if we have an asset identifier
+            if let assetIdentifier = document.assetIdentifier {
+                await deleteFromPhotoLibrary(assetIdentifier: assetIdentifier)
+            }
+            
             // Delete the entire document from storage
             try? await store.delete(id: document.id)
             
@@ -232,6 +238,48 @@ class DocumentViewModel: ObservableObject {
                     self.shouldDismiss = true
                 }
             }
+        }
+    }
+    
+    private func deleteFromPhotoLibrary(assetIdentifier: String) async {
+        // Check photo library authorization status
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        
+        switch status {
+        case .notDetermined:
+            // Request permission
+            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            if newStatus == .authorized || newStatus == .limited {
+                await performPhotoDelete(assetIdentifier: assetIdentifier)
+            }
+        case .authorized, .limited:
+            // We have permission, proceed with deletion
+            await performPhotoDelete(assetIdentifier: assetIdentifier)
+        case .denied, .restricted:
+            // Can't delete without permission
+            print("Photo library permission denied, cannot delete photo from device")
+        @unknown default:
+            print("Unknown authorization status")
+        }
+    }
+    
+    private func performPhotoDelete(assetIdentifier: String) async {
+        // Fetch the asset
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil)
+        
+        guard let asset = fetchResult.firstObject else {
+            print("Asset not found in photo library: \(assetIdentifier)")
+            return
+        }
+        
+        // Delete the asset
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.deleteAssets([asset] as NSFastEnumeration)
+            }
+            print("Successfully deleted photo from device library")
+        } catch {
+            print("Failed to delete photo from library: \(error)")
         }
     }
     

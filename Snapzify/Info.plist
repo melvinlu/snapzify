@@ -26,7 +26,7 @@
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Snapzify needs access to your photo library to import screenshots for text recognition.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Snapzify needs permission to save processed images to your photo library.</string>
+    <string>Snapzify needs permission to save and delete images in your photo library.</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

@@ -37,7 +37,7 @@ struct DocumentView: View {
                 vm.deleteImage()
             }
         } message: {
-            Text("This will delete the entire document and remove it from your recents. This action cannot be undone.")
+            Text("This will delete the document from Snapzify AND permanently delete the original photo from your device's photo library. This action cannot be undone.")
         }
         .task {
             await vm.translateAllPending()
@@ -155,7 +155,8 @@ struct DocumentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             
-            if vm.document.imageData != nil {
+            // Only show delete button if we have an asset identifier (photo from "Most Recent")
+            if vm.document.assetIdentifier != nil {
                 Button {
                     vm.showDeleteImageAlert = true
                 } label: {

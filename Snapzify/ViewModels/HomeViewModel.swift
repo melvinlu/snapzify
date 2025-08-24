@@ -160,19 +160,14 @@ class HomeViewModel: ObservableObject {
                 let image = try await loadImage(from: info.asset)
                 
                 // Add 60-second timeout to image processing
-                let document = try await withTimeout(seconds: 60) {
-                    try await self.processImage(image, source: .photos)
+                _ = try await withTimeout(seconds: 60) {
+                    try await self.processImage(image, source: .photos, assetIdentifier: info.asset.localIdentifier)
                 }
                 
-                try await store.save(document)
+                // Document is already saved in processImage
                 shouldSuggestLatest = false
                 
-                // Navigate directly to the document view
-                onOpenDocument(document)
-                
-                // Update documents list after navigation
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
-                await refreshDocuments()
+                // No need to refresh - document is already added to the list in processImage
             } catch {
                 print("Failed to snapzify screenshot: \(error)")
                 await MainActor.run {
@@ -200,18 +195,12 @@ class HomeViewModel: ObservableObject {
             
             do {
                 // Add 60-second timeout to image processing
-                let document = try await withTimeout(seconds: 60) {
+                _ = try await withTimeout(seconds: 60) {
                     try await self.processImage(image, source: .imported)
                 }
                 
-                try await store.save(document)
-                
-                // Navigate directly to the document view
-                onOpenDocument(document)
-                
-                // Update documents list after navigation
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
-                await refreshDocuments()
+                // Document is already saved and navigation happens inside processImage
+                // Document is also already added to the list in processImage
             } catch {
                 logger.error("Failed to snapzify pasted image: \(error.localizedDescription)")
                 await MainActor.run {
@@ -247,16 +236,13 @@ class HomeViewModel: ObservableObject {
                 logger.debug("Calling OCR service")
                 
                 // Add 60-second timeout to image processing
-                let document = try await withTimeout(seconds: 60) {
+                _ = try await withTimeout(seconds: 60) {
                     try await self.processImage(image, source: .imported)
                 }
                 
                 // Document is already saved and navigation happens inside processImage
-                // No need to save again here
+                // Document is also already added to the list in processImage
                 logger.info("Snapzifying completed, updating UI")
-                
-                // Update documents list after navigation
-                await refreshDocuments()
                 logger.debug("Documents reloaded")
             } catch {
                 logger.error("Failed to snapzify picked image: \(error.localizedDescription)")
@@ -302,7 +288,7 @@ class HomeViewModel: ObservableObject {
         }.value
     }
     
-    private func processImageWithoutNavigation(_ image: UIImage, source: DocumentSource, script: ChineseScript) async throws -> Document {
+    private func processImageWithoutNavigation(_ image: UIImage, source: DocumentSource, script: ChineseScript, assetIdentifier: String? = nil) async throws -> Document {
         logger.info("About to call OCR service")
         let ocrLines = try await ocrService.recognizeText(in: image)
         logger.info("OCR completed, got \(ocrLines.count) lines")
@@ -373,15 +359,18 @@ class HomeViewModel: ObservableObject {
             source: source,
             script: script,
             sentences: sentences,
-            imageData: image.pngData()
+            imageData: image.pngData(),
+            assetIdentifier: assetIdentifier
         )
         
         // Save document without navigation
         try await store.save(document)
         let savedDocument = document
         
-        // IMMEDIATELY refresh documents to show in recents
-        await refreshDocuments()
+        // IMMEDIATELY add to documents list to show in recents
+        await MainActor.run {
+            self.documents.insert(savedDocument, at: 0)
+        }
         
         // Clear processing flag for shared images since document is now visible
         if source == .shareExtension {
@@ -507,7 +496,7 @@ class HomeViewModel: ObservableObject {
         return false
     }
     
-    private func processImage(_ image: UIImage, source: DocumentSource) async throws -> Document {
+    private func processImage(_ image: UIImage, source: DocumentSource, assetIdentifier: String? = nil) async throws -> Document {
         let script = ChineseScript(rawValue: selectedScript) ?? .simplified
         
         logger.info("About to call OCR service")
@@ -580,7 +569,8 @@ class HomeViewModel: ObservableObject {
             source: source,
             script: script,
             sentences: sentences,
-            imageData: image.pngData()
+            imageData: image.pngData(),
+            assetIdentifier: assetIdentifier
         )
         
         // Save document and navigate to it immediately after OCR
@@ -589,6 +579,9 @@ class HomeViewModel: ObservableObject {
         
         // Navigate to document view and clear processing flag
         await MainActor.run {
+            // Add the document to the local documents array immediately
+            self.documents.insert(savedDocument, at: 0)
+            
             self.onOpenDocument(savedDocument)
             // Clear processing flag since document is now created and visible
             self.isProcessing = false
