@@ -6,6 +6,7 @@ struct HomeView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastRefreshTime = Date()
+    @State private var photoCheckTimer: Timer?
     
     var body: some View {
         RootBackground {
@@ -47,6 +48,11 @@ struct HomeView: View {
                     .padding(.vertical, 24)
                 }
                 .scrollIndicators(.hidden)
+                .refreshable {
+                    // Manual refresh - check for latest photo immediately
+                    await vm.checkForLatestScreenshot()
+                    await vm.refreshSavedDocuments()
+                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -98,6 +104,9 @@ struct HomeView: View {
             await vm.loadDocuments()
         }
         .onAppear {
+            // Start polling for new photos every 2 seconds
+            startPhotoPolling()
+            
             // Refresh saved documents when view appears
             // Add a small delay to ensure navigation has completed
             Task {
@@ -105,16 +114,27 @@ struct HomeView: View {
                 await vm.refreshSavedDocuments()
             }
         }
+        .onDisappear {
+            // Stop polling when view disappears
+            stopPhotoPolling()
+        }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
+                // Resume polling when app becomes active
+                startPhotoPolling()
+                
                 // Refresh when scene becomes active
                 let now = Date()
                 if now.timeIntervalSince(lastRefreshTime) > 0.5 {
                     Task {
                         await vm.refreshSavedDocuments()
+                        await vm.checkForLatestScreenshot()
                     }
                     lastRefreshTime = now
                 }
+            } else if phase == .background {
+                // Stop polling when app goes to background
+                stopPhotoPolling()
             }
         }
     }
@@ -327,6 +347,28 @@ struct HomeView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, h:mm a"
         return "Screenshot • \(formatter.string(from: doc.createdAt))"
+    }
+    
+    private func startPhotoPolling() {
+        // Stop any existing timer first
+        stopPhotoPolling()
+        
+        // Check immediately
+        Task {
+            await vm.checkForLatestScreenshot()
+        }
+        
+        // Then check every 2 seconds
+        photoCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task {
+                await vm.checkForLatestScreenshot()
+            }
+        }
+    }
+    
+    private func stopPhotoPolling() {
+        photoCheckTimer?.invalidate()
+        photoCheckTimer = nil
     }
 }
 
