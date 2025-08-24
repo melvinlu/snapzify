@@ -87,9 +87,8 @@ struct Sentence: Identifiable, Codable, Hashable {
     var plecoURL: URL
     var audioAsset: AudioAsset?
     var status: SentenceStatus
-    var isSaved: Bool
     
-    init(id: UUID = UUID(), text: String, rangeInImage: CGRect? = nil, tokens: [Token] = [], pinyin: [String] = [], english: String? = nil, plecoURL: URL? = nil, audioAsset: AudioAsset? = nil, status: SentenceStatus = .pending, isSaved: Bool = false) {
+    init(id: UUID = UUID(), text: String, rangeInImage: CGRect? = nil, tokens: [Token] = [], pinyin: [String] = [], english: String? = nil, plecoURL: URL? = nil, audioAsset: AudioAsset? = nil, status: SentenceStatus = .pending) {
         self.id = id
         self.text = text
         self.rangeInImage = rangeInImage
@@ -99,7 +98,6 @@ struct Sentence: Identifiable, Codable, Hashable {
         self.plecoURL = plecoURL ?? URL(string: "plecoapi://x-callback-url/s?q=\(text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
         self.audioAsset = audioAsset
         self.status = status
-        self.isSaved = isSaved
     }
 }
 

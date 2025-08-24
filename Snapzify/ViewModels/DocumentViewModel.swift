@@ -211,15 +211,6 @@ class DocumentViewModel: ObservableObject {
         expandedSentenceIds.count == document.sentences.count
     }
     
-    func toggleSentenceSave(sentenceId: UUID) {
-        guard let index = document.sentences.firstIndex(where: { $0.id == sentenceId }) else {
-            return
-        }
-        document.sentences[index].isSaved.toggle()
-        Task {
-            try? await store.update(document)
-        }
-    }
     
     func deleteImage() {
         Task {

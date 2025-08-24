@@ -60,5 +60,4 @@ protocol DocumentStore {
     func deleteAll() async throws
     func update(_ document: Document) async throws
     func fetchSaved() async throws -> [Document]
-    func fetchSavedSentences() async throws -> [Sentence]
 }

@@ -132,7 +132,7 @@ struct HomeView: View {
             }
             .padding(.horizontal, T.S.xs)
             
-            let hasAnyContent = !vm.savedDocuments.isEmpty || !vm.savedSentences.isEmpty
+            let hasAnyContent = !vm.savedDocuments.isEmpty
             
             if !hasAnyContent {
                 HStack {
@@ -149,43 +149,17 @@ struct HomeView: View {
                     ForEach(vm.savedDocuments) { doc in
                         documentRow(doc, showPinIcon: false)
                         
-                        let isLast = doc.id == vm.savedDocuments.last?.id && vm.savedSentences.isEmpty
+                        let isLast = doc.id == vm.savedDocuments.last?.id
                         if !isLast {
                             Divider()
                                 .background(T.C.divider.opacity(0.6))
                                 .padding(.leading, 78)
                         }
                     }
-                    
-                    // Sentences after images
-                    ForEach(vm.savedSentences, id: \.id) { sentence in
-                        savedSentenceRow(sentence)
-                        
-                        if sentence.id != vm.savedSentences.last?.id {
-                            Divider()
-                                .background(T.C.divider.opacity(0.6))
-                                .padding(.leading, T.S.md)
-                        }
-                    }
                 }
                 .card()
             }
         }
-    }
-    
-    @ViewBuilder
-    private func savedSentenceRow(_ sentence: Sentence) -> some View {
-        ExpandableSentenceCard(
-            sentence: sentence, 
-            isExpanded: vm.expandedSentenceIds.contains(sentence.id),
-            onToggleExpanded: { expanded in
-                if expanded {
-                    vm.expandedSentenceIds.insert(sentence.id)
-                } else {
-                    vm.expandedSentenceIds.remove(sentence.id)
-                }
-            }
-        )
     }
     
     @ViewBuilder
@@ -356,51 +330,3 @@ struct HomeView: View {
     }
 }
 
-struct ExpandableSentenceCard: View {
-    let sentence: Sentence
-    let isExpanded: Bool
-    let onToggleExpanded: (Bool) -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                Text(sentence.text)
-                    .foregroundStyle(T.C.ink)
-                    .font(.subheadline)
-                    .lineLimit(isExpanded ? nil : 1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .foregroundStyle(T.C.ink2)
-                    .font(.system(size: 12))
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
-            }
-            
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 4) {
-                    if !sentence.pinyin.isEmpty {
-                        Text(sentence.pinyin.joined(separator: " "))
-                            .foregroundStyle(T.C.accent)
-                            .font(.caption)
-                    }
-                    
-                    if let english = sentence.english {
-                        Text(english)
-                            .foregroundStyle(T.C.ink2)
-                            .font(.caption)
-                    }
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
-            }
-        }
-        .padding(.horizontal, T.S.md)
-        .padding(.vertical, T.S.md)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                onToggleExpanded(!isExpanded)
-            }
-        }
-    }
-}

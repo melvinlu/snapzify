@@ -8,14 +8,12 @@ class HomeViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "HomeViewModel")
     @Published var documents: [Document] = []
     @Published var savedDocuments: [Document] = []
-    @Published var savedSentences: [Sentence] = []
     @Published var shouldSuggestLatest = false
     @Published var latestInfo: LatestScreenshotInfo?
     @Published var isProcessing = false
     @Published var isLoading = true
     @Published var showPhotoPicker = false
     @Published var errorMessage: String?
-    @Published var expandedSentenceIds: Set<UUID> = []
     
     private var hasLoadedDocuments = false
     private let store: DocumentStore
@@ -62,7 +60,6 @@ class HomeViewModel: ObservableObject {
         do {
             documents = try await store.fetchAll()
             savedDocuments = try await store.fetchSaved()
-            savedSentences = try await store.fetchSavedSentences()
             await checkForLatestScreenshot()
             hasLoadedDocuments = true
         } catch {
@@ -77,7 +74,6 @@ class HomeViewModel: ObservableObject {
         do {
             documents = try await store.fetchAll()
             savedDocuments = try await store.fetchSaved()
-            savedSentences = try await store.fetchSavedSentences()
             await checkForLatestScreenshot()
         } catch {
             print("Failed to load documents: \(error)")
@@ -90,7 +86,6 @@ class HomeViewModel: ObservableObject {
         do {
             documents = try await store.fetchAll()
             savedDocuments = try await store.fetchSaved()
-            savedSentences = try await store.fetchSavedSentences()
         } catch {
             print("Failed to refresh saved documents: \(error)")
         }

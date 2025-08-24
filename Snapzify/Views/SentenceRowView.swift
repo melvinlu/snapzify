@@ -111,14 +111,6 @@ struct SentenceRowView: View {
                 }
                 .buttonStyle(ActionButtonStyle(isActive: vm.isPlaying))
             }
-            
-            Button {
-                vm.toggleSave()
-            } label: {
-                Image(systemName: vm.sentence.isSaved ? "pin.fill" : "pin")
-                    .font(.caption)
-            }
-            .buttonStyle(ActionButtonStyle(isActive: vm.sentence.isSaved))
         }
     }
 }

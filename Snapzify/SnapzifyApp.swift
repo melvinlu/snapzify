@@ -200,8 +200,7 @@ struct ContentView: View {
                         rangeInImage: bbox,
                         pinyin: pinyin,
                         english: nil,
-                        status: .ocrOnly,
-                        isSaved: false
+                        status: .ocrOnly
                     )
                     processedSentences.append(sentence)
                 }
@@ -388,14 +387,6 @@ class DocumentStoreImpl: DocumentStore {
     func fetchSaved() async throws -> [Document] {
         let all = try await fetchAll()
         return all.filter { $0.isSaved }
-    }
-    
-    func fetchSavedSentences() async throws -> [Sentence] {
-        let all = try await fetchAll()
-        let savedSentences = all.flatMap { document in
-            document.sentences.filter { $0.isSaved }
-        }
-        return savedSentences
     }
 }
 

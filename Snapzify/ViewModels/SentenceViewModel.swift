@@ -304,11 +304,6 @@ class SentenceViewModel: ObservableObject {
         onAudioStateChange?(sentence.id, false)
         print("AudioPlayback: Audio stopped and cleaned up")
     }
-    
-    func toggleSave() {
-        sentence.isSaved.toggle()
-        onUpdate(sentence)
-    }
 }
 
 private class AudioPlayerDelegate: NSObject, AVAudioPlayerDelegate {
