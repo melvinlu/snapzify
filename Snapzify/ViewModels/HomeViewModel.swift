@@ -20,10 +20,8 @@ class HomeViewModel: ObservableObject {
     private let store: DocumentStore
     private let ocrService: OCRService
     private let scriptConversionService: ScriptConversionService
-    private let segmentationService: SentenceSegmentationService
-    private let pinyinService: PinyinService
-    private let chineseProcessingService: ChineseProcessingService
-    private let streamingChineseProcessingService: StreamingChineseProcessingService
+    private let chineseProcessingService: ChineseProcessingService = ServiceContainer.shared.chineseProcessingService
+    private let streamingChineseProcessingService: StreamingChineseProcessingService = ServiceContainer.shared.streamingChineseProcessingService
     private let onOpenSettings: () -> Void
     private let onOpenDocument: (Document) -> Void
     @AppStorage("selectedScript") private var selectedScript: String = ChineseScript.simplified.rawValue
@@ -37,18 +35,12 @@ class HomeViewModel: ObservableObject {
         store: DocumentStore,
         ocrService: OCRService,
         scriptConversionService: ScriptConversionService,
-        segmentationService: SentenceSegmentationService,
-        pinyinService: PinyinService,
         onOpenSettings: @escaping () -> Void,
         onOpenDocument: @escaping (Document) -> Void
     ) {
         self.store = store
         self.ocrService = ocrService
         self.scriptConversionService = scriptConversionService
-        self.segmentationService = segmentationService
-        self.pinyinService = pinyinService
-        self.chineseProcessingService = ChineseProcessingService(configService: ConfigServiceImpl())
-        self.streamingChineseProcessingService = StreamingChineseProcessingService(configService: ConfigServiceImpl())
         self.onOpenSettings = onOpenSettings
         self.onOpenDocument = onOpenDocument
     }
@@ -289,160 +281,13 @@ class HomeViewModel: ObservableObject {
     }
     
     private func processImageWithoutNavigation(_ image: UIImage, source: DocumentSource, script: ChineseScript, assetIdentifier: String? = nil) async throws -> Document {
-        logger.info("About to call OCR service")
-        let ocrLines = try await ocrService.recognizeText(in: image)
-        logger.info("OCR completed, got \(ocrLines.count) lines")
-        
-        var sentences: [Sentence] = []
-        var chineseLinesToProcess: [String] = []
-        var chineseLineIndices: [Int] = []
-        
-        // First pass: collect all Chinese lines that need processing
-        for (_, line) in ocrLines.enumerated() {
-            // Check if line contains parsed data (chinese|pinyin|english format)
-            let components = line.text.components(separatedBy: "|")
-            
-            if components.count == 3 {
-                // This is parsed data - handle separately
-                let chinese = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                let pinyin = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
-                let english = components[2].trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                if containsChinese(chinese) {
-                    let normalizedChinese = script == .simplified ?
-                        scriptConversionService.toSimplified(chinese) :
-                        scriptConversionService.toTraditional(chinese)
-                    
-                    sentences.append(Sentence(
-                        text: normalizedChinese,
-                        rangeInImage: nil,
-                        tokens: [],
-                        pinyin: [pinyin],
-                        english: english,
-                        status: .translated
-                    ))
-                }
-            } else if containsChinese(line.text) {
-                // Collect Chinese lines for batch processing
-                let normalizedText = script == .simplified ?
-                    scriptConversionService.toSimplified(line.text) :
-                    scriptConversionService.toTraditional(line.text)
-                
-                chineseLinesToProcess.append(normalizedText)
-                chineseLineIndices.append(sentences.count)
-                
-                // Add placeholder sentence with "Generating..." status
-                sentences.append(Sentence(
-                    text: normalizedText,
-                    rangeInImage: nil,
-                    tokens: [],
-                    pinyin: [],
-                    english: "Generating...",
-                    status: .ocrOnly
-                ))
-            }
-        }
-        
-        // Check if we have any Chinese content
-        let hasChineseContent = !sentences.isEmpty
-        
-        // If no Chinese content found, throw an error
-        if !hasChineseContent {
-            logger.warning("No Chinese content detected, throwing error")
-            throw ProcessingError.noChineseDetected
-        }
-        
-        // Create document with initial sentences (including placeholders)
-        logger.info("Created document with \(sentences.count) sentences")
-        
-        let document = Document(
+        return try await processImageCore(
+            image,
             source: source,
             script: script,
-            sentences: sentences,
-            imageData: image.pngData(),
-            assetIdentifier: assetIdentifier
+            assetIdentifier: assetIdentifier,
+            shouldNavigate: false
         )
-        
-        // Save document without navigation
-        try await store.save(document)
-        let savedDocument = document
-        
-        // IMMEDIATELY add to documents list to show in recents
-        await MainActor.run {
-            self.documents.insert(savedDocument, at: 0)
-        }
-        
-        // Clear processing flag for shared images since document is now visible
-        if source == .shareExtension {
-            await MainActor.run {
-                isProcessingSharedImage = false
-            }
-        }
-        
-        // Second pass: stream process Chinese lines with concurrent requests
-        if !chineseLinesToProcess.isEmpty {
-            logger.info("Stream processing \(chineseLinesToProcess.count) Chinese lines")
-            
-            do {
-                // Store a reference to the document for updates
-                var documentToUpdate = savedDocument
-                
-                try await streamingChineseProcessingService.processStreamingBatch(
-                    chineseLinesToProcess,
-                    script: script
-                ) { [weak self] processed in
-                    guard let self = self else { return }
-                    
-                    // Update sentence as soon as it's processed
-                    let sentenceIndex = chineseLineIndices[processed.index]
-                    sentences[sentenceIndex] = Sentence(
-                        text: processed.chinese,
-                        rangeInImage: nil,
-                        tokens: [],
-                        pinyin: processed.pinyin,
-                        english: processed.english,
-                        status: .translated
-                    )
-                    
-                    // Update the document
-                    documentToUpdate.sentences = sentences
-                    
-                    // Update in store
-                    Task {
-                        try? await self.store.update(documentToUpdate)
-                    }
-                }
-            } catch {
-                logger.error("Stream processing failed: \(error.localizedDescription)")
-                // Fall back to regular batch processing
-                do {
-                    let processedBatch = try await chineseProcessingService.processBatch(chineseLinesToProcess, script: script)
-                    
-                    for (batchIndex, sentenceIndex) in chineseLineIndices.enumerated() {
-                        if batchIndex < processedBatch.count {
-                            let processed = processedBatch[batchIndex]
-                            sentences[sentenceIndex] = Sentence(
-                                text: processed.chinese,
-                                rangeInImage: nil,
-                                tokens: [],
-                                pinyin: processed.pinyin,
-                                english: processed.english,
-                                status: .translated
-                            )
-                        }
-                    }
-                    
-                    // Update document with final sentences
-                    var updatedDocument = savedDocument
-                    updatedDocument.sentences = sentences
-                    _ = try? await store.update(updatedDocument)
-                } catch {
-                    logger.error("Fallback batch processing also failed: \(error.localizedDescription)")
-                }
-            }
-        }
-        
-        return savedDocument
     }
     
     func open(_ document: Document) {
@@ -498,7 +343,22 @@ class HomeViewModel: ObservableObject {
     
     private func processImage(_ image: UIImage, source: DocumentSource, assetIdentifier: String? = nil) async throws -> Document {
         let script = ChineseScript(rawValue: selectedScript) ?? .simplified
-        
+        return try await processImageCore(
+            image,
+            source: source,
+            script: script,
+            assetIdentifier: assetIdentifier,
+            shouldNavigate: true
+        )
+    }
+    
+    private func processImageCore(
+        _ image: UIImage,
+        source: DocumentSource,
+        script: ChineseScript,
+        assetIdentifier: String? = nil,
+        shouldNavigate: Bool
+    ) async throws -> Document {
         logger.info("About to call OCR service")
         let ocrLines = try await ocrService.recognizeText(in: image)
         logger.info("OCR completed, got \(ocrLines.count) lines")
@@ -573,18 +433,23 @@ class HomeViewModel: ObservableObject {
             assetIdentifier: assetIdentifier
         )
         
-        // Save document and navigate to it immediately after OCR
+        // Save document
         try await store.save(document)
         let savedDocument = document
         
-        // Navigate to document view and clear processing flag
+        // Handle navigation and UI updates
         await MainActor.run {
             // Add the document to the local documents array immediately
             self.documents.insert(savedDocument, at: 0)
             
-            self.onOpenDocument(savedDocument)
-            // Clear processing flag since document is now created and visible
-            self.isProcessing = false
+            if shouldNavigate {
+                self.onOpenDocument(savedDocument)
+                // Clear processing flag since document is now created and visible
+                self.isProcessing = false
+            } else if source == .shareExtension {
+                // Clear processing flag for shared images since document is now visible
+                self.isProcessingSharedImage = false
+            }
         }
         
         // Second pass: stream process Chinese lines with concurrent requests
@@ -615,13 +480,19 @@ class HomeViewModel: ObservableObject {
                     // Update the document
                     documentToUpdate.sentences = sentences
                     
-                    // Defer the store update to avoid publishing changes within view updates
-                    Task.detached { @MainActor in
-                        do {
-                            try await self.store.update(documentToUpdate)
-                            self.logger.debug("Updated sentence \(processed.index + 1)/\(chineseLinesToProcess.count)")
-                        } catch {
-                            self.logger.error("Failed to update document: \(error)")
+                    // Update in store (use detached task only if navigating to avoid UI issues)
+                    if shouldNavigate {
+                        Task.detached { @MainActor in
+                            do {
+                                try await self.store.update(documentToUpdate)
+                                self.logger.debug("Updated sentence \(processed.index + 1)/\(chineseLinesToProcess.count)")
+                            } catch {
+                                self.logger.error("Failed to update document: \(error)")
+                            }
+                        }
+                    } else {
+                        Task {
+                            try? await self.store.update(documentToUpdate)
                         }
                     }
                 }
