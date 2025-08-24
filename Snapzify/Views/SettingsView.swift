@@ -39,11 +39,33 @@ struct SettingsView: View {
                 .font(.headline)
                 .foregroundStyle(T.C.ink)
             
-            HStack {
-                Label("Snapzify v1.0", systemImage: "camera.viewfinder")
-                    .foregroundStyle(T.C.ink)
+            VStack(spacing: T.S.sm) {
+                HStack {
+                    Label("Snapzify v1.0", systemImage: "camera.viewfinder")
+                        .foregroundStyle(T.C.ink)
+                    
+                    Spacer()
+                }
                 
-                Spacer()
+                Divider()
+                    .background(T.C.divider.opacity(0.6))
+                
+                Button {
+                    if let url = URL(string: "mailto:snapzify.feedback@gmail.com?subject=Snapzify%20Feedback") {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    HStack {
+                        Label("Send Feedback", systemImage: "envelope")
+                            .foregroundStyle(T.C.ink)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "arrow.up.right")
+                            .foregroundStyle(T.C.ink2)
+                            .font(.caption)
+                    }
+                }
             }
         }
         .padding()
