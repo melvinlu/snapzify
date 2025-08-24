@@ -37,10 +37,6 @@ class OCRServiceImpl: OCRService {
                     ],
                     "features": [
                         [
-                            "type": "TEXT_DETECTION",
-                            "maxResults": 50
-                        ],
-                        [
                             "type": "DOCUMENT_TEXT_DETECTION",
                             "maxResults": 50
                         ]
@@ -102,41 +98,13 @@ class OCRServiceImpl: OCRService {
                     for block in blocks {
                         if let paragraphs = block["paragraphs"] as? [[String: Any]] {
                             for paragraph in paragraphs {
-                                var paragraphText = ""
+                                var currentLineText = ""
+                                var lineTexts: [String] = []
                                 var paragraphBbox: CGRect?
+                                var currentLineMinY: Int?
+                                var currentLineMaxY: Int?
                                 
-                                if let words = paragraph["words"] as? [[String: Any]] {
-                                    for word in words {
-                                        if let symbols = word["symbols"] as? [[String: Any]] {
-                                            for symbol in symbols {
-                                                if let text = symbol["text"] as? String {
-                                                    paragraphText += text
-                                                }
-                                                // Check for space after symbol
-                                                if let property = symbol["property"] as? [String: Any],
-                                                   let detectedBreak = property["detectedBreak"] as? [String: Any],
-                                                   let breakType = detectedBreak["type"] as? String {
-                                                    if breakType == "SPACE" || breakType == "EOL_SURE_SPACE" {
-                                                        paragraphText += " "
-                                                    } else if breakType == "LINE_BREAK" || breakType == "EOL_SURE_BREAK" {
-                                                        // This is a line break, so we should treat this as end of line
-                                                        let trimmedText = paragraphText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                                        if !trimmedText.isEmpty {
-                                                            ocrLines.append(OCRLine(
-                                                                text: trimmedText,
-                                                                bbox: paragraphBbox ?? CGRect(x: 0, y: 0, width: image.size.width, height: 50),
-                                                                words: []
-                                                            ))
-                                                            paragraphText = ""
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                
-                                // Get bounding box for paragraph
+                                // Get bounding box for paragraph first
                                 if let boundingBox = paragraph["boundingBox"] as? [String: Any],
                                    let vertices = boundingBox["vertices"] as? [[String: Any]],
                                    vertices.count >= 4 {
@@ -154,11 +122,72 @@ class OCRServiceImpl: OCRService {
                                     )
                                 }
                                 
-                                // Add remaining text if any
-                                let trimmedText = paragraphText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                if !trimmedText.isEmpty {
+                                if let words = paragraph["words"] as? [[String: Any]] {
+                                    for word in words {
+                                        // Get word bounding box to track vertical position
+                                        var wordMinY: Int?
+                                        var wordMaxY: Int?
+                                        if let wordBbox = word["boundingBox"] as? [String: Any],
+                                           let vertices = wordBbox["vertices"] as? [[String: Any]],
+                                           vertices.count >= 4 {
+                                            wordMinY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.min()
+                                            wordMaxY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.max()
+                                        }
+                                        
+                                        // Check if this word is on a new line (significant Y position change)
+                                        if let currentY = currentLineMinY,
+                                           let wordY = wordMinY,
+                                           abs(wordY - currentY) > 10 {  // Threshold for detecting new line
+                                            // Save current line
+                                            let trimmedLine = currentLineText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            if !trimmedLine.isEmpty {
+                                                lineTexts.append(trimmedLine)
+                                            }
+                                            currentLineText = ""
+                                            currentLineMinY = wordMinY
+                                            currentLineMaxY = wordMaxY
+                                        } else if currentLineMinY == nil {
+                                            currentLineMinY = wordMinY
+                                            currentLineMaxY = wordMaxY
+                                        }
+                                        
+                                        if let symbols = word["symbols"] as? [[String: Any]] {
+                                            for symbol in symbols {
+                                                if let text = symbol["text"] as? String {
+                                                    currentLineText += text
+                                                }
+                                                // Check for breaks after symbol
+                                                if let property = symbol["property"] as? [String: Any],
+                                                   let detectedBreak = property["detectedBreak"] as? [String: Any],
+                                                   let breakType = detectedBreak["type"] as? String {
+                                                    if breakType == "SPACE" || breakType == "EOL_SURE_SPACE" {
+                                                        currentLineText += " "
+                                                    } else if breakType == "LINE_BREAK" || breakType == "EOL_SURE_BREAK" {
+                                                        // Explicit line break detected
+                                                        let trimmedLine = currentLineText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                                        if !trimmedLine.isEmpty {
+                                                            lineTexts.append(trimmedLine)
+                                                        }
+                                                        currentLineText = ""
+                                                        currentLineMinY = nil
+                                                        currentLineMaxY = nil
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Add remaining text as final line
+                                let trimmedLine = currentLineText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmedLine.isEmpty {
+                                    lineTexts.append(trimmedLine)
+                                }
+                                
+                                // Add each line as a separate OCRLine
+                                for lineText in lineTexts {
                                     ocrLines.append(OCRLine(
-                                        text: trimmedText,
+                                        text: lineText,
                                         bbox: paragraphBbox ?? CGRect(x: 0, y: 0, width: image.size.width, height: 50),
                                         words: []
                                     ))

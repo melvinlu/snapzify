@@ -107,6 +107,9 @@ struct HomeView: View {
             // Start polling for new photos every 2 seconds
             startPhotoPolling()
             
+            // Check for shared images from share extension
+            checkForSharedImages()
+            
             // Refresh saved documents when view appears
             // Add a small delay to ensure navigation has completed
             Task {
@@ -122,6 +125,9 @@ struct HomeView: View {
             if phase == .active {
                 // Resume polling when app becomes active
                 startPhotoPolling()
+                
+                // Check for shared images when app becomes active
+                checkForSharedImages()
                 
                 // Refresh when scene becomes active
                 let now = Date()
@@ -369,6 +375,45 @@ struct HomeView: View {
     private func stopPhotoPolling() {
         photoCheckTimer?.invalidate()
         photoCheckTimer = nil
+    }
+    
+    private func checkForSharedImages() {
+        // Check if there's a pending shared image from the share extension
+        guard let sharedDefaults = UserDefaults(suiteName: "group.com.snapzify.app") else { return }
+        
+        // Check if we should process a shared image
+        if let fileName = sharedDefaults.string(forKey: "pendingSharedImage") {
+            // Check timestamp to ensure it's recent (within last 60 seconds)
+            let timestamp = sharedDefaults.double(forKey: "sharedImageTimestamp")
+            let timeDiff = Date().timeIntervalSince1970 - timestamp
+            
+            if timeDiff < 60 {
+                // Load and process the shared image
+                if let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") {
+                    let imagesDirectory = sharedContainerURL.appendingPathComponent("SharedImages")
+                    let fileURL = imagesDirectory.appendingPathComponent(fileName)
+                    
+                    if let imageData = try? Data(contentsOf: fileURL),
+                       let image = UIImage(data: imageData) {
+                        // Clear the pending image flag
+                        sharedDefaults.removeObject(forKey: "pendingSharedImage")
+                        sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
+                        sharedDefaults.synchronize()
+                        
+                        // Process the image
+                        vm.processPickedImage(image)
+                        
+                        // Clean up the file
+                        try? FileManager.default.removeItem(at: fileURL)
+                    }
+                }
+            } else {
+                // Clear old pending image
+                sharedDefaults.removeObject(forKey: "pendingSharedImage")
+                sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
+                sharedDefaults.synchronize()
+            }
+        }
     }
 }
 
