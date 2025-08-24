@@ -21,16 +21,24 @@ class TTSServiceOpenAI: TTSService {
     
     private func setupAudioDirectory() {
         guard let containerURL = fileManager.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.snapzify"
-        ) else { return }
+            forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
+        ) else { 
+            print("TTSService: Failed to get container URL for group.com.snapzify.app")
+            return 
+        }
         
         let audioDir = containerURL.appendingPathComponent("Audio")
         
-        if !fileManager.fileExists(atPath: audioDir.path) {
-            try? fileManager.createDirectory(at: audioDir, withIntermediateDirectories: true)
+        do {
+            if !fileManager.fileExists(atPath: audioDir.path) {
+                try fileManager.createDirectory(at: audioDir, withIntermediateDirectories: true)
+                print("TTSService: Created audio directory at \(audioDir.path)")
+            }
+            audioDirectory = audioDir
+            print("TTSService: Audio directory set to \(audioDir.path)")
+        } catch {
+            print("TTSService: Failed to create audio directory: \(error)")
         }
-        
-        audioDirectory = audioDir
     }
     
     func isConfigured() -> Bool {

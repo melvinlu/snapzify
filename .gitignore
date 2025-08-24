@@ -14,3 +14,7 @@ google-cloud-vision-key.json
 **/google-cloud-vision-key.json
 practical-well-468204-k2-08d5795852cb.json
 **/practical-well-468204-k2-08d5795852cb.json
+
+# Python scripts (helper scripts created during development)
+*.py
+**/*.py

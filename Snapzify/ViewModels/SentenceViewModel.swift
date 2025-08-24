@@ -10,6 +10,7 @@ class SentenceViewModel: ObservableObject {
     @Published var isPlaying = false
     @Published var isTranslating = false
     @Published var isGeneratingAudio = false
+    @Published var isPreparingAudio = false
     
     let script: ChineseScript
     private let translationService: TranslationService
@@ -17,6 +18,7 @@ class SentenceViewModel: ObservableObject {
     private let autoTranslate: Bool
     private let autoGenerateAudio: Bool
     private let onToggleExpanded: (UUID, Bool) -> Void
+    private let onAudioStateChange: ((UUID, Bool) -> Void)?
     private let onUpdate: (Sentence) -> Void
     
     private var audioPlayer: AVAudioPlayer?
@@ -31,6 +33,7 @@ class SentenceViewModel: ObservableObject {
         autoGenerateAudio: Bool,
         isExpanded: Bool = false,
         onToggleExpanded: @escaping (UUID, Bool) -> Void,
+        onAudioStateChange: ((UUID, Bool) -> Void)? = nil,
         onUpdate: @escaping (Sentence) -> Void
     ) {
         self.sentence = sentence
@@ -41,6 +44,7 @@ class SentenceViewModel: ObservableObject {
         self.autoGenerateAudio = autoGenerateAudio
         self.isExpanded = isExpanded
         self.onToggleExpanded = onToggleExpanded
+        self.onAudioStateChange = onAudioStateChange
         self.onUpdate = onUpdate
     }
     
@@ -58,13 +62,12 @@ class SentenceViewModel: ObservableObject {
             
             if isExpanded {
                 Task {
-                    if autoTranslate && sentence.english == nil {
+                    // Don't translate if we're still generating
+                    if autoTranslate && sentence.english == nil && sentence.english != "Generating..." {
                         await translateIfNeeded()
                     }
                     
-                    if autoGenerateAudio && sentence.audioAsset == nil {
-                        await generateAudioIfNeeded()
-                    }
+                    // Remove auto audio generation - it will be done on-demand when play is clicked
                 }
             }
         }
@@ -100,8 +103,9 @@ class SentenceViewModel: ObservableObject {
         print("AudioGeneration: TTS configured: \(ttsService.isConfigured())")
         
         guard sentence.audioAsset == nil,
-              ttsService.isConfigured() else { 
-            print("AudioGeneration: Skipping generation - audioAsset exists or TTS not configured")
+              ttsService.isConfigured(),
+              sentence.english != "Generating..." else { 
+            print("AudioGeneration: Skipping generation - audioAsset exists, TTS not configured, or still generating translation")
             return 
         }
         
@@ -109,12 +113,6 @@ class SentenceViewModel: ObservableObject {
         
         await MainActor.run {
             isGeneratingAudio = true
-        }
-        defer { 
-            Task { @MainActor in
-                isGeneratingAudio = false
-                print("AudioGeneration: Generation completed, isGeneratingAudio set to false")
-            }
         }
         
         do {
@@ -127,13 +125,19 @@ class SentenceViewModel: ObservableObject {
             await MainActor.run {
                 sentence.audioAsset = audioAsset
                 onUpdate(sentence)
-                print("AudioGeneration: Audio asset saved to sentence")
+                isGeneratingAudio = false  // Set to false here, not in defer
+                print("AudioGeneration: Audio asset saved to sentence, isGeneratingAudio set to false")
             }
         } catch {
             print("AudioGeneration: Audio generation failed with error: \(error)")
             print("AudioGeneration: Error details: \(error.localizedDescription)")
             if let ttsError = error as? TTSError {
                 print("AudioGeneration: TTS specific error: \(ttsError)")
+            }
+            
+            await MainActor.run {
+                isGeneratingAudio = false  // Also set to false on error
+                print("AudioGeneration: Error occurred, isGeneratingAudio set to false")
             }
         }
     }
@@ -158,6 +162,12 @@ class SentenceViewModel: ObservableObject {
         print("AudioPlayback: Current isPlaying state: \(isPlaying)")
         print("AudioPlayback: Current audioPlayer exists: \(audioPlayer != nil)")
         
+        // Notify that we're about to start playing
+        onAudioStateChange?(sentence.id, true)
+        
+        // Set preparing flag to prevent UI flicker
+        isPreparingAudio = true
+        
         // Stop any existing audio first
         if let existingPlayer = audioPlayer {
             print("AudioPlayback: Stopping existing audio player")
@@ -166,22 +176,39 @@ class SentenceViewModel: ObservableObject {
             audioPlayerDelegate = nil
         }
         
-        guard let audioAsset = sentence.audioAsset else {
+        // If no audio asset exists, generate it first
+        if sentence.audioAsset == nil {
             print("AudioPlayback: No audio asset found, generating new audio")
             Task {
                 await generateAudioIfNeeded()
                 print("AudioPlayback: Audio generation completed, audioAsset: \(sentence.audioAsset != nil ? "exists" : "nil")")
-                if sentence.audioAsset != nil {
-                    await MainActor.run {
-                        print("AudioPlayback: Starting playback after generation on MainActor")
-                        playAudio()
+                // After generation, try playing again
+                await MainActor.run {
+                    self.isPreparingAudio = false
+                    if self.sentence.audioAsset != nil {
+                        print("AudioPlayback: Starting playback after generation")
+                        self.playGeneratedAudio()
                     }
                 }
             }
             return
         }
         
-        print("AudioPlayback: Found audio asset at URL: \(audioAsset.fileURL)")
+        // Audio asset exists, play it
+        isPreparingAudio = false
+        playGeneratedAudio()
+    }
+    
+    private func playGeneratedAudio() {
+        // Clear preparing flag when we start actual playback
+        isPreparingAudio = false
+        
+        guard let audioAsset = sentence.audioAsset else {
+            print("AudioPlayback: No audio asset to play")
+            return
+        }
+        
+        print("AudioPlayback: Playing audio asset at URL: \(audioAsset.fileURL)")
         print("AudioPlayback: Audio file exists: \(FileManager.default.fileExists(atPath: audioAsset.fileURL.path))")
         
         do {
@@ -210,6 +237,7 @@ class SentenceViewModel: ObservableObject {
                 print("AudioPlayback: DELEGATE CALLBACK - Current isPlaying before reset: \(self?.isPlaying ?? false)")
                 Task { @MainActor in
                     self?.isPlaying = false
+                    self?.onAudioStateChange?(self?.sentence.id ?? UUID(), false)
                     self?.audioPlayer = nil
                     self?.audioPlayerDelegate = nil
                     print("AudioPlayback: DELEGATE CALLBACK - Cleanup completed, isPlaying set to false")
@@ -232,6 +260,7 @@ class SentenceViewModel: ObservableObject {
                 audioPlayer = nil
                 audioPlayerDelegate = nil
                 isPlaying = false
+                onAudioStateChange?(sentence.id, false)
             }
             
         } catch let error as NSError {
@@ -243,6 +272,7 @@ class SentenceViewModel: ObservableObject {
             audioPlayer = nil
             audioPlayerDelegate = nil
             isPlaying = false
+            onAudioStateChange?(sentence.id, false)
         }
     }
     
@@ -257,7 +287,22 @@ class SentenceViewModel: ObservableObject {
         }
         
         isPlaying = false
+        onAudioStateChange?(sentence.id, false)
         print("AudioPlayback: isPlaying set to false")
+    }
+    
+    func stopAudio() {
+        print("AudioPlayback: stopAudio called for sentence: \(sentence.id)")
+        if let player = audioPlayer {
+            player.stop()
+            print("AudioPlayback: Audio player stopped")
+        }
+        audioPlayer = nil
+        audioPlayerDelegate = nil
+        isPlaying = false
+        isPreparingAudio = false
+        onAudioStateChange?(sentence.id, false)
+        print("AudioPlayback: Audio stopped and cleaned up")
     }
     
     func toggleSave() {

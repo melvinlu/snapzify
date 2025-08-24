@@ -88,13 +88,13 @@ struct SentenceRowView: View {
             }
             .buttonStyle(ActionButtonStyle())
             
-            if vm.isGeneratingAudio {
+            if vm.isGeneratingAudio || vm.isPreparingAudio {
                 HStack(spacing: 4) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
                         .scaleEffect(0.6)
                     
-                    Text("Generating...")
+                    Text(vm.isGeneratingAudio ? "Generating..." : "Loading...")
                         .font(.caption)
                         .foregroundStyle(T.C.ink2)
                 }

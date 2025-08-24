@@ -26,8 +26,8 @@ struct HomeView: View {
                                     removal: .move(edge: .top).combined(with: .opacity)
                                 ))
                                 .onAppear {
-                                    // Auto-dismiss after 5 seconds
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                                    // Auto-dismiss after 3 seconds
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             vm.errorMessage = nil
                                         }

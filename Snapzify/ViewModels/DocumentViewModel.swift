@@ -15,6 +15,8 @@ class DocumentViewModel: ObservableObject {
     private let translationService: TranslationService
     private let ttsService: TTSService
     private let store: DocumentStore
+    private var sentenceViewModels: [UUID: SentenceViewModel] = [:]
+    private var currentlyPlayingSentenceId: UUID?
     
     @AppStorage("autoTranslate") private var autoTranslate = true
     @AppStorage("autoGenerateAudio") private var autoGenerateAudio = true
@@ -76,8 +78,26 @@ class DocumentViewModel: ObservableObject {
     }
     
     func createSentenceViewModel(for sentence: Sentence) -> SentenceViewModel {
+        // Always use expandedSentenceIds as source of truth
         let isExpanded = expandedSentenceIds.contains(sentence.id)
-        return SentenceViewModel(
+        
+        // Return cached view model if it exists
+        if let cachedViewModel = sentenceViewModels[sentence.id] {
+            // Only update sentence data if it has actually changed
+            if cachedViewModel.sentence.english != sentence.english ||
+               cachedViewModel.sentence.pinyin != sentence.pinyin ||
+               cachedViewModel.sentence.audioAsset != sentence.audioAsset {
+                cachedViewModel.sentence = sentence
+            }
+            // Ensure expanded state matches our source of truth without triggering animations
+            if cachedViewModel.isExpanded != isExpanded {
+                cachedViewModel.isExpanded = isExpanded
+            }
+            return cachedViewModel
+        }
+        
+        // Create new view model and cache it
+        let viewModel = SentenceViewModel(
             sentence: sentence,
             script: document.script,
             translationService: translationService,
@@ -92,6 +112,10 @@ class DocumentViewModel: ObservableObject {
                 } else {
                     self.expandedSentenceIds.remove(sentenceId)
                 }
+            },
+            onAudioStateChange: { [weak self] sentenceId, isPlaying in
+                guard let self = self else { return }
+                self.handleAudioStateChange(sentenceId: sentenceId, isPlaying: isPlaying)
             }
         ) { [weak self] updatedSentence in
             guard let self = self,
@@ -105,6 +129,9 @@ class DocumentViewModel: ObservableObject {
                 try? await self.store.save(self.document)
             }
         }
+        
+        sentenceViewModels[sentence.id] = viewModel
+        return viewModel
     }
     
     func highlightedRegion(for sentenceId: UUID) -> CGRect? {
@@ -119,6 +146,52 @@ class DocumentViewModel: ObservableObject {
         document.isSaved.toggle()
         Task {
             try? await store.update(document)
+        }
+    }
+    
+    func refreshDocument() async {
+        if let updatedDocument = try? await store.fetch(id: document.id) {
+            await MainActor.run {
+                // Update only the sentence content without triggering view recreation
+                for (index, updatedSentence) in updatedDocument.sentences.enumerated() {
+                    if index < self.document.sentences.count {
+                        // Only update if content has changed
+                        if self.document.sentences[index].english != updatedSentence.english ||
+                           self.document.sentences[index].pinyin != updatedSentence.pinyin {
+                            self.document.sentences[index].english = updatedSentence.english
+                            self.document.sentences[index].pinyin = updatedSentence.pinyin
+                            self.document.sentences[index].status = updatedSentence.status
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private var refreshTask: Task<Void, Never>?
+    
+    func startRefreshTimer() {
+        // Cancel any existing refresh task
+        refreshTask?.cancel()
+        
+        refreshTask = Task {
+            // Wait a bit before starting to refresh to let initial load complete
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second initial delay
+            
+            while !Task.isCancelled {
+                await refreshDocument()
+                
+                // Stop refreshing once all sentences are translated
+                let allTranslated = document.sentences.allSatisfy { sentence in
+                    sentence.status == .translated || 
+                    (sentence.english != nil && sentence.english != "Generating...")
+                }
+                if allTranslated {
+                    break
+                }
+                
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second between refreshes
+            }
         }
     }
     
@@ -159,6 +232,20 @@ class DocumentViewModel: ObservableObject {
                     self.shouldDismiss = true
                 }
             }
+        }
+    }
+    
+    private func handleAudioStateChange(sentenceId: UUID, isPlaying: Bool) {
+        if isPlaying {
+            // If another sentence is playing, stop it first
+            if let currentId = currentlyPlayingSentenceId, currentId != sentenceId {
+                if let currentViewModel = sentenceViewModels[currentId] {
+                    currentViewModel.stopAudio()
+                }
+            }
+            currentlyPlayingSentenceId = sentenceId
+        } else if currentlyPlayingSentenceId == sentenceId {
+            currentlyPlayingSentenceId = nil
         }
     }
 }

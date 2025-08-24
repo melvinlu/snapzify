@@ -42,6 +42,15 @@ struct DocumentView: View {
         .task {
             await vm.translateAllPending()
         }
+        .task {
+            // Start refresh timer if any sentences are still generating
+            let hasGenerating = vm.document.sentences.contains { sentence in
+                sentence.english == "Generating..."
+            }
+            if hasGenerating {
+                vm.startRefreshTimer()
+            }
+        }
         .onChange(of: vm.shouldDismiss) { shouldDismiss in
             if shouldDismiss {
                 dismiss()
@@ -151,7 +160,7 @@ struct DocumentView: View {
                     vm.showDeleteImageAlert = true
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(T.C.ink2)
                         .frame(height: 32)
                         .padding(.horizontal, 12)
                         .background(T.C.card.opacity(0.8))
@@ -169,6 +178,7 @@ struct DocumentView: View {
                 SentenceRowView(
                     vm: vm.createSentenceViewModel(for: sentence)
                 )
+                .id(sentence.id) // Use stable ID to prevent view recreation
                 .onTapGesture {
                     vm.selectSentence(sentence.id)
                 }

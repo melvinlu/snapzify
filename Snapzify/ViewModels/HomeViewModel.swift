@@ -24,6 +24,7 @@ class HomeViewModel: ObservableObject {
     private let segmentationService: SentenceSegmentationService
     private let pinyinService: PinyinService
     private let chineseProcessingService: ChineseProcessingService
+    private let streamingChineseProcessingService: StreamingChineseProcessingService
     private let onOpenSettings: () -> Void
     private let onOpenDocument: (Document) -> Void
     @AppStorage("selectedScript") private var selectedScript: String = ChineseScript.simplified.rawValue
@@ -48,6 +49,7 @@ class HomeViewModel: ObservableObject {
         self.segmentationService = segmentationService
         self.pinyinService = pinyinService
         self.chineseProcessingService = ChineseProcessingService(configService: ConfigServiceImpl())
+        self.streamingChineseProcessingService = StreamingChineseProcessingService(configService: ConfigServiceImpl())
         self.onOpenSettings = onOpenSettings
         self.onOpenDocument = onOpenDocument
     }
@@ -137,8 +139,8 @@ class HomeViewModel: ObservableObject {
             do {
                 let image = try await loadImage(from: info.asset)
                 
-                // Add 10-second timeout to image processing
-                let document = try await withTimeout(seconds: 10) {
+                // Add 60-second timeout to image processing
+                let document = try await withTimeout(seconds: 60) {
                     try await self.processImage(image, source: .photos)
                 }
                 
@@ -176,8 +178,8 @@ class HomeViewModel: ObservableObject {
             defer { isProcessing = false }
             
             do {
-                // Add 10-second timeout to image processing
-                let document = try await withTimeout(seconds: 10) {
+                // Add 60-second timeout to image processing
+                let document = try await withTimeout(seconds: 60) {
                     try await self.processImage(image, source: .imported)
                 }
                 
@@ -228,23 +230,16 @@ class HomeViewModel: ObservableObject {
                 logger.info("Starting image snapzifying")
                 logger.debug("Calling OCR service")
                 
-                // Add 10-second timeout to image processing
-                let document = try await withTimeout(seconds: 10) {
+                // Add 60-second timeout to image processing
+                let document = try await withTimeout(seconds: 60) {
                     try await self.processImage(image, source: .imported)
                 }
                 
-                logger.info("Image snapzified, saving document with \(document.sentences.count) sentences")
-                try await store.save(document)
-                logger.info("Document saved successfully")
-                
-                // Navigate directly to the document view
-                await MainActor.run {
-                    onOpenDocument(document)
-                }
+                // Document is already saved and navigation happens inside processImage
+                // No need to save again here
+                logger.info("Snapzifying completed, updating UI")
                 
                 // Update documents list after navigation
-                logger.debug("Waiting for navigation")
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
                 await refreshDocuments()
                 logger.debug("Documents reloaded")
             } catch {
@@ -327,7 +322,7 @@ class HomeViewModel: ObservableObject {
         var chineseLineIndices: [Int] = []
         
         // First pass: collect all Chinese lines that need processing
-        for (index, line) in ocrLines.enumerated() {
+        for (_, line) in ocrLines.enumerated() {
             // Check if line contains parsed data (chinese|pinyin|english format)
             let components = line.text.components(separatedBy: "|")
             
@@ -360,42 +355,15 @@ class HomeViewModel: ObservableObject {
                 chineseLinesToProcess.append(normalizedText)
                 chineseLineIndices.append(sentences.count)
                 
-                // Add placeholder sentence
+                // Add placeholder sentence with "Generating..." status
                 sentences.append(Sentence(
                     text: normalizedText,
                     rangeInImage: nil,
                     tokens: [],
                     pinyin: [],
-                    english: nil,
+                    english: "Generating...",
                     status: .ocrOnly
                 ))
-            }
-        }
-        
-        // Second pass: batch process all Chinese lines with a single OpenAI call
-        if !chineseLinesToProcess.isEmpty {
-            logger.info("Batch processing \(chineseLinesToProcess.count) Chinese lines")
-            
-            do {
-                let processedBatch = try await chineseProcessingService.processBatch(chineseLinesToProcess, script: script)
-                
-                // Update sentences with processed data
-                for (batchIndex, sentenceIndex) in chineseLineIndices.enumerated() {
-                    if batchIndex < processedBatch.count {
-                        let processed = processedBatch[batchIndex]
-                        sentences[sentenceIndex] = Sentence(
-                            text: processed.chinese,
-                            rangeInImage: nil,
-                            tokens: [],
-                            pinyin: processed.pinyin,
-                            english: processed.english,
-                            status: .translated
-                        )
-                    }
-                }
-            } catch {
-                logger.error("Batch processing failed: \(error.localizedDescription)")
-                // Sentences remain with fallback values
             }
         }
         
@@ -408,14 +376,94 @@ class HomeViewModel: ObservableObject {
             throw ProcessingError.noChineseDetected
         }
         
+        // Create document with initial sentences (including placeholders)
         logger.info("Created document with \(sentences.count) sentences")
         
-        return Document(
+        let document = Document(
             source: source,
             script: script,
             sentences: sentences,
             imageData: image.pngData()
         )
+        
+        // Save document and navigate to it immediately after OCR
+        try await store.save(document)
+        let savedDocument = document
+        
+        // Navigate to document view
+        await MainActor.run {
+            self.onOpenDocument(savedDocument)
+        }
+        
+        // Second pass: stream process Chinese lines with concurrent requests
+        if !chineseLinesToProcess.isEmpty {
+            logger.info("Stream processing \(chineseLinesToProcess.count) Chinese lines")
+            
+            do {
+                // Store a reference to the document for updates
+                var documentToUpdate = savedDocument
+                
+                try await streamingChineseProcessingService.processStreamingBatch(
+                    chineseLinesToProcess,
+                    script: script
+                ) { [weak self] processed in
+                    guard let self = self else { return }
+                    
+                    // Update sentence as soon as it's processed
+                    let sentenceIndex = chineseLineIndices[processed.index]
+                    sentences[sentenceIndex] = Sentence(
+                        text: processed.chinese,
+                        rangeInImage: nil,
+                        tokens: [],
+                        pinyin: processed.pinyin,
+                        english: processed.english,
+                        status: .translated
+                    )
+                    
+                    // Update the document
+                    documentToUpdate.sentences = sentences
+                    
+                    // Defer the store update to avoid publishing changes within view updates
+                    Task.detached { @MainActor in
+                        do {
+                            try await self.store.update(documentToUpdate)
+                            self.logger.debug("Updated sentence \(processed.index + 1)/\(chineseLinesToProcess.count)")
+                        } catch {
+                            self.logger.error("Failed to update document: \(error)")
+                        }
+                    }
+                }
+            } catch {
+                logger.error("Stream processing failed: \(error.localizedDescription)")
+                // Fall back to regular batch processing
+                do {
+                    let processedBatch = try await chineseProcessingService.processBatch(chineseLinesToProcess, script: script)
+                    
+                    for (batchIndex, sentenceIndex) in chineseLineIndices.enumerated() {
+                        if batchIndex < processedBatch.count {
+                            let processed = processedBatch[batchIndex]
+                            sentences[sentenceIndex] = Sentence(
+                                text: processed.chinese,
+                                rangeInImage: nil,
+                                tokens: [],
+                                pinyin: processed.pinyin,
+                                english: processed.english,
+                                status: .translated
+                            )
+                        }
+                    }
+                    
+                    // Update document with final sentences
+                    var updatedDocument = savedDocument
+                    updatedDocument.sentences = sentences
+                    _ = try? await store.update(updatedDocument)
+                } catch {
+                    logger.error("Fallback batch processing also failed: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        return savedDocument
     }
 }
 
