@@ -1,16 +1,18 @@
 import Foundation
 import UIKit
+import os.log
 
 class OCRServiceImpl: OCRService {
+    private let logger = Logger(subsystem: "com.snapzify.app", category: "OCR")
     private let googleCloudVisionURL = "https://vision.googleapis.com/v1/images:annotate"
     private let configService = ConfigServiceImpl()
     
     func recognizeText(in image: UIImage) async throws -> [OCRLine] {
-        print("OCR: Starting text recognition with Google Cloud Vision...")
+        logger.info("Starting text recognition with Google Cloud Vision")
         
         // Get API key from config
         guard let apiKey = configService.googleCloudVisionKey, !apiKey.isEmpty else {
-            print("OCR: No Google Cloud Vision API key configured")
+            logger.error("No Google Cloud Vision API key configured")
             throw OCRError.noAPIKey
         }
         
@@ -18,11 +20,11 @@ class OCRServiceImpl: OCRService {
         let resizedImage = resizeImageIfNeeded(image)
         
         guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
-            print("OCR: Failed to convert image to JPEG")
+            logger.error("Failed to convert image to JPEG")
             throw OCRError.invalidImage
         }
         
-        print("OCR: Image converted to JPEG, size: \(imageData.count) bytes")
+        logger.debug("Image converted to JPEG, size: \(imageData.count) bytes")
         
         let base64Image = imageData.base64EncodedString()
         
@@ -50,7 +52,7 @@ class OCRServiceImpl: OCRService {
             ]
         ]
         
-        print("OCR: Creating Google Cloud Vision API request...")
+        logger.debug("Creating Google Cloud Vision API request")
         
         // Use API key authentication
         let urlWithKey = "\(googleCloudVisionURL)?key=\(apiKey)"
@@ -60,21 +62,21 @@ class OCRServiceImpl: OCRService {
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         request.timeoutInterval = 30.0
         
-        print("OCR: Sending request to Google Cloud Vision...")
+        logger.info("Sending request to Google Cloud Vision")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("OCR: Invalid response type")
+            logger.error("Invalid response type")
             throw OCRError.apiError
         }
         
-        print("OCR: Response status code: \(httpResponse.statusCode)")
+        logger.debug("Response status code: \(httpResponse.statusCode)")
         
         guard httpResponse.statusCode == 200 else {
-            print("OCR: API request failed with status: \(httpResponse.statusCode)")
+            logger.error("API request failed with status: \(httpResponse.statusCode)")
             if let responseString = String(data: data, encoding: .utf8) {
-                print("OCR: Error response: \(responseString)")
+                logger.error("Error response: \(responseString)")
             }
             throw OCRError.apiError
         }
@@ -83,7 +85,7 @@ class OCRServiceImpl: OCRService {
         let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         guard let responses = result?["responses"] as? [[String: Any]],
               let firstResponse = responses.first else {
-            print("OCR: Failed to parse Google Cloud Vision response")
+            logger.error("Failed to parse Google Cloud Vision response")
             throw OCRError.invalidResponse
         }
         
@@ -93,7 +95,7 @@ class OCRServiceImpl: OCRService {
         if let fullTextAnnotation = firstResponse["fullTextAnnotation"] as? [String: Any],
            let pages = fullTextAnnotation["pages"] as? [[String: Any]] {
             
-            print("OCR: Processing full text annotation...")
+            logger.debug("Processing full text annotation")
             
             for page in pages {
                 if let blocks = page["blocks"] as? [[String: Any]] {
@@ -168,7 +170,7 @@ class OCRServiceImpl: OCRService {
             }
         } else if let textAnnotations = firstResponse["textAnnotations"] as? [[String: Any]] {
             // Fallback to text annotations
-            print("OCR: Using text annotations fallback...")
+            logger.debug("Using text annotations fallback")
             
             // The first annotation contains all text, split it by lines
             if let firstAnnotation = textAnnotations.first,
@@ -192,7 +194,7 @@ class OCRServiceImpl: OCRService {
             }
         }
         
-        print("OCR: Successfully extracted \(ocrLines.count) lines of text")
+        logger.info("Successfully extracted \(ocrLines.count) lines of text")
         
         if ocrLines.isEmpty {
             // If no text found, return a message
@@ -203,12 +205,7 @@ class OCRServiceImpl: OCRService {
             )]
         }
         
-        // Filter out any lines that don't contain Chinese characters if needed
-        let chineseLines = ocrLines.filter { line in
-            containsChinese(line.text) || line.text.contains("No text detected")
-        }
-        
-        return chineseLines.isEmpty ? ocrLines : chineseLines
+        return ocrLines
     }
     
     private func containsChinese(_ text: String) -> Bool {

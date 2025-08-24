@@ -1,6 +1,8 @@
 import Foundation
+import os.log
 
 class PinyinServiceOpenAI: PinyinService {
+    private let logger = Logger(subsystem: "com.snapzify.app", category: "PinyinService")
     private let configService: ConfigService
     
     init(configService: ConfigService) {
@@ -11,7 +13,7 @@ class PinyinServiceOpenAI: PinyinService {
         do {
             return try await getPinyinWithAI(text, script: script)
         } catch {
-            print("Failed to get pinyin with AI, falling back to empty: \(error)")
+            logger.error("Failed to get pinyin with AI, falling back to empty: \(error.localizedDescription)")
             return Array(repeating: "", count: text.count)
         }
     }
@@ -26,6 +28,8 @@ class PinyinServiceOpenAI: PinyinService {
             throw PinyinError.noAPIKey
         }
         
+        logger.info("Generating pinyin for text: \(text)")
+        
         let scriptDescription = script == .simplified ? "Simplified Chinese" : "Traditional Chinese"
         
         let payload: [String: Any] = [
@@ -33,11 +37,11 @@ class PinyinServiceOpenAI: PinyinService {
             "messages": [
                 [
                     "role": "system",
-                    "content": "You are a Chinese language expert. Generate pinyin with tone marks for the given \(scriptDescription) text. Return only a JSON array of strings, where each string is the pinyin for the corresponding character in the input text. Use pinyin with tone marks (ā, á, ǎ, à, etc.). For non-Chinese characters, return empty strings."
+                    "content": "You are a Chinese language expert. For the given \(scriptDescription) text, return ONLY the pinyin with tone marks, separated by spaces. One pinyin syllable per Chinese character. Use tone marks (ā, á, ǎ, à, etc.). Do not include JSON formatting, brackets, or quotes - just the pinyin syllables separated by spaces."
                 ],
                 [
                     "role": "user",
-                    "content": "Generate pinyin for: \(text)"
+                    "content": "\(text)"
                 ]
             ],
             "temperature": 0.1,
@@ -65,21 +69,32 @@ class PinyinServiceOpenAI: PinyinService {
             throw PinyinError.invalidResponse
         }
         
-        // Parse the JSON response
-        if let jsonData = content.data(using: .utf8),
-           let pinyinArray = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
-            return pinyinArray
+        logger.debug("Raw response content: \(content)")
+        
+        // Clean up the content
+        let cleanedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // First try to parse as simple space-separated pinyin (preferred format)
+        if !cleanedContent.contains("[") && !cleanedContent.contains("{") {
+            let pinyinSyllables = cleanedContent.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+                .filter { !$0.isEmpty }
+            if !pinyinSyllables.isEmpty {
+                logger.debug("Parsed pinyin syllables: \(pinyinSyllables)")
+                return pinyinSyllables
+            }
         }
         
-        // Fallback: try to extract pinyin from plain text response
-        let words = content.components(separatedBy: CharacterSet.whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-        
-        if !words.isEmpty {
-            return words
+        // Fallback: try to parse as JSON if the response is still in JSON format
+        if cleanedContent.hasPrefix("[") {
+            if let jsonData = cleanedContent.data(using: .utf8),
+               let pinyinArray = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
+                logger.debug("Parsed from JSON: \(pinyinArray)")
+                return pinyinArray
+            }
         }
         
         // Final fallback
+        logger.warning("Failed to parse pinyin, returning empty array")
         return Array(repeating: "", count: text.count)
     }
 }

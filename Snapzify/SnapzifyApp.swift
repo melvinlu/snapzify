@@ -1,7 +1,9 @@
 import SwiftUI
+import os.log
 
 @main
 struct SnapzifyApp: App {
+    private let logger = Logger(subsystem: "com.snapzify.app", category: "Main")
     @StateObject private var appState = AppState()
     
     var body: some Scene {
@@ -24,22 +26,22 @@ struct SnapzifyApp: App {
     }
     
     private func handleDeepLink(_ url: URL) {
-        print("App: Received URL: \(url.absoluteString)")
+        logger.info("Received URL: \(url.absoluteString)")
         
         if url.scheme == "snapzify" {
-            print("App: Handling snapzify URL scheme")
+            logger.debug("Handling snapzify URL scheme")
             
             if url.host == "document" && url.pathComponents.contains("new") {
-                print("App: Opening new document from share extension")
+                logger.info("Opening new document from share extension")
                 // Handle new document from share extension
                 appState.shouldOpenNewDocument = true
                 appState.processSharedImage()
             } else if url.host == "open" {
-                print("App: Refreshing documents")
+                logger.debug("Refreshing documents")
                 appState.shouldRefreshDocuments = true
             }
         } else {
-            print("App: Unknown URL scheme: \(url.scheme ?? "nil")")
+            logger.warning("Unknown URL scheme: \(url.scheme ?? "nil")")
         }
     }
     
@@ -50,24 +52,24 @@ struct SnapzifyApp: App {
     }
     
     private func checkForSharedContent() {
-        print("Main App: Checking for shared content")
+        logger.debug("Checking for shared content")
         
         // Check if there's a pending shared image
         guard let sharedDefaults = UserDefaults(suiteName: "group.com.snapzify.app") else { 
-            print("Main App: Failed to access UserDefaults for group.com.snapzify.app")
+            logger.error("Failed to access UserDefaults for group.com.snapzify.app")
             return 
         }
         
         // Check if we should open a document
         if sharedDefaults.bool(forKey: "shouldOpenDocument") {
-            print("Main App: Found shouldOpenDocument flag")
+            logger.info("Found shouldOpenDocument flag")
             
             // Check timestamp to ensure it's recent (within last 60 seconds)
             let timestamp = sharedDefaults.double(forKey: "sharedImageTimestamp")
             let timeDiff = Date().timeIntervalSince1970 - timestamp
             
             if timeDiff < 60 {
-                print("Main App: Processing shared image (timestamp: \(timestamp), diff: \(timeDiff)s)")
+                logger.info("Processing shared image (timestamp: \(timestamp), diff: \(timeDiff)s)")
                 
                 sharedDefaults.set(false, forKey: "shouldOpenDocument")
                 sharedDefaults.synchronize()
@@ -76,12 +78,12 @@ struct SnapzifyApp: App {
                 appState.shouldOpenNewDocument = true
                 appState.processSharedImage()
             } else {
-                print("Main App: Shared content is too old (diff: \(timeDiff)s), ignoring")
+                logger.warning("Shared content is too old (diff: \(timeDiff)s), ignoring")
                 sharedDefaults.set(false, forKey: "shouldOpenDocument")
                 sharedDefaults.synchronize()
             }
         } else {
-            print("Main App: No shouldOpenDocument flag found")
+            logger.info("No shouldOpenDocument flag found")
         }
     }
 }
@@ -91,6 +93,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var selectedDocument: Document?
     
+    private let logger = Logger(subsystem: "com.snapzify.app", category: "ContentView")
     private let store = DocumentStoreImpl()
     private let configService = ConfigServiceImpl()
     
@@ -135,7 +138,7 @@ struct ContentView: View {
                             selectedDocument = document
                         } else {
                             // Show error message if no Chinese detected
-                            print("Cannot create document: No Chinese content detected")
+                            logger.warning("Cannot create document: No Chinese content detected")
                             // Note: You may want to show an alert or error message here
                         }
                         appState.shouldOpenNewDocument = false
@@ -206,7 +209,7 @@ struct ContentView: View {
             
             // If no Chinese content found, return nil
             if !hasChineseContent {
-                print("No Chinese content detected in shared image")
+                logger.info("No Chinese content detected in shared image")
                 return nil
             }
             
@@ -224,60 +227,61 @@ struct ContentView: View {
             try? await store.save(document)
             return document
         } catch {
-            print("Error processing shared image: \(error)")
+            logger.error("Error processing shared image: \(error)")
             return nil
         }
     }
 }
 
 class AppState: ObservableObject {
+    private let logger = Logger(subsystem: "com.snapzify.app", category: "AppState")
     @Published var shouldRefreshDocuments = false
     @Published var shouldOpenNewDocument = false
     @Published var sharedImage: UIImage?
     
     func processSharedImage() {
-        print("AppState: Processing shared image")
+        logger.info("Processing shared image")
         
         // Get shared image from shared container
         guard let sharedDefaults = UserDefaults(suiteName: "group.com.snapzify.app") else {
-            print("AppState: Failed to access UserDefaults")
+            logger.error("Failed to access UserDefaults")
             return
         }
         
         guard let fileName = sharedDefaults.string(forKey: "pendingSharedImage") else {
-            print("AppState: No pending image filename found")
+            logger.info("No pending image filename found")
             return
         }
         
         guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") else {
-            print("AppState: Failed to get shared container URL")
+            logger.error("Failed to get shared container URL")
             return
         }
         
-        print("AppState: Found pending image: \(fileName)")
+        logger.info("Found pending image: \(fileName)")
         
         let imagesDirectory = sharedContainerURL.appendingPathComponent("SharedImages")
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
         
-        print("AppState: Looking for image at: \(fileURL.path)")
+        logger.debug("Looking for image at: \(fileURL.path)")
         
         if FileManager.default.fileExists(atPath: fileURL.path) {
-            print("AppState: Image file exists")
+            logger.debug("Image file exists")
             
             if let imageData = try? Data(contentsOf: fileURL),
                let image = UIImage(data: imageData) {
-                print("AppState: Successfully loaded image, size: \(image.size)")
+                logger.info("Successfully loaded image")
                 self.sharedImage = image
                 
                 // Clean up
                 sharedDefaults.removeObject(forKey: "pendingSharedImage")
                 try? FileManager.default.removeItem(at: fileURL)
-                print("AppState: Cleaned up shared image file")
+                logger.info("Cleaned up shared image file")
             } else {
-                print("AppState: Failed to load image data from file")
+                logger.info("Failed to load image data from file")
             }
         } else {
-            print("AppState: Image file does not exist at path")
+            logger.debug("Image file does not exist at path")
         }
     }
 }

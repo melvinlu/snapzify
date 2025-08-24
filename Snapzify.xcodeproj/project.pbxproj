@@ -16,6 +16,7 @@
 		3D9B1A0C1234567890123456 /* SentenceSegmentationServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */; };
 		3D9B1A0E1234567890123456 /* PinyinServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */; };
 		3D9B1A211234567890123458 /* PinyinServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */; };
+		3D9B1A311234567890123461 /* ChineseProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A301234567890123460 /* ChineseProcessingService.swift */; };
 		3D9B1A101234567890123456 /* TranslationServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */; };
 		3D9B1A121234567890123456 /* TTSServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */; };
 		3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A151234567890123456 /* ConfigServiceImpl.swift */; };
@@ -68,6 +69,7 @@
 		3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceSegmentationServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceOpenAI.swift; sourceTree = "<group>"; };
+		3D9B1A301234567890123460 /* ChineseProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChineseProcessingService.swift; sourceTree = "<group>"; };
 		3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationServiceOpenAI.swift; sourceTree = "<group>"; };
 		3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSServiceOpenAI.swift; sourceTree = "<group>"; };
 		3D9B1A151234567890123456 /* ConfigServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigServiceImpl.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 				3D9B1A0D1234567890123456 /* SentenceSegmentationServiceImpl.swift */,
 				3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */,
 				3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */,
+				3D9B1A301234567890123460 /* ChineseProcessingService.swift */,
 				3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */,
 				3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */,
 				3D9B1A151234567890123456 /* ConfigServiceImpl.swift */,
@@ -331,6 +334,7 @@
 				3D9B1A0C1234567890123456 /* SentenceSegmentationServiceImpl.swift in Sources */,
 				3D9B1A0E1234567890123456 /* PinyinServiceImpl.swift in Sources */,
 				3D9B1A211234567890123458 /* PinyinServiceOpenAI.swift in Sources */,
+				3D9B1A311234567890123461 /* ChineseProcessingService.swift in Sources */,
 				3D9B1A101234567890123456 /* TranslationServiceOpenAI.swift in Sources */,
 				3D9B1A121234567890123456 /* TTSServiceOpenAI.swift in Sources */,
 				3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */,

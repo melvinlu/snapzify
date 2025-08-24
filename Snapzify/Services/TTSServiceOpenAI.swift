@@ -2,8 +2,10 @@ import Foundation
 import AVFoundation
 import SwiftUI
 import CryptoKit
+import os.log
 
 class TTSServiceOpenAI: TTSService {
+    private let logger = Logger(subsystem: "com.snapzify.app", category: "TTSService")
     private let configService: ConfigService
     private let fileManager = FileManager.default
     private var audioDirectory: URL?
@@ -36,24 +38,25 @@ class TTSServiceOpenAI: TTSService {
         let keyNotEmpty = !(configService.openAIKey?.isEmpty ?? true)
         let keyNotDefault = configService.openAIKey != "REPLACE_WITH_YOUR_OPENAI_KEY"
         
-        print("TTSService: Configuration check - hasKey: \(hasKey), keyNotEmpty: \(keyNotEmpty), keyNotDefault: \(keyNotDefault)")
+        logger.debug("Configuration check - hasKey: \(hasKey), keyNotEmpty: \(keyNotEmpty), keyNotDefault: \(keyNotDefault)")
         
         guard let key = configService.openAIKey,
               !key.isEmpty,
               key != "REPLACE_WITH_YOUR_OPENAI_KEY" else {
-            print("TTSService: TTS service not properly configured")
+            logger.warning("TTS service not properly configured")
             return false
         }
-        print("TTSService: TTS service properly configured")
+        logger.debug("TTS service properly configured")
         return true
     }
     
     func generateAudio(for text: String, script: ChineseScript) async throws -> AudioAsset {
-        print("TTSService: generateAudio called for text: '\(text.prefix(50))...'")
-        print("TTSService: Script: \(script), isConfigured: \(isConfigured())")
+        logger.info("generateAudio called for text: '\(text.prefix(50))...'")
+        let configured = isConfigured()
+        logger.debug("Script: \(script.rawValue), isConfigured: \(configured)")
         
-        guard isConfigured() else {
-            print("TTSService: TTS service not configured")
+        guard configured else {
+            logger.warning("TTS service not configured")
             throw TTSError.notConfigured
         }
         
@@ -61,22 +64,22 @@ class TTSServiceOpenAI: TTSService {
         let voice = script == .simplified ? voiceSimplified : voiceTraditional
         let speed = ttsSpeed
         
-        print("TTSService: Using voice: \(voice), speed: \(speed)")
+        logger.debug("Using voice: \(voice), speed: \(speed)")
         
         let cacheKey = "\(text):\(voice):\(speed):\(script.rawValue)".sha256()
-        print("TTSService: Cache key: \(cacheKey.prefix(16))...")
+        logger.debug("Cache key: \(cacheKey.prefix(16))...")
         
         if let existingAsset = checkCache(for: cacheKey) {
-            print("TTSService: Found cached audio asset")
+            logger.debug("Found cached audio asset")
             return existingAsset
         }
         
-        print("TTSService: No cache found, making API request")
+        logger.debug("No cache found, making API request")
         let audioData = try await requestTTS(text: text, voice: voice, speed: speed)
-        print("TTSService: Received audio data, size: \(audioData.count) bytes")
+        logger.info("Received audio data, size: \(audioData.count) bytes")
         
         let savedAsset = try saveAudio(data: audioData, key: cacheKey)
-        print("TTSService: Audio saved to: \(savedAsset.fileURL)")
+        logger.info("Audio saved to: \(savedAsset.fileURL)")
         return savedAsset
     }
     
@@ -95,11 +98,11 @@ class TTSServiceOpenAI: TTSService {
     }
     
     private func requestTTS(text: String, voice: String, speed: Double) async throws -> Data {
-        print("TTSService: Making TTS request with voice: \(voice), speed: \(speed)")
+        logger.debug("Making TTS request with voice: \(voice), speed: \(speed)")
         
         guard let key = configService.openAIKey,
               let url = URL(string: "https://api.openai.com/v1/audio/speech") else {
-            print("TTSService: Invalid configuration - missing API key or URL")
+            logger.error("Invalid configuration - missing API key or URL")
             throw TTSError.invalidConfiguration
         }
         
@@ -116,36 +119,36 @@ class TTSServiceOpenAI: TTSService {
             "speed": speed
         ]
         
-        print("TTSService: Request payload - model: \(configService.ttsModel), voice: \(voice), speed: \(speed), format: aac")
+        logger.debug("Request payload - model: \(self.configService.ttsModel), voice: \(voice), speed: \(speed), format: aac")
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-            print("TTSService: Request body created, size: \(request.httpBody?.count ?? 0) bytes")
+            logger.debug("Request body created, size: \(request.httpBody?.count ?? 0) bytes")
         } catch {
-            print("TTSService: Failed to serialize request payload: \(error)")
+            logger.error("Failed to serialize request payload: \(error)")
             throw error
         }
         
-        print("TTSService: Sending request to OpenAI TTS API...")
+        logger.debug("Sending request to OpenAI TTS API...")
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("TTSService: Invalid response type")
+            logger.error("Invalid response type")
             throw TTSError.requestFailed
         }
         
-        print("TTSService: Received response with status code: \(httpResponse.statusCode)")
-        print("TTSService: Response data size: \(data.count) bytes")
+        logger.info("Received response with status code: \(httpResponse.statusCode)")
+        logger.debug("Response data size: \(data.count) bytes")
         
         guard httpResponse.statusCode == 200 else {
-            print("TTSService: API request failed with status: \(httpResponse.statusCode)")
+            logger.error("API request failed with status: \(httpResponse.statusCode)")
             if let responseString = String(data: data, encoding: .utf8) {
-                print("TTSService: Error response: \(responseString)")
+                logger.error("Error response: \(responseString)")
             }
             throw TTSError.requestFailed
         }
         
-        print("TTSService: TTS request completed successfully")
+        logger.debug("TTS request completed successfully")
         return data
     }
     
