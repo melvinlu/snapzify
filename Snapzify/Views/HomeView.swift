@@ -147,7 +147,7 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     // Images first
                     ForEach(vm.savedDocuments) { doc in
-                        documentRow(doc)
+                        documentRow(doc, showPinIcon: false)
                         
                         let isLast = doc.id == vm.savedDocuments.last?.id && vm.savedSentences.isEmpty
                         if !isLast {
@@ -224,7 +224,7 @@ struct HomeView: View {
             
             VStack(spacing: 0) {
                 ForEach(Array(vm.documents.prefix(10).enumerated()), id: \.element.id) { index, doc in
-                    documentRow(doc)
+                    documentRow(doc, showPinIcon: false)
                     
                     if index < min(9, vm.documents.count - 1) {
                         Divider()
@@ -238,7 +238,7 @@ struct HomeView: View {
     }
     
     @ViewBuilder
-    private func documentRow(_ doc: Document) -> some View {
+    private func documentRow(_ doc: Document, showPinIcon: Bool = true) -> some View {
         HStack(spacing: T.S.md) {
             Group {
                 if let imageData = doc.imageData,
@@ -271,7 +271,7 @@ struct HomeView: View {
                         .font(.subheadline)
                         .lineLimit(1)
                     
-                    if doc.isSaved {
+                    if doc.isSaved && showPinIcon {
                         Image(systemName: "pin.fill")
                             .foregroundStyle(T.C.accent)
                             .font(.caption2)
