@@ -101,7 +101,7 @@ struct ContentView: View {
                 ocrService: OCRServiceImpl(),
                 scriptConversionService: ScriptConversionServiceImpl(),
                 segmentationService: SentenceSegmentationServiceImpl(),
-                pinyinService: PinyinServiceImpl(),
+                pinyinService: PinyinServiceOpenAI(configService: ConfigServiceImpl()),
                 onOpenSettings: {
                     showSettings = true
                 },
@@ -168,7 +168,7 @@ struct ContentView: View {
         let ocrService = OCRServiceImpl()
         let scriptConversionService = ScriptConversionServiceImpl()
         let segmentationService = SentenceSegmentationServiceImpl()
-        let pinyinService = PinyinServiceImpl()
+        let pinyinService = PinyinServiceOpenAI(configService: ConfigServiceImpl())
         
         do {
             // Perform OCR on the image
@@ -189,7 +189,7 @@ struct ContentView: View {
                     let simplifiedText = scriptConversionService.toSimplified(sentenceText)
                     
                     // Get pinyin
-                    let pinyin = await pinyinService.getPinyin(for: simplifiedText, script: .simplified)
+                    let pinyin = await pinyinService.getPinyin(for: simplifiedText, script: ChineseScript.simplified)
                     
                     // Create sentence
                     let sentence = Sentence(

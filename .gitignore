@@ -10,3 +10,7 @@ DerivedData/
 # Configuration files with API keys
 SnapzifyConfig.json
 **/SnapzifyConfig.json
+google-cloud-vision-key.json
+**/google-cloud-vision-key.json
+practical-well-468204-k2-08d5795852cb.json
+**/practical-well-468204-k2-08d5795852cb.json

@@ -5,6 +5,7 @@ class ConfigServiceImpl: ConfigService {
     private var config: SnapzifyConfig
     private let keychainService = "com.snapzify.api"
     private let keychainAccount = "openai"
+    private let googleCloudKeychainAccount = "googlecloud"
     
     var openAIKey: String? {
         if let keychainKey = getKeyFromKeychain() {
@@ -12,6 +13,19 @@ class ConfigServiceImpl: ConfigService {
         }
         return config.openai.apiKey.isEmpty || 
                config.openai.apiKey == "REPLACE_WITH_YOUR_OPENAI_KEY" ? nil : config.openai.apiKey
+    }
+    
+    var googleCloudVisionKey: String? {
+        if let keychainKey = getKeyFromKeychain(account: googleCloudKeychainAccount) {
+            return keychainKey
+        }
+        // Check if config has Google Cloud Vision key
+        if let googleConfig = config.googleCloud,
+           !googleConfig.visionApiKey.isEmpty,
+           googleConfig.visionApiKey != "REPLACE_WITH_YOUR_GOOGLE_CLOUD_KEY" {
+            return googleConfig.visionApiKey
+        }
+        return nil
     }
     
     var translationModel: String { config.openai.translationModel }
@@ -40,11 +54,11 @@ class ConfigServiceImpl: ConfigService {
         }
     }
     
-    private func getKeyFromKeychain() -> String? {
+    private func getKeyFromKeychain(account: String? = nil) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount,
+            kSecAttrAccount as String: account ?? keychainAccount,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -91,6 +105,7 @@ class ConfigServiceImpl: ConfigService {
 struct SnapzifyConfig: Codable {
     let openai: OpenAIConfig
     let features: FeaturesConfig
+    let googleCloud: GoogleCloudConfig?
     
     struct OpenAIConfig: Codable {
         let apiKey: String
@@ -106,6 +121,10 @@ struct SnapzifyConfig: Codable {
         let cloudAudioEnabledDefault: Bool
     }
     
+    struct GoogleCloudConfig: Codable {
+        let visionApiKey: String
+    }
+    
     static let `default` = SnapzifyConfig(
         openai: OpenAIConfig(
             apiKey: "REPLACE_WITH_YOUR_OPENAI_KEY",
@@ -118,6 +137,7 @@ struct SnapzifyConfig: Codable {
         features: FeaturesConfig(
             cloudTranslationEnabledDefault: true,
             cloudAudioEnabledDefault: true
-        )
+        ),
+        googleCloud: nil
     )
 }

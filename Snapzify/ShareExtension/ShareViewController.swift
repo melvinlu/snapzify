@@ -123,7 +123,8 @@ class ShareViewController: UIViewController, ObservableObject {
         let ocrService = OCRServiceImpl()
         let scriptConversionService = ScriptConversionServiceImpl()
         let segmentationService = SentenceSegmentationServiceImpl()
-        let pinyinService = PinyinServiceImpl()
+        let configService = ConfigServiceImpl()
+        let pinyinService = PinyinServiceOpenAI(configService: configService)
         
         let script = ChineseScript.simplified
         
@@ -136,19 +137,21 @@ class ShareViewController: UIViewController, ObservableObject {
             return OCRLine(text: normalizedText, bbox: line.bbox, words: line.words)
         }
         
-        let sentenceData = segmentationService.segmentIntoSentences(from: normalizedLines)
+        let sentenceData = await segmentationService.segmentIntoSentences(from: normalizedLines)
         
-        let sentences = sentenceData.map { sentenceInfo in
-            let tokens = segmentationService.tokenize(sentenceInfo.text)
-            let pinyin = pinyinService.getPinyinForTokens(tokens, script: script)
+        var sentences: [Sentence] = []
+        for sentenceInfo in sentenceData {
+            let tokens = await segmentationService.tokenize(sentenceInfo.text)
+            let pinyin = await pinyinService.getPinyinForTokens(tokens, script: script)
             
-            return Sentence(
+            let sentence = Sentence(
                 text: sentenceInfo.text,
                 rangeInImage: sentenceInfo.bbox,
                 tokens: tokens,
                 pinyin: pinyin,
                 status: .ocrOnly
             )
+            sentences.append(sentence)
         }
         
         return Document(

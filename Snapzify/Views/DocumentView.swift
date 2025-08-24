@@ -190,10 +190,13 @@ struct FullScreenImageView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
+    @State private var dragOffset: CGSize = .zero
+    @State private var backgroundOpacity: Double = 1.0
     
     var body: some View {
         ZStack {
             Color.black
+                .opacity(backgroundOpacity)
                 .ignoresSafeArea(.all)
             
             VStack {
@@ -212,7 +215,7 @@ struct FullScreenImageView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .scaleEffect(scale)
-                    .offset(offset)
+                    .offset(x: offset.width, y: offset.height + dragOffset.height)
                     .gesture(
                         SimultaneousGesture(
                             MagnificationGesture()
@@ -235,17 +238,41 @@ struct FullScreenImageView: View {
                                 },
                             DragGesture()
                                 .onChanged { value in
-                                    offset = CGSize(
-                                        width: lastOffset.width + value.translation.width,
-                                        height: lastOffset.height + value.translation.height
-                                    )
+                                    if scale > 1.0 {
+                                        // When zoomed in, use drag for panning
+                                        offset = CGSize(
+                                            width: lastOffset.width + value.translation.width,
+                                            height: lastOffset.height + value.translation.height
+                                        )
+                                    } else {
+                                        // When not zoomed, use vertical drag for dismissal
+                                        if value.translation.height > 0 {
+                                            dragOffset = value.translation
+                                            backgroundOpacity = 1.0 - (value.translation.height / 500.0)
+                                        }
+                                    }
                                 }
-                                .onEnded { _ in
-                                    lastOffset = offset
-                                    if scale <= 1.0 {
-                                        withAnimation {
-                                            offset = .zero
-                                            lastOffset = .zero
+                                .onEnded { value in
+                                    if scale > 1.0 {
+                                        // When zoomed in, save pan offset
+                                        lastOffset = offset
+                                    } else {
+                                        // When not zoomed, check for dismissal
+                                        if value.translation.height > 150 {
+                                            isPresented = false
+                                        } else {
+                                            withAnimation(.spring()) {
+                                                dragOffset = .zero
+                                                backgroundOpacity = 1.0
+                                            }
+                                        }
+                                        
+                                        // Reset offsets when at normal scale
+                                        if scale <= 1.0 {
+                                            withAnimation {
+                                                offset = .zero
+                                                lastOffset = .zero
+                                            }
                                         }
                                     }
                                 }

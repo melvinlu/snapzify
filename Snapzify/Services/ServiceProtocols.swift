@@ -39,6 +39,7 @@ protocol PlecoLinkService {
 
 protocol ConfigService {
     var openAIKey: String? { get }
+    var googleCloudVisionKey: String? { get }
     var translationModel: String { get }
     var ttsModel: String { get }
     var defaultVoiceSimplified: String { get }

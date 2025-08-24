@@ -1,102 +1,68 @@
 import Foundation
 import UIKit
 
-struct ParsedSentence: Codable {
-    let chinese: String
-    let pinyin: String
-    let english: String
-}
-
 class OCRServiceImpl: OCRService {
+    private let googleCloudVisionURL = "https://vision.googleapis.com/v1/images:annotate"
     private let configService = ConfigServiceImpl()
     
     func recognizeText(in image: UIImage) async throws -> [OCRLine] {
-        print("OCR: Starting text recognition...")
+        print("OCR: Starting text recognition with Google Cloud Vision...")
         
-        guard let apiKey = configService.openAIKey else {
-            print("OCR: No API key found")
+        // Get API key from config
+        guard let apiKey = configService.googleCloudVisionKey, !apiKey.isEmpty else {
+            print("OCR: No Google Cloud Vision API key configured")
             throw OCRError.noAPIKey
         }
-        
-        print("OCR: API key found, processing image...")
-        
-        // Skip API key validation to improve performance - let the main request handle any auth errors
         
         // Resize image if too large
         let resizedImage = resizeImageIfNeeded(image)
         
-        var finalImageData: Data
-        
-        guard let imageData = resizedImage.jpegData(compressionQuality: 0.3) else { // Further reduced for faster processing
+        guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
             print("OCR: Failed to convert image to JPEG")
             throw OCRError.invalidImage
         }
         
         print("OCR: Image converted to JPEG, size: \(imageData.count) bytes")
         
-        // Check if image data is too large (OpenAI has a 20MB limit, but aim for much smaller)
-        if imageData.count > 5 * 1024 * 1024 { // Reduced threshold from 20MB to 5MB
-            print("OCR: Image too large (\(imageData.count) bytes), reducing quality")
-            guard let smallerData = resizedImage.jpegData(compressionQuality: 0.2) else {
-                throw OCRError.invalidImage
-            }
-            finalImageData = smallerData
-            print("OCR: Using compressed image, size: \(finalImageData.count) bytes")
-        } else {
-            finalImageData = imageData
-        }
+        let base64Image = imageData.base64EncodedString()
         
-        let base64Image = finalImageData.base64EncodedString()
-        print("OCR: Image encoded to base64, length: \(base64Image.count)")
-        
+        // Create request payload for Google Cloud Vision
         let payload: [String: Any] = [
-            "model": "gpt-4o-mini",
-            "messages": [
+            "requests": [
                 [
-                    "role": "user",
-                    "content": [
+                    "image": [
+                        "content": base64Image
+                    ],
+                    "features": [
                         [
-                            "type": "text",
-                            "text": """
-                                From this picture, parse out ALL the Chinese (grouped by digital spacing), and also provide pinyin"
-                                + "and English for them. Return ONLY a JSON array containing an array for each section with this exact format: [{\"chinese\": \"Chinese text\", \"pinyin\": \"pinyin text\", \"english\": \"English translation\"}]. No markdown, no\"
-                                 "explanations, just the JSON array.
-                                """
+                            "type": "TEXT_DETECTION",
+                            "maxResults": 50
                         ],
                         [
-                            "type": "image_url",
-                            "image_url": [
-                                "url": "data:image/jpeg;base64,\(base64Image)"
-                            ]
+                            "type": "DOCUMENT_TEXT_DETECTION",
+                            "maxResults": 50
                         ]
+                    ],
+                    "imageContext": [
+                        "languageHints": ["zh", "zh-Hans", "zh-Hant", "en"]
                     ]
                 ]
-            ],
-            "max_tokens": 3000
+            ]
         ]
         
-        print("OCR: Creating API request...")
-        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        print("OCR: Creating Google Cloud Vision API request...")
+        
+        // Use API key authentication
+        let urlWithKey = "\(googleCloudVisionURL)?key=\(apiKey)"
+        var request = URLRequest(url: URL(string: urlWithKey)!)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        request.timeoutInterval = 30.0 // Reduced timeout for faster failure
+        request.timeoutInterval = 30.0
         
-        print("OCR: Sending request to OpenAI...")
+        print("OCR: Sending request to Google Cloud Vision...")
         
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-            print("OCR: Received response from OpenAI")
-        } catch {
-            print("OCR: Network request failed: \(error)")
-            if let urlError = error as? URLError {
-                print("OCR: URLError code: \(urlError.code.rawValue)")
-                print("OCR: URLError description: \(urlError.localizedDescription)")
-            }
-            throw OCRError.apiError
-        }
+        let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             print("OCR: Invalid response type")
@@ -113,218 +79,157 @@ class OCRServiceImpl: OCRService {
             throw OCRError.apiError
         }
         
+        // Parse the response
         let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        guard let choices = result?["choices"] as? [[String: Any]],
-              let firstChoice = choices.first,
-              let message = firstChoice["message"] as? [String: Any],
-              let content = message["content"] as? String else {
-            print("OCR: Failed to parse OpenAI response structure")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("OCR: Raw response: \(responseString.prefix(500))...")
-            }
+        guard let responses = result?["responses"] as? [[String: Any]],
+              let firstResponse = responses.first else {
+            print("OCR: Failed to parse Google Cloud Vision response")
             throw OCRError.invalidResponse
         }
         
-        print("OCR: Successfully extracted content from OpenAI response")
-        print("OCR: Content preview: \(content.prefix(200))...")
+        var ocrLines: [OCRLine] = []
         
-        // Check for content policy violations
-        if content.lowercased().contains("sorry") && content.lowercased().contains("can't assist") {
-            print("OCR: Content policy violation detected, content may be inappropriate for OpenAI")
-            throw OCRError.apiError
-        }
-        
-        // Try to parse as JSON array of parsed sentences
-        // First, try to extract JSON from the content (ChatGPT often wraps JSON in markdown)
-        let cleanedContent = extractJSONFromContent(content)
-        print("OCR: Attempting to parse JSON from cleaned content: \(cleanedContent.prefix(200))...")
-        
-        if let jsonData = cleanedContent.data(using: .utf8) {
-            do {
-                let parsedSentences = try JSONDecoder().decode([ParsedSentence].self, from: jsonData)
-                print("OCR: Successfully parsed \(parsedSentences.count) sentences from JSON response")
-                
-                // Convert parsed sentences to OCRLine format
-                return parsedSentences.enumerated().map { index, parsed in
-                    let lineHeight = image.size.height / CGFloat(parsedSentences.count)
-                    let bbox = CGRect(
-                        x: 0,
-                        y: CGFloat(index) * lineHeight,
-                        width: image.size.width,
-                        height: lineHeight
-                    )
-                    // Store complete parsed data in the text field temporarily 
-                    // We'll extract it later in the processing pipeline
-                    let combinedText = "\(parsed.chinese)|\(parsed.pinyin)|\(parsed.english)"
-                    return OCRLine(text: combinedText, bbox: bbox, words: [])
+        // Try to get full text annotation first (better for documents)
+        if let fullTextAnnotation = firstResponse["fullTextAnnotation"] as? [String: Any],
+           let pages = fullTextAnnotation["pages"] as? [[String: Any]] {
+            
+            print("OCR: Processing full text annotation...")
+            
+            for page in pages {
+                if let blocks = page["blocks"] as? [[String: Any]] {
+                    for block in blocks {
+                        if let paragraphs = block["paragraphs"] as? [[String: Any]] {
+                            for paragraph in paragraphs {
+                                var paragraphText = ""
+                                var paragraphBbox: CGRect?
+                                
+                                if let words = paragraph["words"] as? [[String: Any]] {
+                                    for word in words {
+                                        if let symbols = word["symbols"] as? [[String: Any]] {
+                                            for symbol in symbols {
+                                                if let text = symbol["text"] as? String {
+                                                    paragraphText += text
+                                                }
+                                                // Check for space after symbol
+                                                if let property = symbol["property"] as? [String: Any],
+                                                   let detectedBreak = property["detectedBreak"] as? [String: Any],
+                                                   let breakType = detectedBreak["type"] as? String {
+                                                    if breakType == "SPACE" || breakType == "EOL_SURE_SPACE" {
+                                                        paragraphText += " "
+                                                    } else if breakType == "LINE_BREAK" || breakType == "EOL_SURE_BREAK" {
+                                                        // This is a line break, so we should treat this as end of line
+                                                        let trimmedText = paragraphText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                                        if !trimmedText.isEmpty {
+                                                            ocrLines.append(OCRLine(
+                                                                text: trimmedText,
+                                                                bbox: paragraphBbox ?? CGRect(x: 0, y: 0, width: image.size.width, height: 50),
+                                                                words: []
+                                                            ))
+                                                            paragraphText = ""
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Get bounding box for paragraph
+                                if let boundingBox = paragraph["boundingBox"] as? [String: Any],
+                                   let vertices = boundingBox["vertices"] as? [[String: Any]],
+                                   vertices.count >= 4 {
+                                    
+                                    let minX = vertices.compactMap { ($0["x"] as? Int) ?? 0 }.min() ?? 0
+                                    let minY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.min() ?? 0
+                                    let maxX = vertices.compactMap { ($0["x"] as? Int) ?? 0 }.max() ?? 0
+                                    let maxY = vertices.compactMap { ($0["y"] as? Int) ?? 0 }.max() ?? 0
+                                    
+                                    paragraphBbox = CGRect(
+                                        x: Double(minX),
+                                        y: Double(minY),
+                                        width: Double(maxX - minX),
+                                        height: Double(maxY - minY)
+                                    )
+                                }
+                                
+                                // Add remaining text if any
+                                let trimmedText = paragraphText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmedText.isEmpty {
+                                    ocrLines.append(OCRLine(
+                                        text: trimmedText,
+                                        bbox: paragraphBbox ?? CGRect(x: 0, y: 0, width: image.size.width, height: 50),
+                                        words: []
+                                    ))
+                                }
+                            }
+                        }
+                    }
                 }
-            } catch let decodingError {
-                print("OCR: Failed to parse JSON response: \(decodingError)")
-                print("OCR: JSON content that failed to parse: '\(cleanedContent)'")
-                print("OCR: Full original content: '\(content)'")
+            }
+        } else if let textAnnotations = firstResponse["textAnnotations"] as? [[String: Any]] {
+            // Fallback to text annotations
+            print("OCR: Using text annotations fallback...")
+            
+            // The first annotation contains all text, split it by lines
+            if let firstAnnotation = textAnnotations.first,
+               let fullText = firstAnnotation["description"] as? String {
                 
-                // Try to parse individual JSON objects if array parsing fails
-                if let individualSentences = tryParseIndividualSentences(from: cleanedContent) {
-                    print("OCR: Successfully recovered \(individualSentences.count) sentences using fallback parsing")
-                    return individualSentences.enumerated().map { index, parsed in
-                        let lineHeight = image.size.height / CGFloat(individualSentences.count)
+                let lines = fullText.components(separatedBy: .newlines)
+                for (index, line) in lines.enumerated() {
+                    let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmedLine.isEmpty {
+                        // Create a simple bounding box for each line
+                        let lineHeight = image.size.height / CGFloat(lines.count)
                         let bbox = CGRect(
                             x: 0,
                             y: CGFloat(index) * lineHeight,
                             width: image.size.width,
                             height: lineHeight
                         )
-                        let combinedText = "\(parsed.chinese)|\(parsed.pinyin)|\(parsed.english)"
-                        return OCRLine(text: combinedText, bbox: bbox, words: [])
+                        ocrLines.append(OCRLine(text: trimmedLine, bbox: bbox, words: []))
                     }
                 }
-                // Fall back to treating as plain text
             }
         }
         
-        // Fallback: split content into lines for basic processing
-        let lines = content.components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        print("OCR: Successfully extracted \(ocrLines.count) lines of text")
         
-        print("OCR: Using fallback text parsing, split content into \(lines.count) lines")
-        
-        if lines.isEmpty {
-            // If no lines, return the original content as one block
-            let fallbackBox = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
-            return [OCRLine(text: content, bbox: fallbackBox, words: [])]
+        if ocrLines.isEmpty {
+            // If no text found, return a message
+            return [OCRLine(
+                text: "No text detected",
+                bbox: CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height),
+                words: []
+            )]
         }
         
-        // Create OCR lines with estimated bounding boxes
-        return lines.enumerated().map { index, lineText in
-            let lineHeight = image.size.height / CGFloat(lines.count)
-            let bbox = CGRect(
-                x: 0,
-                y: CGFloat(index) * lineHeight,
-                width: image.size.width,
-                height: lineHeight
-            )
-            return OCRLine(text: lineText, bbox: bbox, words: [])
+        // Filter out any lines that don't contain Chinese characters if needed
+        let chineseLines = ocrLines.filter { line in
+            containsChinese(line.text) || line.text.contains("No text detected")
         }
+        
+        return chineseLines.isEmpty ? ocrLines : chineseLines
     }
     
-    private func tryParseIndividualSentences(from content: String) -> [ParsedSentence]? {
-        // Try to extract individual JSON objects from malformed array content
-        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Look for individual JSON objects using regex pattern
-        let pattern = "\\{[^\\{\\}]*\"chinese\"[^\\{\\}]*\"pinyin\"[^\\{\\}]*\"english\"[^\\{\\}]*\\}"
-        
-        do {
-            let regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
-            let range = NSRange(location: 0, length: trimmedContent.count)
-            let matches = regex.matches(in: trimmedContent, options: [], range: range)
-            
-            var parsedSentences: [ParsedSentence] = []
-            
-            for match in matches {
-                if let range = Range(match.range, in: trimmedContent) {
-                    let jsonObjectString = String(trimmedContent[range])
-                    
-                    if let jsonData = jsonObjectString.data(using: .utf8) {
-                        do {
-                            let sentence = try JSONDecoder().decode(ParsedSentence.self, from: jsonData)
-                            parsedSentences.append(sentence)
-                        } catch {
-                            print("OCR: Failed to parse individual sentence: \(jsonObjectString)")
-                        }
-                    }
-                }
-            }
-            
-            return parsedSentences.isEmpty ? nil : parsedSentences
-        } catch {
-            print("OCR: Regex parsing failed: \(error)")
-            return nil
-        }
-    }
-    
-    private func extractJSONFromContent(_ content: String) -> String {
-        // ChatGPT often wraps JSON in markdown code blocks or adds explanatory text
-        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // First try: Look for markdown code blocks with json
-        if trimmedContent.contains("```") {
-            let lines = trimmedContent.components(separatedBy: .newlines)
-            var jsonLines: [String] = []
-            var inCodeBlock = false
-            
-            for line in lines {
-                let cleanLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                if cleanLine.hasPrefix("```") {
-                    if inCodeBlock {
-                        break // End of code block
-                    } else {
-                        inCodeBlock = true // Start of code block
-                        continue
-                    }
-                }
-                if inCodeBlock {
-                    jsonLines.append(line)
-                }
-            }
-            
-            let extractedJson = jsonLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            if !extractedJson.isEmpty && (extractedJson.hasPrefix("[") || extractedJson.hasPrefix("{")) {
-                return extractedJson
+    private func containsChinese(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            // Check for CJK Unified Ideographs ranges
+            if (0x4E00...0x9FFF).contains(scalar.value) ||
+               (0x3400...0x4DBF).contains(scalar.value) ||
+               (0x20000...0x2A6DF).contains(scalar.value) ||
+               (0x2A700...0x2B73F).contains(scalar.value) ||
+               (0x2B740...0x2B81F).contains(scalar.value) ||
+               (0x2B820...0x2CEAF).contains(scalar.value) ||
+               (0x2CEB0...0x2EBEF).contains(scalar.value) ||
+               (0x30000...0x3134F).contains(scalar.value) {
+                return true
             }
         }
-        
-        // Second try: Look for JSON array patterns - use safer string extraction
-        if let startRange = trimmedContent.range(of: "["),
-           let endRange = trimmedContent.range(of: "]", options: .backwards),
-           startRange.lowerBound < endRange.upperBound {
-            
-            // Create safe substring extraction
-            let startIndex = startRange.lowerBound
-            let endIndex = endRange.upperBound
-            
-            // Ensure indices are valid
-            if startIndex < trimmedContent.endIndex && endIndex <= trimmedContent.endIndex {
-                let jsonContent = String(trimmedContent[startIndex..<endIndex])
-                return jsonContent
-            }
-        }
-        
-        // Third try: Look for lines that start with [ or { (common ChatGPT format)
-        let lines = trimmedContent.components(separatedBy: .newlines)
-        var jsonContent: [String] = []
-        var foundStart = false
-        
-        for line in lines {
-            let cleanLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if cleanLine.hasPrefix("[") || cleanLine.hasPrefix("{") {
-                foundStart = true
-            }
-            
-            if foundStart {
-                jsonContent.append(line)
-                
-                // Stop if we found the end
-                if cleanLine.hasSuffix("]") || cleanLine.hasSuffix("}") {
-                    break
-                }
-            }
-        }
-        
-        if !jsonContent.isEmpty {
-            let extracted = jsonContent.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            if !extracted.isEmpty {
-                return extracted
-            }
-        }
-        
-        // Return as-is if no special formatting detected
-        return trimmedContent
+        return false
     }
     
     private func resizeImageIfNeeded(_ image: UIImage) -> UIImage {
-        let maxDimension: CGFloat = 768 // Further reduced from 1024 to 768 for faster processing
+        let maxDimension: CGFloat = 1024
         let currentMax = max(image.size.width, image.size.height)
         
         if currentMax <= maxDimension {
