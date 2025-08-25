@@ -4,6 +4,7 @@ struct DocumentView: View {
     @StateObject var vm: DocumentViewModel
     @State private var showFullScreenImage = false
     @State private var dividerPosition: CGFloat = UIScreen.main.bounds.height * 0.5
+    @State private var dragStartPosition: CGFloat = 0
     @State private var isDragging = false
     @Environment(\.dismiss) private var dismiss
     
@@ -30,43 +31,54 @@ struct DocumentView: View {
                 }
                 
                 // Sentences section - positioned below divider
-                ZStack(alignment: .top) {
-                    // Background for bottom sheet
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(T.C.card.opacity(0.95))
-                        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: -5)
+                VStack(spacing: 0) {
+                    Spacer()
+                        .frame(height: dividerPosition + 30)
                     
-                    ScrollView(.vertical) {
-                        VStack(spacing: T.S.sm) {
-                            // Sentences list
-                            sentencesList
-                                .padding(.horizontal, 16)
-                                .padding(.top, 12)
-                                .padding(.bottom, 20)
+                    ZStack(alignment: .top) {
+                        // Background for bottom sheet
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(T.C.card.opacity(0.95))
+                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: -5)
+                        
+                        ScrollView(.vertical) {
+                            VStack(spacing: T.S.sm) {
+                                // Sentences list
+                                sentencesList
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 12)
+                                    .padding(.bottom, 20)
+                            }
                         }
+                        .scrollIndicators(.hidden)
                     }
-                    .scrollIndicators(.hidden)
+                    .frame(maxHeight: .infinity)
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height - dividerPosition - 20)
-                .position(x: geometry.size.width / 2, y: dividerPosition + 20 + (geometry.size.height - dividerPosition - 20) / 2)
                 
                 // Divider - positioned at dividerPosition
-                VStack(spacing: 2) {
-                    Capsule()
-                        .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
-                        .frame(width: 40, height: 4)
-                    Capsule()
-                        .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
-                        .frame(width: 40, height: 4)
+                HStack {
+                    Spacer()
+                    VStack(spacing: 3) {
+                        Capsule()
+                            .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
+                            .frame(width: 40, height: 4)
+                        Capsule()
+                            .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
+                            .frame(width: 40, height: 4)
+                    }
+                    Spacer()
                 }
-                .frame(width: geometry.size.width, height: 20)
-                .position(x: geometry.size.width / 2, y: dividerPosition + 10)
+                .frame(width: geometry.size.width, height: 30) // Taller with full width hitbox
                 .contentShape(Rectangle())
-                .highPriorityGesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                .position(x: geometry.size.width / 2, y: dividerPosition + 15)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            isDragging = true
-                            let newPosition = value.location.y - geometry.frame(in: .global).minY - 10
+                            if !isDragging {
+                                isDragging = true
+                                dragStartPosition = dividerPosition
+                            }
+                            let newPosition = dragStartPosition + value.translation.height
                             dividerPosition = min(max(newPosition, geometry.size.height * 0.2), geometry.size.height * 0.8)
                         }
                         .onEnded { _ in
@@ -220,9 +232,6 @@ struct DocumentView: View {
                     vm: vm.createSentenceViewModel(for: sentence)
                 )
                 .id(sentence.id) // Use stable ID to prevent view recreation
-                .onTapGesture {
-                    vm.selectSentence(sentence.id)
-                }
             }
         }
     }

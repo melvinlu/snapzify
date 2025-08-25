@@ -7,7 +7,7 @@
         "key": "Delete Document",
         "location": {
           "startingColumn": 16,
-          "startingLine": 87
+          "startingLine": 99
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "Cancel",
         "location": {
           "startingColumn": 20,
-          "startingLine": 88
+          "startingLine": 100
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "Delete",
         "location": {
           "startingColumn": 20,
-          "startingLine": 89
+          "startingLine": 101
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "This will delete the document from Snapzify AND permanently delete the original photo from your device's photo library. This action cannot be undone.",
         "location": {
           "startingColumn": 18,
-          "startingLine": 93
+          "startingLine": 105
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "Done",
         "location": {
           "startingColumn": 28,
-          "startingLine": 256
+          "startingLine": 265
         }
       }
     ]
