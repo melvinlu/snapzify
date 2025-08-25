@@ -6,23 +6,51 @@ struct DocumentView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        RootBackground {
-            ScrollView(.vertical) {
-                VStack(spacing: T.S.md) {
-                    if vm.showOriginalImage, let imageData = vm.document.imageData {
-                        imageSection(imageData: imageData)
+        GeometryReader { geometry in
+            RootBackground {
+                VStack(spacing: 0) {
+                    // Top 50%: Fixed image section
+                    ZStack(alignment: .bottom) {
+                        if let imageData = vm.document.imageData {
+                            imageSection(imageData: imageData, height: geometry.size.height * 0.5)
+                        }
+                        
+                        // Action buttons overlay at bottom of image
+                        actionButtons
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
                     }
+                    .frame(height: geometry.size.height * 0.5)
                     
-                    imageToggle
-                    
-                    
-                    sentencesList
+                    // Bottom 50%: Scrollable sentences list
+                    ZStack(alignment: .top) {
+                        // Background for bottom sheet
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(T.C.card.opacity(0.95))
+                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: -5)
+                        
+                        ScrollView(.vertical) {
+                            VStack(spacing: T.S.sm) {
+                                // Handle bar indicator
+                                Capsule()
+                                    .fill(T.C.ink2.opacity(0.3))
+                                    .frame(width: 36, height: 5)
+                                    .padding(.top, 8)
+                                    .padding(.bottom, 4)
+                                
+                                // Sentences list
+                                sentencesList
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 20)
+                            }
+                        }
+                        .scrollIndicators(.hidden)
+                    }
+                    .frame(height: geometry.size.height * 0.5)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 20)
             }
-            .scrollIndicators(.hidden)
         }
+        .ignoresSafeArea(edges: .bottom)
         .navigationTitle(documentTitle)
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
@@ -59,35 +87,42 @@ struct DocumentView: View {
     }
     
     @ViewBuilder
-    private func imageSection(imageData: Data) -> some View {
+    private func imageSection(imageData: Data, height: CGFloat) -> some View {
         if let uiImage = UIImage(data: imageData) {
             GeometryReader { geometry in
                 ZStack {
+                    // Background blur
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: height)
+                        .blur(radius: 30)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.3))
+                    
+                    // Main image
                     Image(uiImage: uiImage)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: geometry.size.width)
+                        .frame(maxWidth: geometry.size.width, maxHeight: height)
                     
                     if let selectedId = vm.selectedSentenceId,
                        let region = vm.highlightedRegion(for: selectedId) {
-                        highlightOverlay(region: region, imageSize: uiImage.size, viewSize: geometry.size)
+                        let imageDisplaySize = calculateImageDisplaySize(imageSize: uiImage.size, viewSize: CGSize(width: geometry.size.width, height: height))
+                        highlightOverlay(region: region, imageSize: uiImage.size, viewSize: imageDisplaySize)
                     }
                 }
             }
-            .frame(height: 300)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(T.C.outline, lineWidth: 1)
-            )
-            .transition(.asymmetric(
-                insertion: .scale(scale: 0.95).combined(with: .opacity),
-                removal: .scale(scale: 0.95).combined(with: .opacity)
-            ))
+            .frame(height: height)
             .onTapGesture {
                 showFullScreenImage = true
             }
         }
+    }
+    
+    private func calculateImageDisplaySize(imageSize: CGSize, viewSize: CGSize) -> CGSize {
+        let scale = min(viewSize.width / imageSize.width, viewSize.height / imageSize.height)
+        return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
     }
     
     @ViewBuilder
@@ -112,47 +147,33 @@ struct DocumentView: View {
     }
     
     @ViewBuilder
-    private var imageToggle: some View {
+    private var actionButtons: some View {
         HStack(spacing: T.S.sm) {
-            Button {
-                vm.toggleImageVisibility()
-            } label: {
-                HStack {
-                    Image(systemName: vm.showOriginalImage ? "eye.slash" : "eye")
-                    Text(vm.showOriginalImage ? "Hide" : "Show")
-                        .font(.subheadline)
-                }
-                .foregroundStyle(T.C.ink2)
-                .frame(height: 32)
-                .padding(.horizontal, 12)
-                .background(T.C.card.opacity(0.8))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-            
             Button {
                 vm.toggleExpandAll()
             } label: {
                 HStack {
                     Image(systemName: vm.areAllExpanded ? "arrow.up.and.down.and.arrow.left.and.right" : "arrow.down.left.and.arrow.up.right")
-                    Text(vm.areAllExpanded ? "Collapse" : "Expand")
+                    Text(vm.areAllExpanded ? "Collapse All" : "Expand All")
                         .font(.subheadline)
                 }
-                .foregroundStyle(T.C.ink2)
-                .frame(height: 32)
+                .foregroundStyle(T.C.ink)
+                .frame(height: 36)
                 .padding(.horizontal, 12)
-                .background(T.C.card.opacity(0.8))
+                .background(T.C.card.opacity(0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+            
+            Spacer()
             
             Button {
                 vm.toggleImageSave()
             } label: {
                 Image(systemName: vm.document.isSaved ? "pin.fill" : "pin")
-                    .foregroundStyle(vm.document.isSaved ? T.C.ink : T.C.ink2)
-                    .frame(height: 32)
-                    .padding(.horizontal, 12)
-                    .background(T.C.card.opacity(0.8))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .foregroundStyle(vm.document.isSaved ? T.C.accent : T.C.ink)
+                    .frame(width: 36, height: 36)
+                    .background(T.C.card.opacity(0.95))
+                    .clipShape(Circle())
             }
             
             // Only show delete button if we have an asset identifier (photo from "Most Recent")
@@ -161,11 +182,10 @@ struct DocumentView: View {
                     vm.showDeleteImageAlert = true
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundStyle(T.C.ink2)
-                        .frame(height: 32)
-                        .padding(.horizontal, 12)
-                        .background(T.C.card.opacity(0.8))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .foregroundStyle(.red)
+                        .frame(width: 36, height: 36)
+                        .background(T.C.card.opacity(0.95))
+                        .clipShape(Circle())
                 }
             }
         }

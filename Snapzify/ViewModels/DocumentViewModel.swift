@@ -10,7 +10,6 @@ extension Notification.Name {
 @MainActor
 class DocumentViewModel: ObservableObject {
     @Published var document: Document
-    @Published var showOriginalImage = false
     @Published var selectedSentenceId: UUID?
     @Published var isTranslatingBatch = false
     @Published var expandedSentenceIds: Set<UUID> = []
@@ -36,12 +35,6 @@ class DocumentViewModel: ObservableObject {
         self.translationService = translationService
         self.ttsService = ttsService
         self.store = store
-    }
-    
-    func toggleImageVisibility() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showOriginalImage.toggle()
-        }
     }
     
     func selectSentence(_ sentenceId: UUID) {
@@ -140,8 +133,7 @@ class DocumentViewModel: ObservableObject {
     }
     
     func highlightedRegion(for sentenceId: UUID) -> CGRect? {
-        guard showOriginalImage,
-              let sentence = document.sentences.first(where: { $0.id == sentenceId }) else {
+        guard let sentence = document.sentences.first(where: { $0.id == sentenceId }) else {
             return nil
         }
         return sentence.rangeInImage
