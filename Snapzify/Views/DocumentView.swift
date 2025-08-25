@@ -3,51 +3,76 @@ import SwiftUI
 struct DocumentView: View {
     @StateObject var vm: DocumentViewModel
     @State private var showFullScreenImage = false
+    @State private var dividerPosition: CGFloat = UIScreen.main.bounds.height * 0.5
+    @State private var isDragging = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         GeometryReader { geometry in
-            RootBackground {
-                VStack(spacing: 0) {
-                    // Top 50%: Fixed image section
+            ZStack(alignment: .top) {
+                RootBackground {
+                    Color.clear
+                }
+                
+                // Image section - positioned at top
+                if let imageData = vm.document.imageData {
                     ZStack(alignment: .bottom) {
-                        if let imageData = vm.document.imageData {
-                            imageSection(imageData: imageData, height: geometry.size.height * 0.5)
-                        }
+                        imageSection(imageData: imageData, height: dividerPosition)
                         
                         // Action buttons overlay at bottom of image
                         actionButtons
                             .padding(.horizontal, 16)
                             .padding(.bottom, 12)
                     }
-                    .frame(height: geometry.size.height * 0.5)
-                    
-                    // Bottom 50%: Scrollable sentences list
-                    ZStack(alignment: .top) {
-                        // Background for bottom sheet
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(T.C.card.opacity(0.95))
-                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: -5)
-                        
-                        ScrollView(.vertical) {
-                            VStack(spacing: T.S.sm) {
-                                // Handle bar indicator
-                                Capsule()
-                                    .fill(T.C.ink2.opacity(0.3))
-                                    .frame(width: 36, height: 5)
-                                    .padding(.top, 8)
-                                    .padding(.bottom, 4)
-                                
-                                // Sentences list
-                                sentencesList
-                                    .padding(.horizontal, 16)
-                                    .padding(.bottom, 20)
-                            }
-                        }
-                        .scrollIndicators(.hidden)
-                    }
-                    .frame(height: geometry.size.height * 0.5)
+                    .frame(width: geometry.size.width, height: dividerPosition)
+                    .clipped()
+                    .position(x: geometry.size.width / 2, y: dividerPosition / 2)
                 }
+                
+                // Sentences section - positioned below divider
+                ZStack(alignment: .top) {
+                    // Background for bottom sheet
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(T.C.card.opacity(0.95))
+                        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: -5)
+                    
+                    ScrollView(.vertical) {
+                        VStack(spacing: T.S.sm) {
+                            // Sentences list
+                            sentencesList
+                                .padding(.horizontal, 16)
+                                .padding(.top, 12)
+                                .padding(.bottom, 20)
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height - dividerPosition - 20)
+                .position(x: geometry.size.width / 2, y: dividerPosition + 20 + (geometry.size.height - dividerPosition - 20) / 2)
+                
+                // Divider - positioned at dividerPosition
+                VStack(spacing: 2) {
+                    Capsule()
+                        .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
+                        .frame(width: 40, height: 4)
+                    Capsule()
+                        .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
+                        .frame(width: 40, height: 4)
+                }
+                .frame(width: geometry.size.width, height: 20)
+                .position(x: geometry.size.width / 2, y: dividerPosition + 10)
+                .contentShape(Rectangle())
+                .highPriorityGesture(
+                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                        .onChanged { value in
+                            isDragging = true
+                            let newPosition = value.location.y - geometry.frame(in: .global).minY - 10
+                            dividerPosition = min(max(newPosition, geometry.size.height * 0.2), geometry.size.height * 0.8)
+                        }
+                        .onEnded { _ in
+                            isDragging = false
+                        }
+                )
             }
         }
         .ignoresSafeArea(edges: .bottom)
@@ -143,7 +168,7 @@ struct DocumentView: View {
             )
             .frame(width: scaledRect.width, height: scaledRect.height)
             .position(x: scaledRect.midX, y: scaledRect.midY)
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: region)
+            .animation(isDragging ? nil : .spring(response: 0.3, dampingFraction: 0.8), value: region)
     }
     
     @ViewBuilder
@@ -152,16 +177,11 @@ struct DocumentView: View {
             Button {
                 vm.toggleExpandAll()
             } label: {
-                HStack {
-                    Image(systemName: vm.areAllExpanded ? "arrow.up.and.down.and.arrow.left.and.right" : "arrow.down.left.and.arrow.up.right")
-                    Text(vm.areAllExpanded ? "Collapse All" : "Expand All")
-                        .font(.subheadline)
-                }
-                .foregroundStyle(T.C.ink)
-                .frame(height: 36)
-                .padding(.horizontal, 12)
-                .background(T.C.card.opacity(0.95))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                Image(systemName: vm.areAllExpanded ? "arrow.up.and.down.and.arrow.left.and.right" : "arrow.down.left.and.arrow.up.right")
+                    .foregroundStyle(T.C.ink)
+                    .frame(width: 36, height: 36)
+                    .background(T.C.card.opacity(0.95))
+                    .clipShape(Circle())
             }
             
             Spacer()
