@@ -116,10 +116,10 @@ struct DocumentView: View {
                                 
                                 ForEach(expandedRegions, id: \.id) { region in
                                     Rectangle()
-                                        .fill(T.C.accent.opacity(0.1))
+                                        .fill(Color.green.opacity(0.1))
                                         .overlay(
                                             Rectangle()
-                                                .strokeBorder(T.C.accent, lineWidth: 2)
+                                                .strokeBorder(Color.green.opacity(0.5), lineWidth: 1)
                                         )
                                         .frame(
                                             width: region.rect.width * scale,

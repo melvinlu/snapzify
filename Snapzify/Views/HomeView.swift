@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import os.log
 
 struct HomeView: View {
     @StateObject var vm: HomeViewModel
@@ -8,6 +9,7 @@ struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @State private var lastRefreshTime = Date()
     @State private var photoCheckTimer: Timer?
+    private let logger = Logger(subsystem: "com.snapzify.app", category: "HomeView")
     
     var body: some View {
         RootBackground {
@@ -108,8 +110,7 @@ struct HomeView: View {
             // Start polling for new photos every 2 seconds
             startPhotoPolling()
             
-            // Check for shared images from share extension
-            checkForSharedImages()
+            // Shared images are checked at app level
             
             // Check for images from ActionExtension
             checkForActionExtensionImage()
@@ -133,8 +134,7 @@ struct HomeView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
-                // Check for shared images IMMEDIATELY when app becomes active
-                checkForSharedImages()
+                // Shared images are checked at app level when app becomes active
                 
                 // Check for ActionExtension images
                 checkForActionExtensionImage()
@@ -458,8 +458,7 @@ struct HomeView: View {
         photoCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
             checkCount += 1
             
-            // Check for shared images every time
-            self.checkForSharedImages()
+            // Shared images are now checked at app level
             
             // After 10 checks (5 seconds), slow down to every 2 seconds
             if checkCount >= 10 {
@@ -468,7 +467,6 @@ struct HomeView: View {
                     Task {
                         await self.vm.checkForLatestScreenshot()
                     }
-                    self.checkForSharedImages()
                 }
             } else {
                 Task {
@@ -484,38 +482,9 @@ struct HomeView: View {
     }
     
     private func checkForSharedImages() {
-        // Check if there's a pending shared image from the share extension
-        guard let sharedDefaults = UserDefaults(suiteName: "group.com.snapzify.app") else { return }
-        
-        // Check if we should process a shared image
-        if let fileName = sharedDefaults.string(forKey: "pendingSharedImage") {
-            // Load and process the shared image (no time restriction)
-            if let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") {
-                let imagesDirectory = sharedContainerURL.appendingPathComponent("SharedImages")
-                let fileURL = imagesDirectory.appendingPathComponent(fileName)
-                
-                if let imageData = try? Data(contentsOf: fileURL),
-                   let image = UIImage(data: imageData) {
-                    // Clear the pending image flag
-                    sharedDefaults.removeObject(forKey: "pendingSharedImage")
-                    sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
-                    sharedDefaults.synchronize()
-                    
-                    // Process the image in background without opening
-                    Task {
-                        await vm.processSharedImage(image)
-                    }
-                    
-                    // Clean up the file
-                    try? FileManager.default.removeItem(at: fileURL)
-                } else {
-                    // If file doesn't exist, clear the pending flag
-                    sharedDefaults.removeObject(forKey: "pendingSharedImage")
-                    sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
-                    sharedDefaults.synchronize()
-                }
-            }
-        }
+        // Shared image checking is now handled at app level in SnapzifyApp
+        // This ensures it works regardless of which view is currently active
+        logger.debug("Shared content checking moved to app level")
     }
     
     private func checkForActionExtensionImage() {

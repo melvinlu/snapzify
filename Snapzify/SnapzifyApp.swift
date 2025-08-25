@@ -56,8 +56,42 @@ struct SnapzifyApp: App {
     }
     
     private func checkForSharedContent() {
-        // Shared content is now handled by HomeView's checkForSharedImages
-        logger.debug("Shared content checking moved to HomeView")
+        // Check if there's a pending shared image from the share extension
+        guard let sharedDefaults = UserDefaults(suiteName: "group.com.snapzify.app") else { return }
+        
+        // Check if we should process a shared image
+        if let fileName = sharedDefaults.string(forKey: "pendingSharedImage") {
+            logger.info("Found pending shared image: \(fileName)")
+            
+            // Load the shared image
+            if let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") {
+                let imagesDirectory = sharedContainerURL.appendingPathComponent("SharedImages")
+                let fileURL = imagesDirectory.appendingPathComponent(fileName)
+                
+                if let imageData = try? Data(contentsOf: fileURL),
+                   let image = UIImage(data: imageData) {
+                    logger.info("Loaded shared image, setting for processing")
+                    
+                    // Clear the pending image flag
+                    sharedDefaults.removeObject(forKey: "pendingSharedImage")
+                    sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
+                    sharedDefaults.synchronize()
+                    
+                    // Store image for processing
+                    appState.pendingSharedImage = image
+                    appState.shouldProcessSharedImage = true
+                    
+                    // Clean up the file
+                    try? FileManager.default.removeItem(at: fileURL)
+                } else {
+                    // If file doesn't exist, clear the pending flag
+                    logger.warning("Shared image file not found, clearing flag")
+                    sharedDefaults.removeObject(forKey: "pendingSharedImage")
+                    sharedDefaults.removeObject(forKey: "sharedImageTimestamp")
+                    sharedDefaults.synchronize()
+                }
+            }
+        }
     }
 }
 
@@ -65,27 +99,62 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @State private var showSettings = false
     @State private var selectedDocument: Document?
+    @StateObject private var homeVM: HomeViewModel
     
     private let logger = Logger(subsystem: "com.snapzify.app", category: "ContentView")
     private let serviceContainer = ServiceContainer.shared
     
+    init() {
+        let container = ServiceContainer.shared
+        _homeVM = StateObject(wrappedValue: container.makeHomeViewModel(
+            onOpenSettings: { },
+            onOpenDocument: { _ in }
+        ))
+    }
+    
     var body: some View {
         NavigationStack {
-            HomeView(vm: serviceContainer.makeHomeViewModel(
-                onOpenSettings: {
-                    showSettings = true
-                },
-                onOpenDocument: { document in
-                    selectedDocument = document
+            HomeView(vm: homeVM)
+                .navigationDestination(item: $selectedDocument) { document in
+                    DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
                 }
-            ))
-            .navigationDestination(item: $selectedDocument) { document in
-                DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
-            }
         }
         .tint(.white)
         .sheet(isPresented: $showSettings) {
             SettingsView(vm: serviceContainer.makeSettingsViewModel())
+        }
+        .onAppear {
+            // Set up callbacks after view is created
+            homeVM.onOpenSettings = {
+                showSettings = true
+            }
+            homeVM.onOpenDocument = { document in
+                logger.info("Opening document: \(document.id)")
+                // Dismiss current document first if showing one
+                if selectedDocument != nil {
+                    selectedDocument = nil
+                    // Small delay to allow dismissal
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                        selectedDocument = document
+                    }
+                } else {
+                    selectedDocument = document
+                }
+            }
+        }
+        .onChange(of: appState.shouldProcessSharedImage) { shouldProcess in
+            if shouldProcess, let image = appState.pendingSharedImage {
+                logger.info("Processing shared image from app state")
+                
+                Task {
+                    await homeVM.processSharedImage(image)
+                    await MainActor.run {
+                        appState.shouldProcessSharedImage = false
+                        appState.pendingSharedImage = nil
+                    }
+                }
+            }
         }
     }
     
@@ -96,4 +165,6 @@ class AppState: ObservableObject {
     @Published var shouldRefreshDocuments = false
     @Published var shouldProcessActionImage = false
     @Published var pendingActionImage: String?
+    @Published var shouldProcessSharedImage = false
+    @Published var pendingSharedImage: UIImage?
 }

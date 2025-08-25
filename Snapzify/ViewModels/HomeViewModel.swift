@@ -22,8 +22,8 @@ class HomeViewModel: ObservableObject {
     private let scriptConversionService: ScriptConversionService
     private let chineseProcessingService: ChineseProcessingService = ServiceContainer.shared.chineseProcessingService
     private let streamingChineseProcessingService: StreamingChineseProcessingService = ServiceContainer.shared.streamingChineseProcessingService
-    private let onOpenSettings: () -> Void
-    private let onOpenDocument: (Document) -> Void
+    var onOpenSettings: () -> Void
+    var onOpenDocument: (Document) -> Void
     @AppStorage("selectedScript") private var selectedScript: String = ChineseScript.simplified.rawValue
     
     struct LatestScreenshotInfo {
@@ -489,6 +489,7 @@ class HomeViewModel: ObservableObject {
             self.documents.insert(savedDocument, at: 0)
             
             if shouldNavigate {
+                logger.info("Calling onOpenDocument for document: \(savedDocument.id)")
                 self.onOpenDocument(savedDocument)
                 // Clear processing flag since document is now created and visible
                 if source == .shareExtension {
