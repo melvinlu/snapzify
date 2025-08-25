@@ -28,6 +28,10 @@ class OCRServiceImpl: OCRService {
         // Resize image if too large
         let resizedImage = resizeImageIfNeeded(image)
         
+        // Calculate scale factor for coordinate conversion back to original size
+        let scaleFactorX = image.size.width / resizedImage.size.width
+        let scaleFactorY = image.size.height / resizedImage.size.height
+        
         guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
             logger.error("Failed to convert image to JPEG")
             throw OCRError.invalidImage
@@ -113,10 +117,10 @@ class OCRServiceImpl: OCRService {
                                 if let boundingBox = paragraph["boundingBox"] as? [String: Any],
                                    let bbox = bboxFrom(boundingBox) {
                                     paragraphBbox = CGRect(
-                                        x: bbox.minX,
-                                        y: bbox.minY,
-                                        width: bbox.maxX - bbox.minX,
-                                        height: bbox.maxY - bbox.minY
+                                        x: bbox.minX * scaleFactorX,
+                                        y: bbox.minY * scaleFactorY,
+                                        width: (bbox.maxX - bbox.minX) * scaleFactorX,
+                                        height: (bbox.maxY - bbox.minY) * scaleFactorY
                                     )
                                 }
                                 
@@ -163,10 +167,10 @@ class OCRServiceImpl: OCRService {
                                         if !buffer.isEmpty {
                                             tokens.append(OCRToken(
                                                 text: buffer,
-                                                minX: bb.minX,
-                                                maxX: bb.maxX,
-                                                minY: bb.minY,
-                                                maxY: bb.maxY
+                                                minX: bb.minX * scaleFactorX,
+                                                maxX: bb.maxX * scaleFactorX,
+                                                minY: bb.minY * scaleFactorY,
+                                                maxY: bb.maxY * scaleFactorY
                                             ))
                                         }
                                     }
@@ -206,18 +210,34 @@ class OCRServiceImpl: OCRService {
                                     }()
                                     
                                     var segment = ""
+                                    var segmentTokens: [OCRToken] = []
                                     var prev: OCRToken? = nil
                                     
                                     func flush() {
                                         let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
-                                        if !trimmed.isEmpty {
+                                        if !trimmed.isEmpty && !segmentTokens.isEmpty {
+                                            // Calculate bounding box from the actual tokens in this segment
+                                            // Tokens are already scaled, so just use them directly
+                                            let minX = segmentTokens.map(\.minX).min() ?? 0
+                                            let minY = segmentTokens.map(\.minY).min() ?? 0
+                                            let maxX = segmentTokens.map(\.maxX).max() ?? 0
+                                            let maxY = segmentTokens.map(\.maxY).max() ?? 0
+                                            
+                                            let segmentBbox = CGRect(
+                                                x: minX,
+                                                y: minY,
+                                                width: maxX - minX,
+                                                height: maxY - minY
+                                            )
+                                            
                                             ocrLines.append(OCRLine(
                                                 text: trimmed,
-                                                bbox: paragraphBbox ?? CGRect(x: 0, y: 0, width: image.size.width, height: 50),
+                                                bbox: segmentBbox,
                                                 words: []
                                             ))
                                         }
                                         segment = ""
+                                        segmentTokens = []
                                     }
                                     
                                     for t in sorted {
@@ -225,6 +245,7 @@ class OCRServiceImpl: OCRService {
                                         if t.text.contains("\n") || t.text.contains("\u{3000}") {
                                             segment += t.text.replacingOccurrences(of: "\n", with: "")
                                                             .replacingOccurrences(of: "\u{3000}", with: " ")
+                                            segmentTokens.append(t)
                                             flush()
                                             prev = nil
                                             continue
@@ -233,6 +254,7 @@ class OCRServiceImpl: OCRService {
                                         // Check for Chinese sentence-ending punctuation
                                         if containsChineseSentenceEnding(t.text) {
                                             segment += t.text
+                                            segmentTokens.append(t)
                                             flush()
                                             prev = nil
                                             continue
@@ -251,6 +273,7 @@ class OCRServiceImpl: OCRService {
                                         }
                                         
                                         segment += t.text
+                                        segmentTokens.append(t)
                                         prev = t
                                     }
                                     

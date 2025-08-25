@@ -431,7 +431,7 @@ class HomeViewModel: ObservableObject {
                     
                     sentences.append(Sentence(
                         text: normalizedChinese,
-                        rangeInImage: nil,
+                        rangeInImage: line.bbox, // Use the bbox from OCR
                         tokens: [],
                         pinyin: [pinyin],
                         english: english,
@@ -450,7 +450,7 @@ class HomeViewModel: ObservableObject {
                 // Add placeholder sentence with "Generating..." status
                 sentences.append(Sentence(
                     text: normalizedText,
-                    rangeInImage: nil,
+                    rangeInImage: line.bbox, // Use the bbox from OCR
                     tokens: [],
                     pinyin: [],
                     english: "Generating...",
@@ -518,9 +518,10 @@ class HomeViewModel: ObservableObject {
                     
                     // Update sentence as soon as it's processed
                     let sentenceIndex = chineseLineIndices[processed.index]
+                    let originalRange = sentences[sentenceIndex].rangeInImage // Preserve the bbox
                     sentences[sentenceIndex] = Sentence(
                         text: processed.chinese,
-                        rangeInImage: nil,
+                        rangeInImage: originalRange, // Keep the original bbox
                         tokens: [],
                         pinyin: processed.pinyin,
                         english: processed.english,
@@ -555,9 +556,10 @@ class HomeViewModel: ObservableObject {
                     for (batchIndex, sentenceIndex) in chineseLineIndices.enumerated() {
                         if batchIndex < processedBatch.count {
                             let processed = processedBatch[batchIndex]
+                            let originalRange = sentences[sentenceIndex].rangeInImage // Preserve the bbox
                             sentences[sentenceIndex] = Sentence(
                                 text: processed.chinese,
-                                rangeInImage: nil,
+                                rangeInImage: originalRange, // Keep the original bbox
                                 tokens: [],
                                 pinyin: processed.pinyin,
                                 english: processed.english,

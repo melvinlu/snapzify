@@ -1,5 +1,11 @@
 import SwiftUI
 
+// Structure to hold highlight data
+struct HighlightRegion: Equatable {
+    let id: UUID
+    let rect: CGRect
+}
+
 // Wrapper that only updates when height changes
 struct EquatableImageView: View, Equatable {
     let imageData: Data
@@ -70,15 +76,63 @@ struct DocumentView: View {
                 }
                 
                 // Image section - positioned at top
-                if let imageData = vm.document.imageData {
+                if let imageData = vm.document.imageData,
+                   let uiImage = UIImage(data: imageData) {
                     ZStack(alignment: .bottom) {
-                        EquatableView(
-                            content: EquatableImageView(
-                                imageData: imageData,
-                                height: dividerPosition,
-                                showFullScreenImage: { showFullScreenImage = true }
+                        // Static image layer with overlay
+                        ZStack {
+                            EquatableView(
+                                content: EquatableImageView(
+                                    imageData: imageData,
+                                    height: dividerPosition,
+                                    showFullScreenImage: { showFullScreenImage = true }
+                                )
                             )
-                        )
+                            
+                            // Dynamic highlight overlay for expanded sentences
+                            // Place it directly over the image with the same frame calculation
+                            GeometryReader { imageGeometry in
+                                let expandedRegions = vm.document.sentences
+                                    .filter { vm.expandedSentenceIds.contains($0.id) }
+                                    .compactMap { sentence -> HighlightRegion? in
+                                        guard let rect = sentence.rangeInImage else { return nil }
+                                        return HighlightRegion(id: sentence.id, rect: rect)
+                                    }
+                                
+                                let imageAspect = uiImage.size.width / uiImage.size.height
+                                let viewAspect = imageGeometry.size.width / imageGeometry.size.height
+                                
+                                let scale = imageAspect > viewAspect 
+                                    ? imageGeometry.size.width / uiImage.size.width
+                                    : imageGeometry.size.height / uiImage.size.height
+                                    
+                                let xOffset = imageAspect > viewAspect
+                                    ? 0
+                                    : (imageGeometry.size.width - uiImage.size.width * scale) / 2
+                                    
+                                let yOffset = imageAspect > viewAspect
+                                    ? (imageGeometry.size.height - uiImage.size.height * scale) / 2
+                                    : 0
+                                
+                                ForEach(expandedRegions, id: \.id) { region in
+                                    Rectangle()
+                                        .fill(T.C.accent.opacity(0.1))
+                                        .overlay(
+                                            Rectangle()
+                                                .strokeBorder(T.C.accent, lineWidth: 2)
+                                        )
+                                        .frame(
+                                            width: region.rect.width * scale,
+                                            height: region.rect.height * scale
+                                        )
+                                        .position(
+                                            x: region.rect.midX * scale + xOffset,
+                                            y: region.rect.midY * scale + yOffset
+                                        )
+                                }
+                            }
+                            .allowsHitTesting(false)
+                        }
                         
                         // Action buttons overlay at bottom of image
                         actionButtons
