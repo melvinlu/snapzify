@@ -1,0 +1,4 @@
+Target dependency graph (2 targets)
+Target 'Snapzify' in project 'Snapzify'
+➜ Explicit dependency on target 'ActionExtension' in project 'Snapzify'
+Target 'ActionExtension' in project 'Snapzify' (no dependencies)

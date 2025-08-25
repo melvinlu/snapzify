@@ -5,6 +5,7 @@ struct HomeView: View {
     @StateObject var vm: HomeViewModel
     @State private var selectedPhoto: PhotosPickerItem?
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject var appState: AppState
     @State private var lastRefreshTime = Date()
     @State private var photoCheckTimer: Timer?
     
@@ -110,6 +111,9 @@ struct HomeView: View {
             // Check for shared images from share extension
             checkForSharedImages()
             
+            // Check for images from ActionExtension
+            checkForActionExtensionImage()
+            
             // Refresh saved documents when view appears
             // Add a small delay to ensure navigation has completed
             Task {
@@ -132,6 +136,9 @@ struct HomeView: View {
                 // Check for shared images IMMEDIATELY when app becomes active
                 checkForSharedImages()
                 
+                // Check for ActionExtension images
+                checkForActionExtensionImage()
+                
                 // Resume polling when app becomes active
                 startPhotoPolling()
                 
@@ -147,6 +154,11 @@ struct HomeView: View {
             } else if phase == .background {
                 // Stop polling when app goes to background
                 stopPhotoPolling()
+            }
+        }
+        .onChange(of: appState.shouldProcessActionImage) { shouldProcess in
+            if shouldProcess {
+                checkForActionExtensionImage()
             }
         }
     }
@@ -503,6 +515,41 @@ struct HomeView: View {
                     sharedDefaults.synchronize()
                 }
             }
+        }
+    }
+    
+    private func checkForActionExtensionImage() {
+        // Check if there's a pending image from ActionExtension
+        guard let fileName = appState.pendingActionImage else { return }
+        
+        guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") else { return }
+        
+        let tempDirectory = sharedContainerURL.appendingPathComponent("ActionTemp")
+        let fileURL = tempDirectory.appendingPathComponent(fileName)
+        
+        if let imageData = try? Data(contentsOf: fileURL),
+           let image = UIImage(data: imageData) {
+            // Clear the pending image
+            appState.pendingActionImage = nil
+            appState.shouldProcessActionImage = false
+            
+            // Process and open the image
+            Task {
+                await vm.processActionExtensionImage(image)
+            }
+            
+            // Clean up the temp file
+            try? FileManager.default.removeItem(at: fileURL)
+            
+            // Clean up the temp directory if empty
+            if let contents = try? FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil),
+               contents.isEmpty {
+                try? FileManager.default.removeItem(at: tempDirectory)
+            }
+        } else {
+            // Clear invalid pending image
+            appState.pendingActionImage = nil
+            appState.shouldProcessActionImage = false
         }
     }
 }

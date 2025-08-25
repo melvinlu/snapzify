@@ -1,0 +1,80 @@
+{
+  "source": "/Users/melvinlu/snapzify/Snapzify/Views/DocumentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Delete Document",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 34
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 36
+        }
+      },
+      {
+        "comment": "",
+        "key": "This will delete the document from Snapzify AND permanently delete the original photo from your device's photo library. This action cannot be undone.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hide",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "Collapse",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Expand",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 216
+        }
+      }
+    ]
+  },
+  "version": 1
+}

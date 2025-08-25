@@ -8,7 +8,7 @@ struct VersionHistoryView: View {
             version: "1.0",
             date: "August 2025",
             notes: [
-                ""                
+                "Hello world!"                
             ]
         )
     ]

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		14FF5D5227ED405755C43183 /* ActionIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 15627FBFFEB1AFE5A161B98D /* ActionIcon.png */; };
 		2400A106E61C6BD7F823EE8D /* ServiceContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E937F459F270D304710898D8 /* ServiceContainer.swift */; };
 		3D9B1A001234567890123456 /* SnapzifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A011234567890123456 /* SnapzifyApp.swift */; };
 		3D9B1A021234567890123456 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A031234567890123456 /* Theme.swift */; };
@@ -35,28 +36,44 @@
 		3D9B1A331234567890123463 /* StreamingChineseProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A321234567890123462 /* StreamingChineseProcessingService.swift */; };
 		3D9B1A341234567890123464 /* ShimmerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A351234567890123465 /* ShimmerView.swift */; };
 		3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A371234567890123467 /* VersionHistoryView.swift */; };
+		408EE21643E4AE8A216691B0 /* ActionIcon@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */; };
+		48B5B75E4312202E118FFB46 /* ActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5E7351685F648D10E0213F08 /* ActionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0646378E12D0819C51E3B5FA /* ActionViewController.swift */; };
 		6C10D521A75AB7C28AB8B387 /* DocumentStoreImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = F681F60E8E6F38EEB03596EB /* DocumentStoreImpl.swift */; };
-		D298523E2E595F5D007795D3 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D29852342E595F5D007795D3 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		73550BFDF166174BD82CAAAC /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7FBD0CFE852306298E69989D /* MainInterface.storyboard */; };
+		B48270D521E2273F3FB6A834 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 518E226ED0401075BE5C372C /* Foundation.framework */; };
+		C0047CD5DB0F20CF4724D8B2 /* ActionIcon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = D7C5FB603D1781A9612ED1BD /* ActionIcon@2x.png */; };
+		C45810DDED58D9C91534ABC6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A530A292416FC5D38CDF259F /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		D298523C2E595F5D007795D3 /* PBXContainerItemProxy */ = {
+		5FCE758C1DE02763C3DD1881 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3D9B1A3D1234567890123456 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = D29852332E595F5D007795D3;
-			remoteInfo = ShareExtension;
+			remoteGlobalIDString = 274BE966137DB85211C33E18;
+			remoteInfo = ActionExtension;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		7A7D96196FA2BA794A2C9B52 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				48B5B75E4312202E118FFB46 /* ActionExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D29852432E595F5D007795D3 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				D298523E2E595F5D007795D3 /* ShareExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -64,6 +81,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0646378E12D0819C51E3B5FA /* ActionViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActionViewController.swift; path = ActionExtension/ActionViewController.swift; sourceTree = "<group>"; };
+		15627FBFFEB1AFE5A161B98D /* ActionIcon.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = ActionIcon.png; path = ActionExtension/Resources/ActionIcon.png; sourceTree = "<group>"; };
+		189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; name = ActionExtension.appex; path = ActionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1EE13F3C9DF4F4B275E2EE1E /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ActionExtension/Info.plist; sourceTree = "<group>"; };
+		39E40C2907C1D8EA1D754160 /* ActionExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = ActionExtension.entitlements; path = ActionExtension/ActionExtension.entitlements; sourceTree = "<group>"; };
 		3D9B1A001234567890123457 /* Snapzify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Snapzify.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3D9B1A011234567890123456 /* SnapzifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapzifyApp.swift; sourceTree = "<group>"; };
 		3D9B1A031234567890123456 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -94,35 +116,14 @@
 		3D9B1A321234567890123462 /* StreamingChineseProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingChineseProcessingService.swift; sourceTree = "<group>"; };
 		3D9B1A351234567890123465 /* ShimmerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShimmerView.swift; sourceTree = "<group>"; };
 		3D9B1A371234567890123467 /* VersionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionHistoryView.swift; sourceTree = "<group>"; };
-		D29852342E595F5D007795D3 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		518E226ED0401075BE5C372C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		7FBD0CFE852306298E69989D /* MainInterface.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; name = MainInterface.storyboard; path = ActionExtension/MainInterface.storyboard; sourceTree = "<group>"; };
+		A530A292416FC5D38CDF259F /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = ActionExtension/Assets.xcassets; sourceTree = "<group>"; };
+		C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = "ActionIcon@3x.png"; path = "ActionExtension/Resources/ActionIcon@3x.png"; sourceTree = "<group>"; };
+		D7C5FB603D1781A9612ED1BD /* ActionIcon@2x.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = "ActionIcon@2x.png"; path = "ActionExtension/Resources/ActionIcon@2x.png"; sourceTree = "<group>"; };
 		E937F459F270D304710898D8 /* ServiceContainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ServiceContainer.swift; sourceTree = "<group>"; };
 		F681F60E8E6F38EEB03596EB /* DocumentStoreImpl.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentStoreImpl.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		D298523F2E595F5D007795D3 /* Exceptions for "ShareExtension" folder in "ShareExtension" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = D29852332E595F5D007795D3 /* ShareExtension */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		D29852352E595F5D007795D3 /* ShareExtension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				D298523F2E595F5D007795D3 /* Exceptions for "ShareExtension" folder in "ShareExtension" target */,
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = ShareExtension;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		3D9B1A2F1234567890123456 /* Frameworks */ = {
@@ -132,10 +133,11 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		D29852312E595F5D007795D3 /* Frameworks */ = {
+		838245672CEEC552C80D2FE4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B48270D521E2273F3FB6A834 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -146,8 +148,9 @@
 			isa = PBXGroup;
 			children = (
 				3D9B1A311234567890123456 /* Snapzify */,
-				D29852352E595F5D007795D3 /* ShareExtension */,
 				3D9B1A321234567890123456 /* Products */,
+				ADE3CCA179E221298D3A14F7 /* Frameworks */,
+				C21222F34C8BD1137656C9DE /* ActionExtension */,
 			);
 			sourceTree = "<group>";
 		};
@@ -171,7 +174,7 @@
 			isa = PBXGroup;
 			children = (
 				3D9B1A001234567890123457 /* Snapzify.app */,
-				D29852342E595F5D007795D3 /* ShareExtension.appex */,
+				189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -246,9 +249,65 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		ADE3CCA179E221298D3A14F7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DD82DECAC7FE5CEA8A53EA8A /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C21222F34C8BD1137656C9DE /* ActionExtension */ = {
+			isa = PBXGroup;
+			children = (
+				0646378E12D0819C51E3B5FA /* ActionViewController.swift */,
+				7FBD0CFE852306298E69989D /* MainInterface.storyboard */,
+				1EE13F3C9DF4F4B275E2EE1E /* Info.plist */,
+				39E40C2907C1D8EA1D754160 /* ActionExtension.entitlements */,
+				FF86BDE4092989B65228CA65 /* Resources */,
+				A530A292416FC5D38CDF259F /* Assets.xcassets */,
+			);
+			name = ActionExtension;
+			sourceTree = "<group>";
+		};
+		DD82DECAC7FE5CEA8A53EA8A /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				518E226ED0401075BE5C372C /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		FF86BDE4092989B65228CA65 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				15627FBFFEB1AFE5A161B98D /* ActionIcon.png */,
+				D7C5FB603D1781A9612ED1BD /* ActionIcon@2x.png */,
+				C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		274BE966137DB85211C33E18 /* ActionExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3928AB46ED1D5894F9ED044A /* Build configuration list for PBXNativeTarget "ActionExtension" */;
+			buildPhases = (
+				2E25E513798326C97E341B22 /* Sources */,
+				838245672CEEC552C80D2FE4 /* Frameworks */,
+				902C0D69973111D4B8A60514 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ActionExtension;
+			productName = ActionExtension;
+			productReference = 189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		3D9B1A391234567890123456 /* Snapzify */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 3D9B1A3A1234567890123456 /* Build configuration list for PBXNativeTarget "Snapzify" */;
@@ -257,36 +316,17 @@
 				3D9B1A2F1234567890123456 /* Frameworks */,
 				3D9B1A3C1234567890123456 /* Resources */,
 				D29852432E595F5D007795D3 /* Embed Foundation Extensions */,
+				7A7D96196FA2BA794A2C9B52 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				D298523D2E595F5D007795D3 /* PBXTargetDependency */,
+				547DC48C87625337A7D24722 /* PBXTargetDependency */,
 			);
 			name = Snapzify;
 			productName = Snapzify;
 			productReference = 3D9B1A001234567890123457 /* Snapzify.app */;
 			productType = "com.apple.product-type.application";
-		};
-		D29852332E595F5D007795D3 /* ShareExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = D29852402E595F5D007795D3 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
-			buildPhases = (
-				D29852302E595F5D007795D3 /* Sources */,
-				D29852312E595F5D007795D3 /* Frameworks */,
-				D29852322E595F5D007795D3 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				D29852352E595F5D007795D3 /* ShareExtension */,
-			);
-			name = ShareExtension;
-			productName = ShareExtension;
-			productReference = D29852342E595F5D007795D3 /* ShareExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -320,7 +360,7 @@
 			projectRoot = "";
 			targets = (
 				3D9B1A391234567890123456 /* Snapzify */,
-				D29852332E595F5D007795D3 /* ShareExtension */,
+				274BE966137DB85211C33E18 /* ActionExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -335,16 +375,29 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		D29852322E595F5D007795D3 /* Resources */ = {
+		902C0D69973111D4B8A60514 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				73550BFDF166174BD82CAAAC /* MainInterface.storyboard in Resources */,
+				14FF5D5227ED405755C43183 /* ActionIcon.png in Resources */,
+				C0047CD5DB0F20CF4724D8B2 /* ActionIcon@2x.png in Resources */,
+				408EE21643E4AE8A216691B0 /* ActionIcon@3x.png in Resources */,
+				C45810DDED58D9C91534ABC6 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2E25E513798326C97E341B22 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E7351685F648D10E0213F08 /* ActionViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3D9B1A3B1234567890123456 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -379,20 +432,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		D29852302E595F5D007795D3 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		D298523D2E595F5D007795D3 /* PBXTargetDependency */ = {
+		547DC48C87625337A7D24722 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = D29852332E595F5D007795D3 /* ShareExtension */;
-			targetProxy = D298523C2E595F5D007795D3 /* PBXContainerItemProxy */;
+			name = ActionExtension;
+			target = 274BE966137DB85211C33E18 /* ActionExtension */;
+			targetProxy = 5FCE758C1DE02763C3DD1881 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -582,63 +629,69 @@
 			};
 			name = Release;
 		};
-		D29852412E595F5D007795D3 /* Debug */ = {
+		902A1F9C6B6C827E9E12B214 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				ASSETCATALOG_COMPILER_APPICON_NAME = ActionIcon;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ActionExtension/ActionExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8FN3F53SM8;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				INFOPLIST_FILE = ActionExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app.ShareExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app.ActionExtension;
+				PRODUCT_MODULE_NAME = ActionExtension;
+				PRODUCT_NAME = ActionExtension;
+				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		D29852422E595F5D007795D3 /* Release */ = {
+		E2A41321B1FCC7D852279DE9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				ASSETCATALOG_COMPILER_APPICON_NAME = ActionIcon;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ActionExtension/ActionExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8FN3F53SM8;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				INFOPLIST_FILE = ActionExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app.ShareExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapzify.app.ActionExtension;
+				PRODUCT_MODULE_NAME = ActionExtension;
+				PRODUCT_NAME = ActionExtension;
+				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3928AB46ED1D5894F9ED044A /* Build configuration list for PBXNativeTarget "ActionExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E2A41321B1FCC7D852279DE9 /* Release */,
+				902A1F9C6B6C827E9E12B214 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		3D9B1A3A1234567890123456 /* Build configuration list for PBXNativeTarget "Snapzify" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -653,15 +706,6 @@
 			buildConfigurations = (
 				3D9B1A3F1234567890123456 /* Debug */,
 				3D9B1A401234567890123456 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		D29852402E595F5D007795D3 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				D29852412E595F5D007795D3 /* Debug */,
-				D29852422E595F5D007795D3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

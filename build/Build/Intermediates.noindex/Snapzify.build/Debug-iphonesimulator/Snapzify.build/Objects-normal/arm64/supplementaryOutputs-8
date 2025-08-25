@@ -1,0 +1,18 @@
+"/Users/melvinlu/snapzify/Snapzify/Services/ChineseProcessingService.swift":
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/ChineseProcessingService.dia"
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/ChineseProcessingService.d"
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/ChineseProcessingService.o"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/ChineseProcessingService.swiftconstvalues"
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/ChineseProcessingService.swiftdeps"
+"/Users/melvinlu/snapzify/Snapzify/Services/StreamingChineseProcessingService.swift":
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/StreamingChineseProcessingService.d"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/StreamingChineseProcessingService.swiftconstvalues"
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/StreamingChineseProcessingService.o"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/StreamingChineseProcessingService.dia"
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/StreamingChineseProcessingService.swiftdeps"
+"/Users/melvinlu/snapzify/Snapzify/Services/TranslationServiceOpenAI.swift":
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/TranslationServiceOpenAI.o"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/TranslationServiceOpenAI.swiftconstvalues"
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/TranslationServiceOpenAI.swiftdeps"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/TranslationServiceOpenAI.dia"
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/arm64/TranslationServiceOpenAI.d"

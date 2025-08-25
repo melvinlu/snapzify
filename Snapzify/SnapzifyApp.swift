@@ -34,6 +34,15 @@ struct SnapzifyApp: App {
             if url.host == "open" {
                 logger.debug("Refreshing documents")
                 appState.shouldRefreshDocuments = true
+            } else if url.host == "process-image" {
+                // Handle image from ActionExtension
+                if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                   let queryItems = components.queryItems,
+                   let fileName = queryItems.first(where: { $0.name == "file" })?.value {
+                    logger.info("Processing image from ActionExtension: \(fileName)")
+                    appState.pendingActionImage = fileName
+                    appState.shouldProcessActionImage = true
+                }
             }
         } else {
             logger.warning("Unknown URL scheme: \(url.scheme ?? "nil")")
@@ -85,4 +94,6 @@ struct ContentView: View {
 class AppState: ObservableObject {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "AppState")
     @Published var shouldRefreshDocuments = false
+    @Published var shouldProcessActionImage = false
+    @Published var pendingActionImage: String?
 }

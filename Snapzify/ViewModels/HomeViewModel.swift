@@ -265,16 +265,62 @@ class HomeViewModel: ObservableObject {
                 
                 let script = ChineseScript(rawValue: selectedScript) ?? .simplified
                 
-                // Process the image - isProcessingSharedImage is cleared inside processImageWithoutNavigation
-                _ = try await processImageWithoutNavigation(image, source: .shareExtension, script: script)
+                // Process the image and automatically navigate to it
+                let document = try await processImageCore(
+                    image,
+                    source: .shareExtension,
+                    script: script,
+                    assetIdentifier: nil,
+                    shouldNavigate: true  // Changed to true to auto-open document
+                )
                 
                 await MainActor.run {
-                    logger.info("Shared image processed successfully")
+                    logger.info("Shared image processed successfully and opened")
                 }
             } catch {
                 await MainActor.run {
                     logger.error("Failed to process shared image: \(error.localizedDescription)")
                     isProcessingSharedImage = false
+                }
+            }
+        }.value
+    }
+    
+    func processActionExtensionImage(_ image: UIImage) async {
+        // Process image from ActionExtension with high priority and auto-open
+        await Task(priority: .high) {
+            do {
+                await MainActor.run {
+                    logger.info("Processing image from ActionExtension")
+                    isProcessing = true
+                }
+                
+                let script = ChineseScript(rawValue: selectedScript) ?? .simplified
+                
+                // Process the image and automatically navigate to it
+                let document = try await processImageCore(
+                    image,
+                    source: .imported,  // Using imported as source for ActionExtension
+                    script: script,
+                    assetIdentifier: nil,
+                    shouldNavigate: true  // Auto-open document
+                )
+                
+                await MainActor.run {
+                    logger.info("ActionExtension image processed successfully and opened")
+                }
+            } catch {
+                await MainActor.run {
+                    logger.error("Failed to process ActionExtension image: \(error.localizedDescription)")
+                    isProcessing = false
+                    
+                    if error is TimeoutError {
+                        errorMessage = "Snapzifying timed out. Please try again with a simpler image."
+                    } else if let processingError = error as? ProcessingError {
+                        errorMessage = processingError.errorDescription ?? "Failed to process image"
+                    } else {
+                        errorMessage = "Failed to process image: \(error.localizedDescription)"
+                    }
                 }
             }
         }.value
@@ -445,7 +491,11 @@ class HomeViewModel: ObservableObject {
             if shouldNavigate {
                 self.onOpenDocument(savedDocument)
                 // Clear processing flag since document is now created and visible
-                self.isProcessing = false
+                if source == .shareExtension {
+                    self.isProcessingSharedImage = false
+                } else {
+                    self.isProcessing = false
+                }
             } else if source == .shareExtension {
                 // Clear processing flag for shared images since document is now visible
                 self.isProcessingSharedImage = false

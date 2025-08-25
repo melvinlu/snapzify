@@ -1,0 +1,28 @@
+{
+  "" : {
+    "diagnostics" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionExtension-master.dia",
+    "emit-module-dependencies" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionExtension-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionExtension-master-emit-module.dia",
+    "swift-dependencies" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionExtension-master.swiftdeps"
+  },
+  "/Users/melvinlu/snapzify/ActionExtension/ActionViewController.swift" : {
+    "const-values" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController.swiftconstvalues",
+    "dependencies" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController.d",
+    "diagnostics" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController.dia",
+    "index-unit-output-path" : "/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController.o",
+    "llvm-bc" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController.bc",
+    "object" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController.o",
+    "swift-dependencies" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController.swiftdeps",
+    "swiftmodule" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/ActionViewController~partial.swiftmodule"
+  },
+  "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/ActionExtension.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

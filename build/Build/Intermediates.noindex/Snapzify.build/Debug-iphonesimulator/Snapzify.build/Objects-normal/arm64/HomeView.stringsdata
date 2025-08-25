@@ -1,0 +1,80 @@
+{
+  "source": "/Users/melvinlu/snapzify/Snapzify/Views/HomeView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Snapzify",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 63
+        }
+      },
+      {
+        "comment": "",
+        "key": "Saved",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 171
+        }
+      },
+      {
+        "comment": "",
+        "key": "No saved content yet",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "Import",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "Most Recent",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 223
+        }
+      },
+      {
+        "comment": "",
+        "key": "Recent",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 235
+        }
+      },
+      {
+        "comment": "",
+        "key": "Snapzifying shared image...",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 243
+        }
+      },
+      {
+        "comment": "",
+        "key": "Snapzifying...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 406
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dismiss",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 428
+        }
+      }
+    ]
+  },
+  "version": 1
+}

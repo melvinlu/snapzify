@@ -1,0 +1,18 @@
+"/Users/melvinlu/snapzify/Snapzify/Services/ServiceProtocols.swift":
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ServiceProtocols.swiftdeps"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ServiceProtocols.dia"
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ServiceProtocols.d"
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ServiceProtocols.o"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ServiceProtocols.swiftconstvalues"
+"/Users/melvinlu/snapzify/Snapzify/Services/OCRServiceImpl.swift":
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/OCRServiceImpl.o"
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/OCRServiceImpl.d"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/OCRServiceImpl.swiftconstvalues"
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/OCRServiceImpl.swiftdeps"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/OCRServiceImpl.dia"
+"/Users/melvinlu/snapzify/Snapzify/Services/ScriptConversionServiceImpl.swift":
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ScriptConversionServiceImpl.d"
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ScriptConversionServiceImpl.o"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ScriptConversionServiceImpl.swiftconstvalues"
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ScriptConversionServiceImpl.swiftdeps"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/ScriptConversionServiceImpl.dia"

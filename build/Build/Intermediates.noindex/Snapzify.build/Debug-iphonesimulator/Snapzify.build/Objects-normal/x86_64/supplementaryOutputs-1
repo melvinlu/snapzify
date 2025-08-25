@@ -1,0 +1,18 @@
+"/Users/melvinlu/snapzify/Snapzify/Models/DataModels.swift":
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/DataModels.swiftconstvalues"
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/DataModels.o"
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/DataModels.d"
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/DataModels.swiftdeps"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/DataModels.dia"
+"/Users/melvinlu/snapzify/Snapzify/Utils/Theme.swift":
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/Theme.o"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/Theme.swiftconstvalues"
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/Theme.d"
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/Theme.swiftdeps"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/Theme.dia"
+"/Users/melvinlu/snapzify/Snapzify/SnapzifyApp.swift":
+  swift-dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/SnapzifyApp.swiftdeps"
+  const-values: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/SnapzifyApp.swiftconstvalues"
+  dependencies: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/SnapzifyApp.d"
+  object: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/SnapzifyApp.o"
+  diagnostics: "/Users/melvinlu/snapzify/build/Build/Intermediates.noindex/Snapzify.build/Debug-iphonesimulator/Snapzify.build/Objects-normal/x86_64/SnapzifyApp.dia"
