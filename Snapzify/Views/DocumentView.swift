@@ -1,5 +1,59 @@
 import SwiftUI
 
+// Wrapper that only updates when height changes
+struct EquatableImageView: View, Equatable {
+    let imageData: Data
+    let height: CGFloat
+    let showFullScreenImage: () -> Void
+    
+    static func == (lhs: EquatableImageView, rhs: EquatableImageView) -> Bool {
+        // Only re-render if height changes, ignore everything else
+        lhs.height == rhs.height
+    }
+    
+    var body: some View {
+        ImageSectionView(
+            imageData: imageData,
+            height: height,
+            showFullScreenImage: showFullScreenImage
+        )
+    }
+}
+
+// Separate view for image to prevent re-renders
+struct ImageSectionView: View {
+    let imageData: Data
+    let height: CGFloat
+    let showFullScreenImage: () -> Void
+    
+    var body: some View {
+        if let uiImage = UIImage(data: imageData) {
+            GeometryReader { geometry in
+                ZStack {
+                    // Background blur
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: height)
+                        .blur(radius: 30)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.3))
+                    
+                    // Main image
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: geometry.size.width, maxHeight: height)
+                }
+            }
+            .frame(height: height)
+            .onTapGesture {
+                showFullScreenImage()
+            }
+        }
+    }
+}
+
 struct DocumentView: View {
     @StateObject var vm: DocumentViewModel
     @State private var showFullScreenImage = false
@@ -18,7 +72,13 @@ struct DocumentView: View {
                 // Image section - positioned at top
                 if let imageData = vm.document.imageData {
                     ZStack(alignment: .bottom) {
-                        imageSection(imageData: imageData, height: dividerPosition)
+                        EquatableView(
+                            content: EquatableImageView(
+                                imageData: imageData,
+                                height: dividerPosition,
+                                showFullScreenImage: { showFullScreenImage = true }
+                            )
+                        )
                         
                         // Action buttons overlay at bottom of image
                         actionButtons
@@ -123,65 +183,6 @@ struct DocumentView: View {
         }
     }
     
-    @ViewBuilder
-    private func imageSection(imageData: Data, height: CGFloat) -> some View {
-        if let uiImage = UIImage(data: imageData) {
-            GeometryReader { geometry in
-                ZStack {
-                    // Background blur
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: geometry.size.width, height: height)
-                        .blur(radius: 30)
-                        .clipped()
-                        .overlay(Color.black.opacity(0.3))
-                    
-                    // Main image
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: geometry.size.width, maxHeight: height)
-                    
-                    if let selectedId = vm.selectedSentenceId,
-                       let region = vm.highlightedRegion(for: selectedId) {
-                        let imageDisplaySize = calculateImageDisplaySize(imageSize: uiImage.size, viewSize: CGSize(width: geometry.size.width, height: height))
-                        highlightOverlay(region: region, imageSize: uiImage.size, viewSize: imageDisplaySize)
-                    }
-                }
-            }
-            .frame(height: height)
-            .onTapGesture {
-                showFullScreenImage = true
-            }
-        }
-    }
-    
-    private func calculateImageDisplaySize(imageSize: CGSize, viewSize: CGSize) -> CGSize {
-        let scale = min(viewSize.width / imageSize.width, viewSize.height / imageSize.height)
-        return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-    }
-    
-    @ViewBuilder
-    private func highlightOverlay(region: CGRect, imageSize: CGSize, viewSize: CGSize) -> some View {
-        let scale = min(viewSize.width / imageSize.width, viewSize.height / imageSize.height)
-        let scaledRect = CGRect(
-            x: region.origin.x * scale,
-            y: region.origin.y * scale,
-            width: region.width * scale,
-            height: region.height * scale
-        )
-        
-        Rectangle()
-            .fill(T.C.accent.opacity(0.2))
-            .overlay(
-                Rectangle()
-                    .stroke(T.C.accent, lineWidth: 2)
-            )
-            .frame(width: scaledRect.width, height: scaledRect.height)
-            .position(x: scaledRect.midX, y: scaledRect.midY)
-            .animation(isDragging ? nil : .spring(response: 0.3, dampingFraction: 0.8), value: region)
-    }
     
     @ViewBuilder
     private var actionButtons: some View {
