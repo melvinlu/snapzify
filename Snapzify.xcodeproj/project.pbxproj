@@ -20,6 +20,7 @@
 		3D9B1A0E1234567890123456 /* PinyinServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */; };
 		3D9B1A101234567890123456 /* TranslationServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */; };
 		3D9B1A121234567890123456 /* TTSServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */; };
+		3D9B1B351234567890123465 /* ChatGPTService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1B341234567890123464 /* ChatGPTService.swift */; };
 		3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A151234567890123456 /* ConfigServiceImpl.swift */; };
 		3D9B1A161234567890123456 /* PlecoLinkServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */; };
 		3D9B1A181234567890123456 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A191234567890123456 /* HomeView.swift */; };
@@ -102,6 +103,7 @@
 		3D9B1A0F1234567890123456 /* PinyinServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationServiceOpenAI.swift; sourceTree = "<group>"; };
 		3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSServiceOpenAI.swift; sourceTree = "<group>"; };
+		3D9B1B341234567890123464 /* ChatGPTService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTService.swift; sourceTree = "<group>"; };
 		3D9B1A151234567890123456 /* ConfigServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlecoLinkServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A191234567890123456 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -208,6 +210,7 @@
 				3D9B1A321234567890123462 /* StreamingChineseProcessingService.swift */,
 				3D9B1A111234567890123456 /* TranslationServiceOpenAI.swift */,
 				3D9B1A131234567890123456 /* TTSServiceOpenAI.swift */,
+				3D9B1B341234567890123464 /* ChatGPTService.swift */,
 				3D9B1A151234567890123456 /* ConfigServiceImpl.swift */,
 				3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */,
 				F681F60E8E6F38EEB03596EB /* DocumentStoreImpl.swift */,
@@ -427,6 +430,7 @@
 				3D9B1A331234567890123463 /* StreamingChineseProcessingService.swift in Sources */,
 				3D9B1A101234567890123456 /* TranslationServiceOpenAI.swift in Sources */,
 				3D9B1A121234567890123456 /* TTSServiceOpenAI.swift in Sources */,
+				3D9B1B351234567890123465 /* ChatGPTService.swift in Sources */,
 				3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */,
 				3D9B1A161234567890123456 /* PlecoLinkServiceImpl.swift in Sources */,
 				3D9B1A181234567890123456 /* HomeView.swift in Sources */,

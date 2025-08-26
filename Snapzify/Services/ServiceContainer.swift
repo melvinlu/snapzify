@@ -17,6 +17,7 @@ class ServiceContainer {
     // Translation & Audio Services
     let translationService: TranslationService
     let ttsService: TTSService
+    let chatGPTService: ChatGPTService
     
     private init() {
         // Initialize core services
@@ -32,6 +33,7 @@ class ServiceContainer {
         // Initialize translation & audio services
         self.translationService = TranslationServiceOpenAI(configService: configService)
         self.ttsService = TTSServiceOpenAI(configService: configService)
+        self.chatGPTService = ChatGPTServiceImpl(configService: configService)
     }
     
     // Factory method for creating ViewModels with injected dependencies

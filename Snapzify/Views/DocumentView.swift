@@ -126,41 +126,112 @@ struct ChatGPTContextInputPopup: View {
     let chineseText: String
     @Binding var context: String
     @Binding var isPresented: Bool
+    @State private var streamedResponse = ""
+    @State private var isStreaming = false
+    @State private var userPrompt = ""
+    @State private var streamTask: Task<Void, Never>?
     @FocusState private var isFocused: Bool
+    
+    private let chatGPTService = ServiceContainer.shared.chatGPTService
     
     var body: some View {
         VStack(alignment: .leading, spacing: T.S.md) {
-            Text("Add context for ChatGPT")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(T.C.ink)
-            
-            Text("Chinese: \"\(String(chineseText.prefix(50)))\(chineseText.count > 50 ? "..." : "")\"")
-                .font(.system(size: 14))
-                .foregroundStyle(T.C.ink2)
-                .lineLimit(2)
-            
-            TextField("What would you like to know? (optional)", text: $context, axis: .vertical)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .lineLimit(2...4)
-                .focused($isFocused)
-            
-            HStack(spacing: T.S.md) {
-                Button {
-                    isPresented = false
-                } label: {
-                    Text("Cancel")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(PopupButtonStyle())
+            // Header
+            HStack {
+                Text("ChatGPT")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(T.C.ink)
+                
+                Spacer()
                 
                 Button {
-                    openChatGPTWithContext()
+                    streamTask?.cancel()
+                    isPresented = false
                 } label: {
-                    Text("Open ChatGPT")
-                        .font(.system(size: 14, weight: .medium))
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(T.C.ink2)
+                        .font(.title2)
                 }
-                .buttonStyle(PopupButtonStyle(isActive: true))
             }
+            
+            // Scrollable response area
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: T.S.sm) {
+                        if streamedResponse.isEmpty && isStreaming {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Analyzing...")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(T.C.ink2)
+                            }
+                        } else if !streamedResponse.isEmpty {
+                            Text(streamedResponse)
+                                .font(.system(size: 14))
+                                .foregroundStyle(T.C.ink)
+                                .textSelection(.enabled)
+                                .id("response")
+                        } else {
+                            Text("Ask me anything about: \"\(String(chineseText.prefix(50)))\(chineseText.count > 50 ? "..." : "")\"")
+                                .font(.system(size: 14))
+                                .foregroundStyle(T.C.ink2)
+                                .italic()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .onChange(of: streamedResponse) { _ in
+                    withAnimation {
+                        proxy.scrollTo("response", anchor: .bottom)
+                    }
+                }
+            }
+            .frame(minHeight: 200, maxHeight: 400)
+            .padding(T.S.sm)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(T.C.ink.opacity(0.05))
+            )
+            
+            // Input area
+            HStack(spacing: T.S.sm) {
+                TextField("Ask a follow-up question...", text: $userPrompt, axis: .vertical)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .lineLimit(1...3)
+                    .focused($isFocused)
+                    .disabled(isStreaming)
+                    .onSubmit {
+                        sendCustomPrompt()
+                    }
+                
+                Button {
+                    if isStreaming {
+                        streamTask?.cancel()
+                    } else if !userPrompt.isEmpty {
+                        sendCustomPrompt()
+                    }
+                } label: {
+                    if isStreaming {
+                        Image(systemName: "stop.circle.fill")
+                            .foregroundStyle(.red)
+                    } else {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .foregroundStyle(userPrompt.isEmpty ? T.C.ink2 : T.C.accent)
+                    }
+                }
+                .font(.title2)
+                .disabled(!isStreaming && userPrompt.isEmpty)
+            }
+            
+            // External ChatGPT button
+            Button {
+                openInChatGPTApp()
+            } label: {
+                Label("Open in ChatGPT", systemImage: "arrow.up.forward.app")
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .buttonStyle(PopupButtonStyle())
         }
         .padding(T.S.lg)
         .background(
@@ -168,21 +239,78 @@ struct ChatGPTContextInputPopup: View {
                 .fill(T.C.card)
                 .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
         )
-        .frame(maxWidth: 340)
+        .frame(maxWidth: 400, maxHeight: 600)
         .onAppear {
-            // Focus immediately for faster response
-            isFocused = true
+            startInitialBreakdown()
+        }
+        .onDisappear {
+            streamTask?.cancel()
         }
     }
     
-    private func openChatGPTWithContext() {
-        let prompt: String
-        if context.isEmpty {
-            prompt = "Please explain this Chinese text: \(chineseText)"
-        } else {
-            prompt = "Please explain this Chinese text: \(chineseText)\n\nContext: \(context)"
+    private func startInitialBreakdown() {
+        guard chatGPTService.isConfigured() else {
+            streamedResponse = "Please configure your OpenAI API key in Settings to use ChatGPT features."
+            return
         }
         
+        isStreaming = true
+        streamedResponse = ""
+        
+        streamTask = Task {
+            do {
+                for try await chunk in chatGPTService.streamBreakdown(chineseText: chineseText) {
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            streamedResponse += chunk
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    streamedResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+            
+            await MainActor.run {
+                isStreaming = false
+            }
+        }
+    }
+    
+    private func sendCustomPrompt() {
+        guard !userPrompt.isEmpty, chatGPTService.isConfigured() else { return }
+        
+        let prompt = userPrompt
+        userPrompt = ""
+        
+        isStreaming = true
+        streamedResponse += "\n\n**You:** \(prompt)\n\n**ChatGPT:** "
+        
+        streamTask?.cancel()
+        streamTask = Task {
+            do {
+                for try await chunk in chatGPTService.streamCustomPrompt(chineseText: chineseText, userPrompt: prompt) {
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            streamedResponse += chunk
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    streamedResponse += "\n\nError: \(error.localizedDescription)"
+                }
+            }
+            
+            await MainActor.run {
+                isStreaming = false
+            }
+        }
+    }
+    
+    private func openInChatGPTApp() {
+        let prompt = chineseText + (userPrompt.isEmpty ? "" : " " + userPrompt)
         let encodedPrompt = prompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         
         // Try ChatGPT app first
@@ -194,8 +322,6 @@ struct ChatGPTContextInputPopup: View {
         else if let url = URL(string: "https://chat.openai.com/?q=\(encodedPrompt)") {
             UIApplication.shared.open(url)
         }
-        
-        isPresented = false
     }
 }
 
