@@ -1,21 +1,5 @@
 import SwiftUI
 
-// Function to open ChatGPT with Chinese text
-private func openInChatGPT(text: String) {
-    let prompt = "Please explain this Chinese text: \(text)"
-    let encodedPrompt = prompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-    
-    // Try ChatGPT app first
-    if let url = URL(string: "chatgpt://message?prompt=\(encodedPrompt)"),
-       UIApplication.shared.canOpenURL(url) {
-        UIApplication.shared.open(url)
-    } 
-    // Fall back to web version
-    else if let url = URL(string: "https://chat.openai.com/?q=\(encodedPrompt)") {
-        UIApplication.shared.open(url)
-    }
-}
-
 // Structure to hold selected sentence data
 struct SelectedSentencePopup: View {
     let sentence: Sentence
@@ -23,7 +7,18 @@ struct SelectedSentencePopup: View {
     @Binding var isShowing: Bool
     let position: CGPoint
     
+    @State private var showingChatGPTInput = false
+    @State private var chatGPTContext = ""
+    
     var body: some View {
+        let _ = print("📱 Popup rendering:")
+        let _ = print("📱   - Text: '\(sentence.text)'")
+        let _ = print("📱   - English: '\(sentence.english ?? "nil")'")
+        let _ = print("📱   - Pinyin count: \(sentence.pinyin.count)")
+        let _ = print("📱   - Pinyin: \(sentence.pinyin)")
+        let _ = print("📱   - vm.sentence.pinyin: \(vm.sentence.pinyin)")
+        let _ = print("📱   - isTranslating: \(vm.isTranslating)")
+        
         VStack(alignment: .leading, spacing: T.S.sm) {
             // Chinese text
             Text(sentence.text)
@@ -31,7 +26,11 @@ struct SelectedSentencePopup: View {
                 .foregroundStyle(T.C.ink)
             
             // Pinyin
-            if !sentence.pinyin.isEmpty {
+            if !vm.sentence.pinyin.isEmpty {
+                Text(vm.sentence.pinyin.joined(separator: " "))
+                    .font(.system(size: 14))
+                    .foregroundStyle(T.C.ink2)
+            } else if !sentence.pinyin.isEmpty {
                 Text(sentence.pinyin.joined(separator: " "))
                     .font(.system(size: 14))
                     .foregroundStyle(T.C.ink2)
@@ -88,12 +87,19 @@ struct SelectedSentencePopup: View {
                 
                 // ChatGPT button
                 Button {
-                    openInChatGPT(text: sentence.text)
+                    showingChatGPTInput = true
                 } label: {
                     Label("ChatGPT", systemImage: "message.circle")
                         .font(.caption)
                 }
                 .buttonStyle(PopupButtonStyle())
+                .sheet(isPresented: $showingChatGPTInput) {
+                    ChatGPTContextInputView(
+                        chineseText: sentence.text,
+                        context: $chatGPTContext,
+                        isPresented: $showingChatGPTInput
+                    )
+                }
                 
                 Spacer()
             }
@@ -121,6 +127,77 @@ struct PopupButtonStyle: ButtonStyle {
                     .fill(isActive ? T.C.accent : T.C.ink.opacity(0.1))
             )
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+    }
+}
+
+struct ChatGPTContextInputView: View {
+    let chineseText: String
+    @Binding var context: String
+    @Binding var isPresented: Bool
+    @FocusState private var isFocused: Bool
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: T.S.lg) {
+                Text("Add context for ChatGPT")
+                    .font(.headline)
+                    .padding(.top)
+                
+                Text("The Chinese text: \"\(chineseText)\"")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                TextField("What would you like to know? (optional)", text: $context, axis: .vertical)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .lineLimit(3...6)
+                    .padding(.horizontal)
+                    .focused($isFocused)
+                
+                Spacer()
+                
+                HStack(spacing: T.S.md) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Open ChatGPT") {
+                        openChatGPTWithContext()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(.bottom)
+            }
+            .navigationBarHidden(true)
+        }
+        .onAppear {
+            isFocused = true
+        }
+    }
+    
+    private func openChatGPTWithContext() {
+        let prompt: String
+        if context.isEmpty {
+            prompt = "Please explain this Chinese text: \(chineseText)"
+        } else {
+            prompt = "Please explain this Chinese text: \(chineseText)\n\nContext: \(context)"
+        }
+        
+        let encodedPrompt = prompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        // Try ChatGPT app first
+        if let url = URL(string: "chatgpt://message?prompt=\(encodedPrompt)"),
+           UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } 
+        // Fall back to web version
+        else if let url = URL(string: "https://chat.openai.com/?q=\(encodedPrompt)") {
+            UIApplication.shared.open(url)
+        }
+        
+        isPresented = false
     }
 }
 

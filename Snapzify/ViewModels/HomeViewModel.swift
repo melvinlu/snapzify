@@ -274,33 +274,69 @@ class HomeViewModel: ObservableObject {
             
             logger.info("Extracted \(frames.count) frames from video")
             
-            // Process each frame for OCR
+            // Process all frames concurrently for OCR
             // Dictionary to track all appearances of each unique text
             var textAppearances: [String: [FrameAppearance]] = [:]
             let frameInterval = 0.2 // seconds between frames (must match extraction interval)
             
-            for (index, frame) in frames.enumerated() {
-                logger.debug("Processing frame \(index + 1)/\(frames.count)")
-                let timestamp = Double(index) * frameInterval
+            logger.info("Starting concurrent OCR processing for \(frames.count) frames")
+            
+            // Process frames in concurrent batches to avoid overwhelming the API
+            // Google Cloud Vision allows up to 30 requests per second by default
+            let batchSize = 10 // Process 10 frames concurrently at a time
+            
+            for batchStart in stride(from: 0, to: frames.count, by: batchSize) {
+                let batchEnd = min(batchStart + batchSize, frames.count)
+                let batch = Array(frames[batchStart..<batchEnd])
+                let batchIndices = Array(batchStart..<batchEnd)
                 
-                let ocrLines = try await ocrService.recognizeText(in: frame)
+                logger.debug("Processing OCR batch: frames \(batchStart + 1)-\(batchEnd)/\(frames.count)")
                 
-                for line in ocrLines {
-                    if containsChinese(line.text) {
-                        let normalizedText = ChineseScript(rawValue: selectedScript) == .simplified ?
-                            scriptConversionService.toSimplified(line.text) :
-                            scriptConversionService.toTraditional(line.text)
-                        
-                        // Track this appearance
-                        let appearance = FrameAppearance(timestamp: timestamp, bbox: line.bbox)
-                        
-                        if textAppearances[normalizedText] == nil {
-                            textAppearances[normalizedText] = []
+                // Process this batch concurrently
+                let batchResults = try await withThrowingTaskGroup(of: (Int, [OCRLine]).self) { group in
+                    for (localIndex, frame) in batch.enumerated() {
+                        let frameIndex = batchIndices[localIndex]
+                        group.addTask {
+                            let ocrLines = try await self.ocrService.recognizeText(in: frame)
+                            return (frameIndex, ocrLines)
                         }
-                        textAppearances[normalizedText]?.append(appearance)
+                    }
+                    
+                    var results: [(Int, [OCRLine])] = []
+                    for try await result in group {
+                        results.append(result)
+                    }
+                    return results
+                }
+                
+                // Process results from this batch
+                for (frameIndex, ocrLines) in batchResults {
+                    let timestamp = Double(frameIndex) * frameInterval
+                    
+                    for line in ocrLines {
+                        if containsChinese(line.text) {
+                            let normalizedText = ChineseScript(rawValue: selectedScript) == .simplified ?
+                                scriptConversionService.toSimplified(line.text) :
+                                scriptConversionService.toTraditional(line.text)
+                            
+                            // Track this appearance
+                            let appearance = FrameAppearance(timestamp: timestamp, bbox: line.bbox)
+                            
+                            if textAppearances[normalizedText] == nil {
+                                textAppearances[normalizedText] = []
+                            }
+                            textAppearances[normalizedText]?.append(appearance)
+                        }
                     }
                 }
+                
+                // Small delay between batches to avoid rate limiting (optional, can be removed if not needed)
+                if batchEnd < frames.count {
+                    try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second pause between batches
+                }
             }
+            
+            logger.info("Completed concurrent OCR processing for all frames")
             
             // Convert to sentences with all their frame appearances
             var allSentences: [Sentence] = []

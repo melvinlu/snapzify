@@ -1,6 +1,112 @@
 import SwiftUI
 import AVKit
 
+// Video-specific popup with ChatGPT context input
+struct VideoSelectedSentencePopup: View {
+    let sentence: Sentence
+    @ObservedObject var vm: SentenceViewModel
+    @Binding var isShowing: Bool
+    let position: CGPoint
+    
+    @State private var showingChatGPTInput = false
+    @State private var chatGPTContext = ""
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: T.S.sm) {
+            // Chinese text
+            Text(sentence.text)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(T.C.ink)
+            
+            // Pinyin
+            if !vm.sentence.pinyin.isEmpty {
+                Text(vm.sentence.pinyin.joined(separator: " "))
+                    .font(.system(size: 14))
+                    .foregroundStyle(T.C.ink2)
+            } else if !sentence.pinyin.isEmpty {
+                Text(sentence.pinyin.joined(separator: " "))
+                    .font(.system(size: 14))
+                    .foregroundStyle(T.C.ink2)
+            }
+            
+            // English translation or loading indicator
+            if vm.isTranslating {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Translating...")
+                        .font(.system(size: 16))
+                        .foregroundStyle(T.C.ink2)
+                }
+            } else if let english = sentence.english, english != "Generating..." {
+                Text(english)
+                    .font(.system(size: 16))
+                    .foregroundStyle(T.C.ink2)
+            }
+            
+            // Action buttons
+            HStack(spacing: T.S.md) {
+                // Pleco button
+                Button {
+                    vm.openInPleco()
+                } label: {
+                    Label("Pleco", systemImage: "book")
+                        .font(.caption)
+                }
+                .buttonStyle(PopupButtonStyle())
+                
+                // Audio button
+                if vm.isGeneratingAudio || vm.isPreparingAudio {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
+                            .scaleEffect(0.6)
+                        Text("Loading...")
+                            .font(.caption)
+                            .foregroundStyle(T.C.ink2)
+                    }
+                } else {
+                    Button {
+                        vm.playOrPauseAudio()
+                    } label: {
+                        Label(
+                            vm.isPlaying ? "Pause" : "Play",
+                            systemImage: vm.isPlaying ? "pause.fill" : "play.fill"
+                        )
+                        .font(.caption)
+                    }
+                    .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
+                }
+                
+                // ChatGPT button
+                Button {
+                    showingChatGPTInput = true
+                } label: {
+                    Label("ChatGPT", systemImage: "message.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(PopupButtonStyle())
+                .sheet(isPresented: $showingChatGPTInput) {
+                    ChatGPTContextInputView(
+                        chineseText: sentence.text,
+                        context: $chatGPTContext,
+                        isPresented: $showingChatGPTInput
+                    )
+                }
+                
+                Spacer()
+            }
+        }
+        .padding(T.S.lg)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(T.C.card)
+                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 340)
+    }
+}
+
 struct VideoDocumentView: View {
     @StateObject var vm: DocumentViewModel
     @State private var currentFrameIndex: Int = 0
@@ -49,7 +155,7 @@ struct VideoDocumentView: View {
                             }
                         }
                     
-                    SelectedSentencePopup(
+                    VideoSelectedSentencePopup(
                         sentence: sentence,
                         vm: vm.createSentenceViewModel(for: sentence),
                         isShowing: $showingPopup,
@@ -153,6 +259,11 @@ struct VideoDocumentView: View {
     
     private func handleSentenceTap(_ sentence: Sentence, at location: CGPoint) {
         print("🎯 Tapped sentence in video: text='\(sentence.text)', frame=\(currentFrameIndex)")
+        print("🎯 Sentence details:")
+        print("🎯   - ID: \(sentence.id)")
+        print("🎯   - English: '\(sentence.english ?? "nil")'")
+        print("🎯   - Pinyin: \(sentence.pinyin)")
+        print("🎯   - Status: \(sentence.status)")
         
         // Always show popup immediately
         withAnimation(.easeInOut(duration: 0.2)) {
@@ -161,15 +272,20 @@ struct VideoDocumentView: View {
             showingPopup = true
         }
         
-        // Check if sentence needs translation
-        if sentence.english == nil || sentence.english == "Generating..." {
+        // Check if sentence needs translation (either English or pinyin missing)
+        if sentence.english == nil || sentence.english == "Generating..." || sentence.pinyin.isEmpty {
+            print("🎯 Sentence needs translation (missing English or pinyin), creating view model")
             // Get or create the sentence view model to handle translation
             let sentenceVM = vm.createSentenceViewModel(for: sentence)
+            print("🎯 View model created, triggering translation")
             
             // Trigger translation in background
             Task {
                 await sentenceVM.translateIfNeeded()
+                print("🎯 Translation completed")
             }
+        } else {
+            print("🎯 Sentence already fully translated (has both English and pinyin)")
         }
     }
 }

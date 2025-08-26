@@ -74,24 +74,63 @@ class SentenceViewModel: ObservableObject {
     }
     
     func translateIfNeeded() async {
-        guard sentence.english == nil || sentence.english == "Generating...",
-              translationService.isConfigured() else { return }
+        print("🔍 translateIfNeeded called for text: '\(sentence.text)'")
+        print("🔍 Current english: \(sentence.english ?? "nil")")
+        print("🔍 Current pinyin: \(sentence.pinyin)")
+        print("🔍 Current script: \(script)")
+        
+        // Need translation if either English or pinyin is missing
+        guard (sentence.english == nil || sentence.english == "Generating..." || sentence.pinyin.isEmpty),
+              translationService.isConfigured() else { 
+            print("🔍 Skipping translation - both english and pinyin exist, or service not configured")
+            return 
+        }
         
         isTranslating = true
         defer { isTranslating = false }
         
+        // Use streaming service to get both English and pinyin
+        let streamingService = ServiceContainer.shared.streamingChineseProcessingService
+        print("🔍 Using streaming service for translation")
+        
         do {
-            let translations = try await translationService.translate([sentence.text])
+            var processedResult: StreamingProcessedSentence?
             
-            if let translation = translations.first, let translation = translation {
-                sentence.english = translation
+            print("🔍 Calling processStreamingBatch with text: '\(sentence.text)'")
+            try await streamingService.processStreamingBatch(
+                [sentence.text],
+                script: script
+            ) { processed in
+                print("🔍 Received processed result:")
+                print("🔍   - Index: \(processed.index)")
+                print("🔍   - Chinese: '\(processed.chinese)'")
+                print("🔍   - English: '\(processed.english)'")
+                print("🔍   - Pinyin: \(processed.pinyin)")
+                processedResult = processed
+            }
+            
+            if let result = processedResult {
+                print("🔍 Updating sentence with result:")
+                print("🔍   - English: '\(result.english)'")
+                print("🔍   - Pinyin count: \(result.pinyin.count)")
+                print("🔍   - Pinyin: \(result.pinyin)")
+                
+                sentence.english = result.english
+                sentence.pinyin = result.pinyin
                 sentence.status = .translated
+                
+                print("🔍 After update:")
+                print("🔍   - sentence.english: '\(sentence.english ?? "nil")'")
+                print("🔍   - sentence.pinyin: \(sentence.pinyin)")
+                
                 onUpdate(sentence)
                 
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } else {
+                print("🔍 No result received from streaming service")
             }
         } catch {
-            print("Translation failed: \(error)")
+            print("🔍 Translation failed: \(error)")
             sentence.status = .error("Translation failed")
             onUpdate(sentence)
         }
