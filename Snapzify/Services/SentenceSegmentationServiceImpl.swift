@@ -7,47 +7,14 @@ class SentenceSegmentationServiceImpl: SentenceSegmentationService {
     
     func segmentIntoSentences(from lines: [OCRLine]) async -> [(text: String, bbox: CGRect)] {
         var sentences: [(text: String, bbox: CGRect)] = []
-        var currentSentence = ""
-        var currentBoxes: [CGRect] = []
         
+        // Simply treat each OCR line as its own sentence
+        // The OCR has already done the line segmentation for us
         for line in lines {
-            let text = line.text
-            var buffer = ""
-            
-            for char in text {
-                buffer.append(char)
-                
-                if sentenceEnders.contains(char.unicodeScalars.first!) {
-                    if let next = text.firstIndex(of: char)?.utf16Offset(in: text),
-                       next < text.count - 1 {
-                        let nextChar = text[text.index(text.startIndex, offsetBy: next + 1)]
-                        if quotationMarks.contains(nextChar.unicodeScalars.first!) {
-                            continue
-                        }
-                    }
-                    
-                    currentSentence += buffer
-                    currentBoxes.append(line.bbox)
-                    
-                    if !currentSentence.isEmpty {
-                        let unionBox = currentBoxes.reduce(CGRect.null) { $0.union($1) }
-                        sentences.append((text: currentSentence, bbox: unionBox))
-                        currentSentence = ""
-                        currentBoxes = []
-                    }
-                    buffer = ""
-                }
+            let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty {
+                sentences.append((text: text, bbox: line.bbox))
             }
-            
-            if !buffer.isEmpty {
-                currentSentence += buffer
-                currentBoxes.append(line.bbox)
-            }
-        }
-        
-        if !currentSentence.isEmpty {
-            let unionBox = currentBoxes.reduce(CGRect.null) { $0.union($1) }
-            sentences.append((text: currentSentence, bbox: unionBox))
         }
         
         return sentences

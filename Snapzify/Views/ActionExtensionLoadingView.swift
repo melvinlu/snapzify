@@ -24,7 +24,9 @@ struct ActionExtensionLoadingView: View {
             Color.black
                 .ignoresSafeArea()
             
-            VStack(spacing: 30) {
+            VStack(spacing: 40) {
+                Spacer()
+                
                 // Thumbnail of the image being processed
                 Image(uiImage: image)
                     .resizable()
@@ -36,25 +38,20 @@ struct ActionExtensionLoadingView: View {
                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
                 
-                // Processing status
-                VStack(spacing: 12) {
-                    Text("Processing Image")
-                        .font(.headline)
+                // "Snapzifying!" with percentage
+                HStack(spacing: 8) {
+                    Text("Snapzifying!")
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.white)
                     
-                    if let progress = vm.processingProgress {
-                        Text(progress)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    
-                    // Progress indicator
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.2)
+                    Text(vm.processingPercentage)
+                        .font(.system(size: 18, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.7))
                 }
                 
-                // Cancel button
+                Spacer()
+                
+                // Cancel button at bottom
                 Button {
                     dismiss()
                 } label: {
@@ -65,6 +62,7 @@ struct ActionExtensionLoadingView: View {
                         .background(Color.white.opacity(0.1))
                         .cornerRadius(20)
                 }
+                .padding(.bottom, 40)
             }
             .padding()
         }
@@ -83,14 +81,12 @@ struct ActionExtensionLoadingView: View {
 
 @MainActor
 class ActionExtensionLoadingViewModel: ObservableObject {
-    @Published var processingProgress: String?
+    @Published var processingPercentage: String = "0%"
     @Published var isProcessing = false
     
     private let store: DocumentStore
     private let ocrService: OCRService
     private let scriptConversionService: ScriptConversionService
-    private let chineseProcessingService: ChineseProcessingService = ServiceContainer.shared.chineseProcessingService
-    private let streamingChineseProcessingService: StreamingChineseProcessingService = ServiceContainer.shared.streamingChineseProcessingService
     @AppStorage("selectedScript") private var selectedScript: String = ChineseScript.simplified.rawValue
     
     private var processingTask: Task<Void, Never>?
@@ -103,7 +99,7 @@ class ActionExtensionLoadingViewModel: ObservableObject {
     
     func processImage(_ image: UIImage, onComplete: @escaping (Document) -> Void) async {
         isProcessing = true
-        processingProgress = "Recognizing text..."
+        processingPercentage = "25%"
         
         processingTask = Task { @MainActor in
             do {
@@ -111,20 +107,20 @@ class ActionExtensionLoadingViewModel: ObservableObject {
                 let ocrLines = try await ocrService.recognizeText(in: image)
                 guard !Task.isCancelled else { return }
                 
-                processingProgress = "Segmenting sentences..."
+                processingPercentage = "50%"
                 
                 // Segment sentences
                 let segmentationService = SentenceSegmentationServiceImpl()
                 let sentencesWithRanges = await segmentationService.segmentIntoSentences(from: ocrLines)
                 guard !Task.isCancelled else { return }
                 
-                processingProgress = "Processing \(sentencesWithRanges.count) sentences..."
+                processingPercentage = "75%"
                 
-                // Create document with initial sentences
+                // Create document with initial sentences (OCR only)
                 let imageData = image.jpegData(compressionQuality: 0.8)
                 let script = ChineseScript(rawValue: selectedScript) ?? .simplified
                 
-                var sentences: [Sentence] = sentencesWithRanges.map { sentenceData in
+                let sentences: [Sentence] = sentencesWithRanges.map { sentenceData in
                     Sentence(
                         text: sentenceData.text,
                         rangeInImage: sentenceData.bbox,
@@ -141,60 +137,20 @@ class ActionExtensionLoadingViewModel: ObservableObject {
                     isSaved: false
                 )
                 
+                processingPercentage = "100%"
+                
                 // Save document
                 try await store.save(document)
                 guard !Task.isCancelled else { return }
                 
-                // Process Chinese sentences
-                let chineseIndices = sentences.enumerated().compactMap { index, sentence in
-                    ChineseDetector.containsChinese(sentence.text) ? index : nil
-                }
-                
-                if !chineseIndices.isEmpty {
-                    processingProgress = "Translating..."
-                    
-                    // Process Chinese sentences
-                    let chineseTexts = chineseIndices.map { sentences[$0].text }
-                    let processedResults = try await chineseProcessingService.processBatch(
-                        chineseTexts,
-                        script: script
-                    )
-                    
-                    // Update sentences with processed results
-                    for (idx, result) in processedResults.enumerated() {
-                        let originalIdx = chineseIndices[idx]
-                        sentences[originalIdx].pinyin = result.pinyin
-                        sentences[originalIdx].english = result.english
-                        sentences[originalIdx].status = .translated
-                    }
-                    
-                    processingProgress = "Translation complete"
-                }
-                
-                // Create final document
-                let finalDocument = Document(
-                    id: document.id,
-                    createdAt: document.createdAt,
-                    source: document.source,
-                    script: script,
-                    sentences: sentences,
-                    imageData: imageData,
-                    isVideo: false,
-                    isSaved: false
-                )
-                
-                // Save and navigate
-                try await store.save(finalDocument)
-                
-                guard !Task.isCancelled else { return }
-                
+                // Navigate immediately - translations will happen on the fly in DocumentView
                 isProcessing = false
-                onComplete(finalDocument)
+                onComplete(document)
                 
             } catch {
                 print("Failed to process action extension image: \(error)")
                 isProcessing = false
-                processingProgress = "Failed to process image"
+                processingPercentage = "Error"
             }
         }
         

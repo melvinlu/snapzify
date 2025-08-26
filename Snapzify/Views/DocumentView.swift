@@ -398,6 +398,22 @@ struct DocumentView: View {
         // Find the current sentence data from the document
         if let currentSentence = vm.document.sentences.first(where: { $0.id == sentence.id }) {
             print("🎯 Current sentence data: english='\(currentSentence.english ?? "nil")', pinyin=\(currentSentence.pinyin), status=\(currentSentence.status)")
+            
+            // Check if sentence needs translation (either English or pinyin missing)
+            if currentSentence.english == nil || currentSentence.english == "Generating..." || currentSentence.pinyin.isEmpty {
+                print("🎯 Sentence needs translation (missing English or pinyin), creating view model")
+                // Get or create the sentence view model to handle translation
+                let sentenceVM = vm.createSentenceViewModel(for: currentSentence)
+                print("🎯 View model created, triggering translation")
+                
+                // Trigger translation in background
+                Task {
+                    await sentenceVM.translateIfNeeded()
+                    print("🎯 Translation completed")
+                }
+            } else {
+                print("🎯 Sentence already fully translated (has both English and pinyin)")
+            }
         } else {
             print("🎯 Could not find sentence in current document")
         }

@@ -306,7 +306,7 @@ class HomeViewModel: ObservableObject {
             
             // Add 60-second timeout to image processing
             _ = try await withTimeout(seconds: 60) {
-                try await self.processImageCore(image, source: .imported, script: ChineseScript(rawValue: self.selectedScript) ?? .simplified, assetIdentifier: nil, shouldNavigate: checkVisibility())
+                try await self.processImageCore(image, source: .imported, script: ChineseScript(rawValue: self.selectedScript) ?? .simplified, assetIdentifier: nil, shouldNavigate: checkVisibility(), existingTaskId: taskId)
             }
             
             logger.info("Snapzifying completed")
@@ -874,35 +874,39 @@ class HomeViewModel: ObservableObject {
         source: DocumentSource,
         script: ChineseScript,
         assetIdentifier: String? = nil,
-        shouldNavigate: Bool
+        shouldNavigate: Bool,
+        existingTaskId: UUID? = nil
     ) async throws -> Document {
-        // Create a new processing task
-        let taskId = UUID()
+        // Use existing task ID if provided, otherwise create new one
+        let taskId = existingTaskId ?? UUID()
         let taskName = source == .shareExtension ? "Shared Image" : 
                        source == .photos ? "Photo" : "Image"
         
-        // Create a small thumbnail
-        let thumbnailSize = CGSize(width: 60, height: 60)
-        let thumbnail = await MainActor.run {
-            UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
-            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
-            let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
-            return thumbnailImage
-        }
-        
-        await MainActor.run {
-            let task = ProcessingTask(
-                id: taskId,
-                name: taskName,
-                progress: "Processing",
-                progressValue: 0.0,
-                totalFrames: 0,
-                processedFrames: 0,
-                type: source == .shareExtension ? .shared : .image,
-                thumbnail: thumbnail
-            )
-            self.activeProcessingTasks.append(task)
+        // Only create a new task if one doesn't exist with this ID
+        if existingTaskId == nil {
+            // Create a small thumbnail
+            let thumbnailSize = CGSize(width: 60, height: 60)
+            let thumbnail = await MainActor.run {
+                UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
+                image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
+                UIGraphicsEndImageContext()
+                return thumbnailImage
+            }
+            
+            await MainActor.run {
+                let task = ProcessingTask(
+                    id: taskId,
+                    name: taskName,
+                    progress: "Processing",
+                    progressValue: 0.0,
+                    totalFrames: 0,
+                    processedFrames: 0,
+                    type: source == .shareExtension ? .shared : .image,
+                    thumbnail: thumbnail
+                )
+                self.activeProcessingTasks.append(task)
+            }
         }
         
         // Helper to update task progress

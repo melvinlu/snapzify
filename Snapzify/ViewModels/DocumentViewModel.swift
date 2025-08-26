@@ -58,12 +58,14 @@ class DocumentViewModel: ObservableObject {
         let texts = pendingSentences.map { $0.text }
         
         do {
-            let translations = try await translationService.translate(texts)
+            // Use ChineseProcessingService to get pinyin AND translations
+            let chineseProcessor = ServiceContainer.shared.chineseProcessingService
+            let processedResults = try await chineseProcessor.processBatch(texts, script: document.script)
             
-            for (index, translation) in translations.enumerated() {
-                if let translation = translation,
-                   let sentenceIndex = document.sentences.firstIndex(where: { $0.id == pendingSentences[index].id }) {
-                    document.sentences[sentenceIndex].english = translation
+            for (index, result) in processedResults.enumerated() {
+                if let sentenceIndex = document.sentences.firstIndex(where: { $0.id == pendingSentences[index].id }) {
+                    document.sentences[sentenceIndex].pinyin = result.pinyin
+                    document.sentences[sentenceIndex].english = result.english
                     document.sentences[sentenceIndex].status = .translated
                 }
             }
