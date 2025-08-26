@@ -64,33 +64,44 @@ struct Document: Identifiable, Codable, Hashable {
     var script: ChineseScript
     var sentences: [Sentence]
     var imageData: Data?
+    var videoData: Data?  // Store video data for playback
+    var isVideo: Bool
     var isSaved: Bool
     var assetIdentifier: String?  // PHAsset localIdentifier for photo library deletion
     
-    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, script: ChineseScript = .simplified, sentences: [Sentence] = [], imageData: Data? = nil, isSaved: Bool = false, assetIdentifier: String? = nil) {
+    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, script: ChineseScript = .simplified, sentences: [Sentence] = [], imageData: Data? = nil, videoData: Data? = nil, isVideo: Bool = false, isSaved: Bool = false, assetIdentifier: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.source = source
         self.script = script
         self.sentences = sentences
         self.imageData = imageData
+        self.videoData = videoData
+        self.isVideo = isVideo
         self.isSaved = isSaved
         self.assetIdentifier = assetIdentifier
     }
 }
 
+struct FrameAppearance: Codable, Hashable {
+    let timestamp: TimeInterval
+    let bbox: CGRect
+}
+
 struct Sentence: Identifiable, Codable, Hashable {
     let id: UUID
     let text: String
-    let rangeInImage: CGRect?
+    let rangeInImage: CGRect? // For static images
     var tokens: [Token]
     var pinyin: [String]
     var english: String?
     var plecoURL: URL
     var audioAsset: AudioAsset?
     var status: SentenceStatus
+    var timestamp: TimeInterval? // Deprecated - kept for backwards compatibility
+    var frameAppearances: [FrameAppearance]? // For videos: all frames where this text appears
     
-    init(id: UUID = UUID(), text: String, rangeInImage: CGRect? = nil, tokens: [Token] = [], pinyin: [String] = [], english: String? = nil, plecoURL: URL? = nil, audioAsset: AudioAsset? = nil, status: SentenceStatus = .pending) {
+    init(id: UUID = UUID(), text: String, rangeInImage: CGRect? = nil, tokens: [Token] = [], pinyin: [String] = [], english: String? = nil, plecoURL: URL? = nil, audioAsset: AudioAsset? = nil, status: SentenceStatus = .pending, timestamp: TimeInterval? = nil, frameAppearances: [FrameAppearance]? = nil) {
         self.id = id
         self.text = text
         self.rangeInImage = rangeInImage
@@ -100,6 +111,8 @@ struct Sentence: Identifiable, Codable, Hashable {
         self.plecoURL = plecoURL ?? URL(string: "plecoapi://x-callback-url/s?q=\(text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
         self.audioAsset = audioAsset
         self.status = status
+        self.timestamp = timestamp
+        self.frameAppearances = frameAppearances
     }
 }
 

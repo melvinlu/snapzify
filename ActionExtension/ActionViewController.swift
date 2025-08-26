@@ -1,6 +1,7 @@
 import UIKit
 import MobileCoreServices
 import UniformTypeIdentifiers
+import AVFoundation
 
 class ActionViewController: UIViewController {
     
@@ -58,7 +59,26 @@ class ActionViewController: UIViewController {
         }
         
         for provider in attachments {
-            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            // Check for video first
+            if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.movie.identifier, options: nil) { [weak self] (item, error) in
+                    guard let self = self else { return }
+                    
+                    if let url = item as? URL {
+                        let videoData = try? Data(contentsOf: url)
+                        if let videoData = videoData {
+                            self.saveAndOpenInApp(videoData, isVideo: true)
+                        } else {
+                            self.done()
+                        }
+                    } else {
+                        self.done()
+                    }
+                }
+                break
+            }
+            // Then check for image
+            else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
                 provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { [weak self] (item, error) in
                     guard let self = self else { return }
                     
@@ -74,17 +94,17 @@ class ActionViewController: UIViewController {
                     
                     if let imageData = imageData {
                         // Save image temporarily and open main app
-                        self.saveAndOpenInApp(imageData)
+                        self.saveAndOpenInApp(imageData, isVideo: false)
                     } else {
                         self.done()
                     }
                 }
-                break // Only process first image
+                break
             }
         }
     }
     
-    private func saveAndOpenInApp(_ imageData: Data) {
+    private func saveAndOpenInApp(_ data: Data, isVideo: Bool) {
         // Save to shared container temporarily
         guard let sharedContainerURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
@@ -96,14 +116,16 @@ class ActionViewController: UIViewController {
         let tempDirectory = sharedContainerURL.appendingPathComponent("ActionTemp")
         try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         
-        let fileName = "action_\(Date().timeIntervalSince1970).jpg"
+        let fileExtension = isVideo ? "mov" : "jpg"
+        let fileName = "action_\(Date().timeIntervalSince1970).\(fileExtension)"
         let fileURL = tempDirectory.appendingPathComponent(fileName)
         
         do {
-            try imageData.write(to: fileURL)
+            try data.write(to: fileURL)
             
-            // Create URL to open main app with the image reference
-            if let url = URL(string: "snapzify://process-image?file=\(fileName)") {
+            // Create URL to open main app with the media reference
+            let scheme = isVideo ? "process-video" : "process-image"
+            if let url = URL(string: "snapzify://\(scheme)?file=\(fileName)") {
                 // Open the main app
                 DispatchQueue.main.async {
                     self.openURL(url)

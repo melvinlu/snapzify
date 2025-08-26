@@ -43,6 +43,15 @@ struct SnapzifyApp: App {
                     appState.pendingActionImage = fileName
                     appState.shouldProcessActionImage = true
                 }
+            } else if url.host == "process-video" {
+                // Handle video from ActionExtension
+                if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                   let queryItems = components.queryItems,
+                   let fileName = queryItems.first(where: { $0.name == "file" })?.value {
+                    logger.info("Processing video from ActionExtension: \(fileName)")
+                    appState.pendingActionVideo = fileName
+                    appState.shouldProcessActionVideo = true
+                }
             }
         } else {
             logger.warning("Unknown URL scheme: \(url.scheme ?? "nil")")
@@ -116,7 +125,11 @@ struct ContentView: View {
         NavigationStack {
             HomeView(vm: homeVM)
                 .navigationDestination(item: $selectedDocument) { document in
-                    DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                    if document.isVideo {
+                        VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                    } else {
+                        DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                    }
                 }
         }
         .tint(.white)
@@ -165,6 +178,8 @@ class AppState: ObservableObject {
     @Published var shouldRefreshDocuments = false
     @Published var shouldProcessActionImage = false
     @Published var pendingActionImage: String?
+    @Published var shouldProcessActionVideo = false
+    @Published var pendingActionVideo: String?
     @Published var shouldProcessSharedImage = false
     @Published var pendingSharedImage: UIImage?
 }

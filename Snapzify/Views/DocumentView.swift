@@ -1,5 +1,21 @@
 import SwiftUI
 
+// Function to open ChatGPT with Chinese text
+private func openInChatGPT(text: String) {
+    let prompt = "Please explain this Chinese text: \(text)"
+    let encodedPrompt = prompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+    
+    // Try ChatGPT app first
+    if let url = URL(string: "chatgpt://message?prompt=\(encodedPrompt)"),
+       UIApplication.shared.canOpenURL(url) {
+        UIApplication.shared.open(url)
+    } 
+    // Fall back to web version
+    else if let url = URL(string: "https://chat.openai.com/?q=\(encodedPrompt)") {
+        UIApplication.shared.open(url)
+    }
+}
+
 // Structure to hold selected sentence data
 struct SelectedSentencePopup: View {
     let sentence: Sentence
@@ -61,6 +77,15 @@ struct SelectedSentencePopup: View {
                     }
                     .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
                 }
+                
+                // ChatGPT button
+                Button {
+                    openInChatGPT(text: sentence.text)
+                } label: {
+                    Label("ChatGPT", systemImage: "message.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(PopupButtonStyle())
                 
                 Spacer()
             }

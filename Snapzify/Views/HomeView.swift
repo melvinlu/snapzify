@@ -1,6 +1,25 @@
 import SwiftUI
 import PhotosUI
+import AVFoundation
 import os.log
+
+// Movie transferable for video handling
+struct Movie: Transferable {
+    let url: URL
+    
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .movie) { movie in
+            SentTransferredFile(movie.url)
+        } importing: { received in
+            let copy = URL.documentsDirectory.appending(path: "video_\(UUID().uuidString).mov")
+            if FileManager.default.fileExists(atPath: copy.path()) {
+                try FileManager.default.removeItem(at: copy)
+            }
+            try FileManager.default.copyItem(at: received.file, to: copy)
+            return Self(url: copy)
+        }
+    }
+}
 
 struct HomeView: View {
     @StateObject var vm: HomeViewModel
@@ -86,18 +105,25 @@ struct HomeView: View {
         .photosPicker(
             isPresented: $vm.showPhotoPicker,
             selection: $selectedPhoto,
-            matching: .images
+            matching: .any(of: [.images, .videos])
         )
         .onChange(of: selectedPhoto) { newValue in
             Task {
                 if let newValue {
-                    print("Photo selected, loading data...")
-                    if let data = try? await newValue.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
+                    print("Media selected, loading data...")
+                    
+                    // Check if it's a video
+                    if let movie = try? await newValue.loadTransferable(type: Movie.self) {
+                        print("Video loaded successfully, processing...")
+                        await vm.processPickedVideo(movie.url)
+                    }
+                    // Otherwise try as image
+                    else if let data = try? await newValue.loadTransferable(type: Data.self),
+                            let image = UIImage(data: data) {
                         print("Image loaded successfully, snapzifying...")
                         vm.processPickedImage(image)
                     } else {
-                        print("Failed to load image data")
+                        print("Failed to load media data")
                     }
                     selectedPhoto = nil
                 }

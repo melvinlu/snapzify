@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Photos
+import AVFoundation
 import os.log
 
 @MainActor
@@ -254,6 +255,230 @@ class HomeViewModel: ObservableObject {
         }
     }
     
+    func processPickedVideo(_ videoURL: URL) async {
+        await MainActor.run {
+            isProcessing = true
+            errorMessage = nil
+        }
+        
+        do {
+            logger.info("Starting video processing from URL: \(videoURL)")
+            
+            // Extract frames from video
+            // Extract frames every 0.2 seconds for real-time tappability
+            let frames = try await extractFramesFromVideo(videoURL, frameInterval: 0.2)
+            
+            guard !frames.isEmpty else {
+                throw ProcessingError.noFramesExtracted
+            }
+            
+            logger.info("Extracted \(frames.count) frames from video")
+            
+            // Process each frame for OCR
+            // Dictionary to track all appearances of each unique text
+            var textAppearances: [String: [FrameAppearance]] = [:]
+            let frameInterval = 0.2 // seconds between frames (must match extraction interval)
+            
+            for (index, frame) in frames.enumerated() {
+                logger.debug("Processing frame \(index + 1)/\(frames.count)")
+                let timestamp = Double(index) * frameInterval
+                
+                let ocrLines = try await ocrService.recognizeText(in: frame)
+                
+                for line in ocrLines {
+                    if containsChinese(line.text) {
+                        let normalizedText = ChineseScript(rawValue: selectedScript) == .simplified ?
+                            scriptConversionService.toSimplified(line.text) :
+                            scriptConversionService.toTraditional(line.text)
+                        
+                        // Track this appearance
+                        let appearance = FrameAppearance(timestamp: timestamp, bbox: line.bbox)
+                        
+                        if textAppearances[normalizedText] == nil {
+                            textAppearances[normalizedText] = []
+                        }
+                        textAppearances[normalizedText]?.append(appearance)
+                    }
+                }
+            }
+            
+            // Convert to sentences with all their frame appearances
+            var allSentences: [Sentence] = []
+            for (text, appearances) in textAppearances {
+                // Use the first appearance's bbox as the primary one for compatibility
+                let primaryBbox = appearances.first?.bbox
+                
+                allSentences.append(Sentence(
+                    text: text,
+                    rangeInImage: primaryBbox,
+                    tokens: [],
+                    pinyin: [],
+                    english: "Generating...",
+                    status: .ocrOnly,
+                    timestamp: appearances.first?.timestamp, // Keep first timestamp for compatibility
+                    frameAppearances: appearances // Store all appearances
+                ))
+            }
+            
+            guard !allSentences.isEmpty else {
+                throw ProcessingError.noChineseDetected
+            }
+            
+            logger.info("Found \(allSentences.count) unique Chinese sentences across all frames")
+            
+            // Process translations BEFORE creating the document
+            let script = ChineseScript(rawValue: selectedScript) ?? .simplified
+            let chineseTexts = allSentences.map { $0.text }
+            
+            logger.info("Processing translations for \(chineseTexts.count) sentences")
+            
+            var translatedSentences = allSentences
+            
+            // Process in batches of 20 sentences to avoid API limits
+            let batchSize = 20
+            var allProcessed: [StreamingProcessedSentence] = []
+            
+            for batchStart in stride(from: 0, to: chineseTexts.count, by: batchSize) {
+                let batchEnd = min(batchStart + batchSize, chineseTexts.count)
+                let batchTexts = Array(chineseTexts[batchStart..<batchEnd])
+                
+                logger.info("Processing batch \(batchStart/batchSize + 1) of \(Int(ceil(Double(chineseTexts.count)/Double(batchSize)))): sentences \(batchStart+1)-\(batchEnd)")
+                
+                do {
+                    var batchProcessed: [StreamingProcessedSentence] = []
+                    
+                    try await streamingChineseProcessingService.processStreamingBatch(
+                        batchTexts,
+                        script: script
+                    ) { processedSentence in
+                        // Adjust index to be relative to the full array
+                        let adjustedSentence = StreamingProcessedSentence(
+                            chinese: processedSentence.chinese,
+                            pinyin: processedSentence.pinyin,
+                            english: processedSentence.english,
+                            index: batchStart + processedSentence.index
+                        )
+                        batchProcessed.append(adjustedSentence)
+                    }
+                    
+                    allProcessed.append(contentsOf: batchProcessed)
+                    logger.info("Successfully processed batch with \(batchProcessed.count) sentences")
+                    
+                    // Small delay between batches to avoid rate limiting
+                    if batchEnd < chineseTexts.count {
+                        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                    }
+                } catch {
+                    logger.error("Failed to process batch starting at \(batchStart): \(error)")
+                    // Continue with next batch even if this one fails
+                }
+            }
+            
+            // Update all sentences with their processed data
+            for processedItem in allProcessed {
+                let index = processedItem.index
+                guard index < translatedSentences.count else { continue }
+                
+                let originalSentence = translatedSentences[index]
+                translatedSentences[index] = Sentence(
+                    id: originalSentence.id,
+                    text: processedItem.chinese,
+                    rangeInImage: originalSentence.rangeInImage,
+                    tokens: [],
+                    pinyin: processedItem.pinyin,
+                    english: processedItem.english,
+                    status: .translated,
+                    timestamp: originalSentence.timestamp,
+                    frameAppearances: originalSentence.frameAppearances // Preserve frame appearances
+                )
+            }
+            
+            logger.info("Successfully processed \(allProcessed.count) translations out of \(chineseTexts.count) total")
+            
+            // Use the first frame as the representative image
+            let representativeImage = frames.first!
+            
+            // Load video data
+            let videoData = try Data(contentsOf: videoURL)
+            
+            // Create document with fully translated sentences
+            let document = Document(
+                source: .imported,
+                script: script,
+                sentences: translatedSentences,
+                imageData: representativeImage.pngData(),
+                videoData: videoData,
+                isVideo: true
+            )
+            
+            try await store.save(document)
+            let savedDocument = document
+            
+            // Navigate to the document after everything is processed
+            await MainActor.run {
+                self.documents.insert(savedDocument, at: 0)
+                self.isProcessing = false
+                self.onOpenDocument(savedDocument)
+            }
+            
+            // Clean up temporary video file
+            try? FileManager.default.removeItem(at: videoURL)
+            
+        } catch {
+            logger.error("Failed to process video: \(error.localizedDescription)")
+            await MainActor.run {
+                isProcessing = false
+                if error is TimeoutError {
+                    errorMessage = "Video processing timed out. Please try a shorter video."
+                } else if let processingError = error as? ProcessingError {
+                    errorMessage = processingError.errorDescription ?? "Failed to process video"
+                } else {
+                    errorMessage = "Failed to process video: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func extractFramesFromVideo(_ url: URL, frameInterval: TimeInterval) async throws -> [UIImage] {
+        let asset = AVAsset(url: url)
+        let duration = try await asset.load(.duration)
+        let durationInSeconds = CMTimeGetSeconds(duration)
+        
+        guard durationInSeconds > 0 else {
+            throw ProcessingError.invalidVideo
+        }
+        
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceAfter = .zero
+        generator.requestedTimeToleranceBefore = .zero
+        
+        var frames: [UIImage] = []
+        var currentTime: TimeInterval = 0
+        
+        while currentTime < durationInSeconds {
+            let cmTime = CMTime(seconds: currentTime, preferredTimescale: 600)
+            
+            do {
+                let cgImage = try generator.copyCGImage(at: cmTime, actualTime: nil)
+                let uiImage = UIImage(cgImage: cgImage)
+                frames.append(uiImage)
+            } catch {
+                logger.warning("Failed to extract frame at \(currentTime)s: \(error)")
+            }
+            
+            currentTime += frameInterval
+            
+            // Limit to 150 frames max to avoid memory issues (30 seconds at 0.2s intervals)
+            if frames.count >= 150 {
+                logger.info("Reached maximum frame limit (150)")
+                break
+            }
+        }
+        
+        return frames
+    }
+    
     func processSharedImage(_ image: UIImage) async {
         // Process shared image with high priority
         await Task(priority: .high) {
@@ -266,7 +491,7 @@ class HomeViewModel: ObservableObject {
                 let script = ChineseScript(rawValue: selectedScript) ?? .simplified
                 
                 // Process the image and automatically navigate to it
-                let document = try await processImageCore(
+                _ = try await processImageCore(
                     image,
                     source: .shareExtension,
                     script: script,
@@ -298,7 +523,7 @@ class HomeViewModel: ObservableObject {
                 let script = ChineseScript(rawValue: selectedScript) ?? .simplified
                 
                 // Process the image and automatically navigate to it
-                let document = try await processImageCore(
+                _ = try await processImageCore(
                     image,
                     source: .imported,  // Using imported as source for ActionExtension
                     script: script,
@@ -631,6 +856,8 @@ func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws 
 enum ProcessingError: Error, LocalizedError {
     case imageLoadFailed
     case noChineseDetected
+    case noFramesExtracted
+    case invalidVideo
     
     var errorDescription: String? {
         switch self {
@@ -638,6 +865,10 @@ enum ProcessingError: Error, LocalizedError {
             return "Failed to load image"
         case .noChineseDetected:
             return "Unsnapzify-able!"
+        case .noFramesExtracted:
+            return "Failed to extract frames from video"
+        case .invalidVideo:
+            return "Invalid video file"
         }
     }
 }
