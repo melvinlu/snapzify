@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import UIKit
 
 enum ChineseScript: String, Codable, CaseIterable, Hashable {
     case simplified
@@ -53,6 +54,44 @@ enum SentenceStatus: Codable, Equatable, Hashable {
         case .error(let message):
             try container.encode("error", forKey: .type)
             try container.encode(message, forKey: .errorMessage)
+        }
+    }
+}
+
+// Lightweight version for list views (no image/video data)
+struct DocumentMetadata: Identifiable, Codable, Hashable {
+    let id: UUID
+    let createdAt: Date
+    let source: DocumentSource
+    let script: ChineseScript
+    let sentenceCount: Int
+    let thumbnailData: Data?  // Small thumbnail only
+    let isVideo: Bool
+    let isSaved: Bool
+    let assetIdentifier: String?
+    
+    // Convert full document to metadata
+    init(from document: Document) {
+        self.id = document.id
+        self.createdAt = document.createdAt
+        self.source = document.source
+        self.script = document.script
+        self.sentenceCount = document.sentences.count
+        self.isVideo = document.isVideo
+        self.isSaved = document.isSaved
+        self.assetIdentifier = document.assetIdentifier
+        
+        // Create small thumbnail from image data
+        if let imageData = document.imageData,
+           let image = UIImage(data: imageData) {
+            let targetSize = CGSize(width: 120, height: 120)
+            let renderer = UIGraphicsImageRenderer(size: targetSize)
+            let thumbnail = renderer.image { context in
+                image.draw(in: CGRect(origin: .zero, size: targetSize))
+            }
+            self.thumbnailData = thumbnail.jpegData(compressionQuality: 0.7)
+        } else {
+            self.thumbnailData = nil
         }
     }
 }

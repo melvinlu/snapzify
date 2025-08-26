@@ -7,8 +7,9 @@ import os.log
 @MainActor
 class HomeViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "HomeViewModel")
-    @Published var documents: [Document] = []
-    @Published var savedDocuments: [Document] = []
+    @Published var documents: [DocumentMetadata] = []
+    @Published var savedDocuments: [DocumentMetadata] = []
+    private var documentCache: [UUID: Document] = [:]  // Cache full documents only when needed
     @Published var shouldSuggestLatest = false
     @Published var latestInfo: LatestScreenshotInfo?
     @Published var isProcessing = false
@@ -36,7 +37,7 @@ class HomeViewModel: ObservableObject {
         }
     }
     
-    private var hasLoadedDocuments = false
+    @Published private(set) var hasLoadedDocuments = false
     private let store: DocumentStore
     private let ocrService: OCRService
     private let scriptConversionService: ScriptConversionService
@@ -71,9 +72,17 @@ class HomeViewModel: ObservableObject {
         
         isLoading = true
         do {
-            documents = try await store.fetchAll()
-            savedDocuments = try await store.fetchSaved()
-            await checkForLatestScreenshot()
+            // Load lightweight metadata in parallel
+            async let recentMeta = store.fetchRecentMetadata(limit: 10)
+            async let savedMeta = store.fetchSavedMetadata()
+            
+            // Only check for screenshot, don't wait for it
+            Task { await checkForLatestScreenshot() }
+            
+            // Wait for metadata to load
+            documents = try await recentMeta
+            savedDocuments = try await savedMeta
+            
             hasLoadedDocuments = true
         } catch {
             print("Failed to load documents: \(error)")
@@ -84,48 +93,55 @@ class HomeViewModel: ObservableObject {
     func refreshDocuments() async {
         // Force refresh documents WITHOUT showing loading state
         do {
-            documents = try await store.fetchAll()
-            savedDocuments = try await store.fetchSaved()
-            await checkForLatestScreenshot()
+            documents = try await store.fetchRecentMetadata(limit: 10)
+            savedDocuments = try await store.fetchSavedMetadata()
+            Task { await checkForLatestScreenshot() }
         } catch {
             print("Failed to load documents: \(error)")
         }
     }
     
     func refreshSavedDocuments() async {
-        // Refresh only saved documents and sentences (for when returning from document view)
+        // Refresh only saved documents metadata (lightweight)
         do {
-            documents = try await store.fetchAll()
-            savedDocuments = try await store.fetchSaved()
+            savedDocuments = try await store.fetchSavedMetadata()
+            // Only update recent if needed
+            if documents.isEmpty {
+                documents = try await store.fetchRecentMetadata(limit: 10)
+            }
         } catch {
             print("Failed to refresh saved documents: \(error)")
         }
     }
     
     func updateDocumentSavedStatus(_ updatedDocument: Document) {
-        // Instantly update the local arrays without waiting for database
+        // Update metadata arrays with new metadata
+        let updatedMetadata = DocumentMetadata(from: updatedDocument)
         
         // Update in documents array
         if let index = documents.firstIndex(where: { $0.id == updatedDocument.id }) {
-            documents[index] = updatedDocument
+            documents[index] = updatedMetadata
         }
         
         // Update saved documents array
         if updatedDocument.isSaved {
             // Add to saved if not already there
             if !savedDocuments.contains(where: { $0.id == updatedDocument.id }) {
-                savedDocuments.append(updatedDocument)
+                savedDocuments.append(updatedMetadata)
                 savedDocuments.sort { $0.createdAt > $1.createdAt }
             } else {
                 // Update existing
                 if let index = savedDocuments.firstIndex(where: { $0.id == updatedDocument.id }) {
-                    savedDocuments[index] = updatedDocument
+                    savedDocuments[index] = updatedMetadata
                 }
             }
         } else {
             // Remove from saved
             savedDocuments.removeAll { $0.id == updatedDocument.id }
         }
+        
+        // Update cache if present
+        documentCache[updatedDocument.id] = updatedDocument
     }
     
     func checkForLatestScreenshot() async {
@@ -172,7 +188,7 @@ class HomeViewModel: ObservableObject {
                 let task = ProcessingTask(
                     id: taskId,
                     name: "Photo",
-                    progress: "Loading",
+                    progress: "Preparing",
                     progressValue: 0.0,
                     totalFrames: 0,
                     processedFrames: 0,
@@ -196,7 +212,6 @@ class HomeViewModel: ObservableObject {
                     
                     if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
                         self.activeProcessingTasks[index].thumbnail = thumbnailImage
-                        self.activeProcessingTasks[index].progress = "Processing"
                     }
                 }
                 
@@ -268,6 +283,54 @@ class HomeViewModel: ObservableObject {
         showPhotoPicker = true
     }
     
+    func processPickedImageWithTask(_ image: UIImage, taskId: UUID, checkVisibility: @escaping () -> Bool) async {
+        // Update existing task with thumbnail
+        let thumbnailSize = CGSize(width: 60, height: 60)
+        let thumbnail = await MainActor.run {
+            UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
+            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+            let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+            return thumbnailImage
+        }
+        
+        await MainActor.run {
+            if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                self.activeProcessingTasks[index].thumbnail = thumbnail
+                self.activeProcessingTasks[index].type = .image
+            }
+        }
+        
+        do {
+            logger.info("Starting image snapzifying")
+            
+            // Add 60-second timeout to image processing
+            _ = try await withTimeout(seconds: 60) {
+                try await self.processImageCore(image, source: .imported, script: ChineseScript(rawValue: self.selectedScript) ?? .simplified, assetIdentifier: nil, shouldNavigate: checkVisibility())
+            }
+            
+            logger.info("Snapzifying completed")
+            
+            // Remove task after successful completion
+            await MainActor.run {
+                self.activeProcessingTasks.removeAll { $0.id == taskId }
+            }
+        } catch {
+            logger.error("Failed to snapzify image: \(error.localizedDescription)")
+            await MainActor.run {
+                self.activeProcessingTasks.removeAll { $0.id == taskId }
+                self.isProcessing = false
+                if error is TimeoutError {
+                    self.errorMessage = "Snapzifying timed out. Please try again with a simpler image."
+                } else if let processingError = error as? ProcessingError {
+                    self.errorMessage = processingError.errorDescription ?? "Failed to process image"
+                } else {
+                    self.errorMessage = "Failed to process image: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
     func processPickedImage(_ image: UIImage) {
         Task {
             // Create processing task immediately
@@ -287,7 +350,7 @@ class HomeViewModel: ObservableObject {
                 let task = ProcessingTask(
                     id: taskId,
                     name: "Image",
-                    progress: "Processing",
+                    progress: "Preparing",
                     progressValue: 0.0,
                     totalFrames: 0,
                     processedFrames: 0,
@@ -343,7 +406,7 @@ class HomeViewModel: ObservableObject {
             let task = ProcessingTask(
                 id: taskId,
                 name: "Video",
-                progress: "Processing",
+                progress: "Preparing",
                 progressValue: 0.0,
                 totalFrames: 0,
                 processedFrames: 0,
@@ -353,10 +416,10 @@ class HomeViewModel: ObservableObject {
             self.activeProcessingTasks.append(task)
             self.isProcessing = true
         }
-        await processPickedVideoWithTask(videoURL, taskId: taskId)
+        await processPickedVideoWithTask(videoURL, taskId: taskId, checkVisibility: { true })
     }
     
-    func processPickedVideoWithTask(_ videoURL: URL, taskId: UUID) async {
+    func processPickedVideoWithTask(_ videoURL: URL, taskId: UUID, checkVisibility: @escaping () -> Bool) async {
         // The task is already created with "Uploading" status
         await MainActor.run {
             errorMessage = nil
@@ -365,12 +428,7 @@ class HomeViewModel: ObservableObject {
         do {
             logger.info("Starting video processing from URL: \(videoURL)")
             
-            // Update task status from "Uploading" to processing
-            await MainActor.run {
-                if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
-                    self.activeProcessingTasks[index].progress = "Processing"
-                }
-            }
+            // Task already shows "Preparing" - no need to update
             
             // Extract frames from video
             // Extract frames every 0.2 seconds for real-time tappability
@@ -388,7 +446,7 @@ class HomeViewModel: ObservableObject {
             // Create thumbnail from first frame and update task
             if let firstFrame = frames.first {
                 let thumbnailSize = CGSize(width: 60, height: 60)
-                let thumbnail = await MainActor.run {
+                await MainActor.run {
                     UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
                     firstFrame.draw(in: CGRect(origin: .zero, size: thumbnailSize))
                     let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
@@ -402,8 +460,6 @@ class HomeViewModel: ObservableObject {
                         self.activeProcessingTasks[index].progressValue = 0.0
                         self.activeProcessingTasks[index].progress = "0%"
                     }
-                    
-                    return thumbnailImage
                 }
             }
             
@@ -584,11 +640,16 @@ class HomeViewModel: ObservableObject {
             
             // Navigate to the document after everything is processed
             await MainActor.run {
-                self.documents.insert(savedDocument, at: 0)
+                self.documents.insert(DocumentMetadata(from: savedDocument), at: 0)
                 self.isProcessing = false
                 // Remove the processing task
                 self.activeProcessingTasks.removeAll { $0.id == taskId }
-                self.onOpenDocument(savedDocument)
+                
+                // Check visibility at completion time - if we're on home page, navigate
+                let shouldNavigate = checkVisibility()
+                if shouldNavigate {
+                    self.onOpenDocument(savedDocument)
+                }
             }
             
             // Clean up temporary video file
@@ -731,8 +792,23 @@ class HomeViewModel: ObservableObject {
         )
     }
     
-    func open(_ document: Document) {
-        onOpenDocument(document)
+    func open(_ metadata: DocumentMetadata) {
+        Task {
+            // Check cache first
+            if let cached = documentCache[metadata.id] {
+                await MainActor.run {
+                    onOpenDocument(cached)
+                }
+            } else {
+                // Fetch full document only when needed
+                if let document = try? await store.fetch(id: metadata.id) {
+                    documentCache[metadata.id] = document
+                    await MainActor.run {
+                        onOpenDocument(document)
+                    }
+                }
+            }
+        }
     }
     
     func openSettings() {
@@ -931,8 +1007,9 @@ class HomeViewModel: ObservableObject {
         // Handle navigation and UI updates
         await MainActor.run {
             // Add the document to the local documents array immediately
-            self.documents.insert(savedDocument, at: 0)
+            self.documents.insert(DocumentMetadata(from: savedDocument), at: 0)
             
+            // Navigation decision - check if we're still on home page at completion time
             if shouldNavigate {
                 logger.info("Calling onOpenDocument for document: \(savedDocument.id)")
                 self.onOpenDocument(savedDocument)

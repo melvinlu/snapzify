@@ -24,10 +24,12 @@ struct Movie: Transferable {
 struct HomeView: View {
     @StateObject var vm: HomeViewModel
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedPhotos: [PhotosPickerItem] = []
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var appState: AppState
     @State private var lastRefreshTime = Date()
     @State private var photoCheckTimer: Timer?
+    @State private var isVisible = true
     private let logger = Logger(subsystem: "com.snapzify.app", category: "HomeView")
     
     var body: some View {
@@ -114,21 +116,26 @@ struct HomeView: View {
         .preferredColorScheme(.dark)
         .photosPicker(
             isPresented: $vm.showPhotoPicker,
-            selection: $selectedPhoto,
+            selection: $selectedPhotos,
+            maxSelectionCount: 10,
             matching: .any(of: [.images, .videos])
         )
-        .onChange(of: selectedPhoto) { newValue in
+        .onChange(of: selectedPhotos) { newValues in
+            guard !newValues.isEmpty else { return }
+            
             Task {
-                if let newValue {
-                    print("Media selected, loading data...")
-                    
-                    // Create processing task IMMEDIATELY with "Uploading" status
+                // Create all tasks first
+                var taskIds: [(PhotosPickerItem, UUID)] = []
+                
+                for (index, item) in newValues.enumerated() {
                     let taskId = UUID()
+                    taskIds.append((item, taskId))
+                    
                     await MainActor.run {
                         let task = HomeViewModel.ProcessingTask(
                             id: taskId,
-                            name: "Media",
-                            progress: "Uploading",
+                            name: "Media \(index + 1)/\(newValues.count)",
+                            progress: "Preparing",
                             progressValue: 0.0,
                             totalFrames: 0,
                             processedFrames: 0,
@@ -138,39 +145,50 @@ struct HomeView: View {
                         vm.activeProcessingTasks.append(task)
                         vm.isProcessing = true
                     }
-                    
-                    // Check if it's a video
-                    if let movie = try? await newValue.loadTransferable(type: Movie.self) {
-                        print("Video loaded successfully, processing...")
-                        // Pass the taskId to continue tracking
-                        await vm.processPickedVideoWithTask(movie.url, taskId: taskId)
-                    }
-                    // Otherwise try as image
-                    else if let data = try? await newValue.loadTransferable(type: Data.self),
-                            let image = UIImage(data: data) {
-                        print("Image loaded successfully, snapzifying...")
-                        // Remove the upload task and let processPickedImage create its own
-                        await MainActor.run {
-                            vm.activeProcessingTasks.removeAll { $0.id == taskId }
-                            vm.isProcessing = false
-                        }
-                        vm.processPickedImage(image)
-                    } else {
-                        print("Failed to load media data")
-                        await MainActor.run {
-                            vm.activeProcessingTasks.removeAll { $0.id == taskId }
-                            vm.isProcessing = false
-                            vm.errorMessage = "Failed to load media file"
-                        }
-                    }
-                    selectedPhoto = nil
                 }
+                
+                // Process all items concurrently
+                await withTaskGroup(of: Void.self) { group in
+                    for (index, (item, taskId)) in taskIds.enumerated() {
+                        group.addTask {
+                            print("Processing item \(index + 1) of \(newValues.count)")
+                            
+                            // Check if it's a video
+                            if let movie = try? await item.loadTransferable(type: Movie.self) {
+                                print("Video \(index + 1) loaded successfully, processing...")
+                                // Always check isVisible at completion time inside processPickedVideoWithTask
+                                await self.vm.processPickedVideoWithTask(movie.url, taskId: taskId, checkVisibility: { self.isVisible })
+                            }
+                            // Otherwise try as image
+                            else if let data = try? await item.loadTransferable(type: Data.self),
+                                    let image = UIImage(data: data) {
+                                print("Image \(index + 1) loaded successfully, snapzifying...")
+                                // Always check isVisible at completion time inside processPickedImageWithTask
+                                await self.vm.processPickedImageWithTask(image, taskId: taskId, checkVisibility: { self.isVisible })
+                            } else {
+                                print("Failed to load media data for item \(index + 1)")
+                                await MainActor.run {
+                                    self.vm.activeProcessingTasks.removeAll { $0.id == taskId }
+                                    if self.vm.activeProcessingTasks.isEmpty {
+                                        self.vm.isProcessing = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Clear selection after all tasks are started
+                selectedPhotos = []
             }
         }
-        .task {
-            await vm.loadDocuments()
-        }
         .onAppear {
+            isVisible = true
+            
+            // Load documents only once
+            Task {
+                await vm.loadDocuments()
+            }
             // Start polling for new photos every 2 seconds
             startPhotoPolling()
             
@@ -179,11 +197,12 @@ struct HomeView: View {
             // Check for images from ActionExtension
             checkForActionExtensionImage()
             
-            // Refresh saved documents when view appears
-            // Add a small delay to ensure navigation has completed
-            Task {
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                await vm.refreshSavedDocuments()
+            // Only refresh saved documents if not just launching
+            if vm.hasLoadedDocuments {
+                Task {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                    await vm.refreshSavedDocuments()
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .documentSavedStatusChanged)) { notification in
@@ -193,6 +212,7 @@ struct HomeView: View {
             }
         }
         .onDisappear {
+            isVisible = false
             // Stop polling when view disappears
             stopPhotoPolling()
         }
@@ -330,11 +350,11 @@ struct HomeView: View {
     }
     
     @ViewBuilder
-    private func documentRow(_ doc: Document, showPinIcon: Bool = true) -> some View {
+    private func documentRow(_ doc: DocumentMetadata, showPinIcon: Bool = true) -> some View {
         HStack(spacing: T.S.md) {
             Group {
-                if let imageData = doc.imageData,
-                   let uiImage = UIImage(data: imageData) {
+                if let thumbnailData = doc.thumbnailData,
+                   let uiImage = UIImage(data: thumbnailData) {
                     Image(uiImage: uiImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -534,7 +554,7 @@ struct HomeView: View {
         .cornerRadius(10)
     }
     
-    private func documentTitle(for doc: Document) -> String {
+    private func documentTitle(for doc: DocumentMetadata) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, h:mm a"
         return "Screenshot • \(formatter.string(from: doc.createdAt))"

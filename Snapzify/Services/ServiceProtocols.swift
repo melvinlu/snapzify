@@ -54,10 +54,13 @@ protocol ConfigService {
 protocol DocumentStore {
     func save(_ document: Document) async throws
     func fetchAll() async throws -> [Document]
+    func fetchRecent(limit: Int) async throws -> [Document]
     func fetch(id: UUID) async throws -> Document?
     func delete(id: UUID) async throws
     func fetchLatest() async throws -> Document?
     func deleteAll() async throws
     func update(_ document: Document) async throws
     func fetchSaved() async throws -> [Document]
+    func fetchRecentMetadata(limit: Int) async throws -> [DocumentMetadata]
+    func fetchSavedMetadata() async throws -> [DocumentMetadata]
 }
