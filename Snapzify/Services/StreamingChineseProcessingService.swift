@@ -138,12 +138,14 @@ class StreamingChineseProcessingService {
                 
                 let trimmedLine = jsonLine.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmedLine.isEmpty {
+                    logger.debug("🔍 Attempting to parse JSON line: '\(trimmedLine)'")
                     if let lineData = trimmedLine.data(using: .utf8),
                        let parsed = try? JSONSerialization.jsonObject(with: lineData) as? [String: String],
                        let pinyinString = parsed["pinyin"],
                        let english = parsed["english"],
                        currentLineIndex < texts.count {
                         
+                        logger.info("✅ Successfully parsed sentence \(currentLineIndex): pinyin='\(pinyinString)', english='\(english)'")
                         let pinyinArray = pinyinString.components(separatedBy: " ").filter { !$0.isEmpty }
                         
                         let processed = StreamingProcessedSentence(

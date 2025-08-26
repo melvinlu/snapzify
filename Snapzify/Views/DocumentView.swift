@@ -1,215 +1,255 @@
 import SwiftUI
 
-// Structure to hold highlight data
-struct HighlightRegion: Equatable {
-    let id: UUID
-    let rect: CGRect
-}
-
-// Wrapper that only updates when height changes
-struct EquatableImageView: View, Equatable {
-    let imageData: Data
-    let height: CGFloat
-    let showFullScreenImage: () -> Void
-    
-    static func == (lhs: EquatableImageView, rhs: EquatableImageView) -> Bool {
-        // Only re-render if height changes, ignore everything else
-        lhs.height == rhs.height
-    }
+// Structure to hold selected sentence data
+struct SelectedSentencePopup: View {
+    let sentence: Sentence
+    @ObservedObject var vm: SentenceViewModel
+    @Binding var isShowing: Bool
+    let position: CGPoint
     
     var body: some View {
-        ImageSectionView(
-            imageData: imageData,
-            height: height,
-            showFullScreenImage: showFullScreenImage
-        )
-    }
-}
-
-// Separate view for image to prevent re-renders
-struct ImageSectionView: View {
-    let imageData: Data
-    let height: CGFloat
-    let showFullScreenImage: () -> Void
-    
-    var body: some View {
-        if let uiImage = UIImage(data: imageData) {
-            GeometryReader { geometry in
-                ZStack {
-                    // Background blur
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: geometry.size.width, height: height)
-                        .blur(radius: 30)
-                        .clipped()
-                        .overlay(Color.black.opacity(0.3))
-                    
-                    // Main image
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: geometry.size.width, maxHeight: height)
-                }
+        VStack(alignment: .leading, spacing: T.S.sm) {
+            // Chinese text
+            Text(sentence.text)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(T.C.ink)
+            
+            // Pinyin
+            if !sentence.pinyin.isEmpty {
+                Text(sentence.pinyin.joined(separator: " "))
+                    .font(.system(size: 14))
+                    .foregroundStyle(T.C.ink2)
             }
-            .frame(height: height)
-            .onTapGesture {
-                showFullScreenImage()
+            
+            // English translation
+            if let english = sentence.english {
+                Text(english)
+                    .font(.system(size: 16))
+                    .foregroundStyle(T.C.ink2)
+            }
+            
+            // Action buttons
+            HStack(spacing: T.S.md) {
+                // Pleco button
+                Button {
+                    vm.openInPleco()
+                } label: {
+                    Label("Pleco", systemImage: "book")
+                        .font(.caption)
+                }
+                .buttonStyle(PopupButtonStyle())
+                
+                // Audio button
+                if vm.isGeneratingAudio || vm.isPreparingAudio {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
+                            .scaleEffect(0.6)
+                        Text("Loading...")
+                            .font(.caption)
+                            .foregroundStyle(T.C.ink2)
+                    }
+                } else {
+                    Button {
+                        vm.playOrPauseAudio()
+                    } label: {
+                        Label(
+                            vm.isPlaying ? "Pause" : "Play",
+                            systemImage: vm.isPlaying ? "pause.fill" : "play.fill"
+                        )
+                        .font(.caption)
+                    }
+                    .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
+                }
+                
+                Spacer()
             }
         }
+        .padding(T.S.lg)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(T.C.card)
+                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 340)
+    }
+}
+
+struct PopupButtonStyle: ButtonStyle {
+    var isActive: Bool = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isActive ? .white : T.C.ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isActive ? T.C.accent : T.C.ink.opacity(0.1))
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
     }
 }
 
 struct DocumentView: View {
     @StateObject var vm: DocumentViewModel
-    @State private var showFullScreenImage = false
-    @State private var dividerPosition: CGFloat = UIScreen.main.bounds.height * 0.5
-    @State private var dragStartPosition: CGFloat = 0
-    @State private var isDragging = false
+    @State private var selectedSentenceId: UUID?
+    @State private var showingPopup = false
+    @State private var tapLocation: CGPoint = .zero
+    @State private var highlightedSentenceId: UUID?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .top) {
-                RootBackground {
-                    Color.clear
-                }
+            ZStack {
+                // Background
+                Color.black
+                    .ignoresSafeArea()
                 
-                // Image section - positioned at top
+                // Full-screen image with tap detection
                 if let imageData = vm.document.imageData,
                    let uiImage = UIImage(data: imageData) {
-                    ZStack(alignment: .bottom) {
-                        // Static image layer with overlay
-                        ZStack {
-                            EquatableView(
-                                content: EquatableImageView(
-                                    imageData: imageData,
-                                    height: dividerPosition,
-                                    showFullScreenImage: { showFullScreenImage = true }
-                                )
-                            )
+                    
+                    // Calculate the image size to fit screen like Photos app
+                    let imageSize = uiImage.size
+                    let screenSize = geometry.size
+                    let scale = min(screenSize.width / imageSize.width,
+                                   screenSize.height / imageSize.height,
+                                   1.0) // Don't scale up, only down if needed
+                    let displayWidth = imageSize.width * scale
+                    let displayHeight = imageSize.height * scale
+                    
+                    // Debug logs
+                    let _ = print("🖼️ Image original size: \(imageSize)")
+                    let _ = print("📱 Screen size: \(screenSize)")
+                    let _ = print("🔍 Scale factor: \(scale)")
+                    let _ = print("📐 Display size: \(displayWidth) x \(displayHeight)")
+                    
+                    ScrollView([.horizontal, .vertical], showsIndicators: false) {
+                        ZStack(alignment: .topLeading) {
+                            // Main image - display at calculated size
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: displayWidth, height: displayHeight)
                             
-                            // Dynamic highlight overlay for expanded sentences
-                            // Place it directly over the image with the same frame calculation
-                            GeometryReader { imageGeometry in
-                                let expandedRegions = vm.document.sentences
-                                    .filter { vm.expandedSentenceIds.contains($0.id) }
-                                    .compactMap { sentence -> HighlightRegion? in
-                                        guard let rect = sentence.rangeInImage else { return nil }
-                                        return HighlightRegion(id: sentence.id, rect: rect)
-                                    }
-                                
-                                let imageAspect = uiImage.size.width / uiImage.size.height
-                                let viewAspect = imageGeometry.size.width / imageGeometry.size.height
-                                
-                                let scale = imageAspect > viewAspect 
-                                    ? imageGeometry.size.width / uiImage.size.width
-                                    : imageGeometry.size.height / uiImage.size.height
-                                    
-                                let xOffset = imageAspect > viewAspect
-                                    ? 0
-                                    : (imageGeometry.size.width - uiImage.size.width * scale) / 2
-                                    
-                                let yOffset = imageAspect > viewAspect
-                                    ? (imageGeometry.size.height - uiImage.size.height * scale) / 2
-                                    : 0
-                                
-                                ForEach(expandedRegions, id: \.id) { region in
+                            // Highlight overlays for all sentences
+                            ForEach(vm.document.sentences.filter { $0.rangeInImage != nil }) { sentence in
+                                if let rect = sentence.rangeInImage {
                                     Rectangle()
-                                        .fill(Color.green.opacity(0.1))
+                                        .fill(highlightedSentenceId == sentence.id ? 
+                                              Color.green.opacity(0.3) : Color.blue.opacity(0.1))
                                         .overlay(
                                             Rectangle()
-                                                .strokeBorder(Color.green.opacity(0.5), lineWidth: 1)
+                                                .strokeBorder(highlightedSentenceId == sentence.id ? 
+                                                            Color.green.opacity(0.8) : Color.blue.opacity(0.4), 
+                                                            lineWidth: highlightedSentenceId == sentence.id ? 2 : 1)
                                         )
-                                        .frame(
-                                            width: region.rect.width * scale,
-                                            height: region.rect.height * scale
-                                        )
-                                        .position(
-                                            x: region.rect.midX * scale + xOffset,
-                                            y: region.rect.midY * scale + yOffset
-                                        )
+                                        .frame(width: rect.width * scale,
+                                               height: rect.height * scale)
+                                        .position(x: rect.midX * scale,
+                                                 y: rect.midY * scale)
+                                        .animation(.easeInOut(duration: 0.2), value: highlightedSentenceId)
                                 }
                             }
-                            .allowsHitTesting(false)
+                            
+                            // Invisible tap areas for each sentence
+                            ForEach(vm.document.sentences.filter { $0.rangeInImage != nil }) { sentence in
+                                if let rect = sentence.rangeInImage {
+                                    Rectangle()
+                                        .fill(Color.clear)
+                                        .contentShape(Rectangle())
+                                        .frame(width: rect.width * scale,
+                                               height: rect.height * scale)
+                                        .position(x: rect.midX * scale,
+                                                 y: rect.midY * scale)
+                                        .onTapGesture { location in
+                                            handleTextTap(sentence: sentence, at: location)
+                                        }
+                                }
+                            }
                         }
-                        
-                        // Action buttons overlay at bottom of image
-                        actionButtons
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 12)
+                        .frame(width: max(displayWidth, screenSize.width),
+                               height: max(displayHeight, screenSize.height))
                     }
-                    .frame(width: geometry.size.width, height: dividerPosition)
-                    .clipped()
-                    .position(x: geometry.size.width / 2, y: dividerPosition / 2)
+                    .frame(width: screenSize.width, height: screenSize.height)
+                    .zoomable(min: 1.0, max: 3.0)
                 }
                 
-                // Sentences section - positioned below divider
-                VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: dividerPosition + 30)
+                // Popup overlay
+                if showingPopup, 
+                   let sentenceId = selectedSentenceId,
+                   let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
                     
-                    ZStack(alignment: .top) {
-                        // Background for bottom sheet
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(T.C.card.opacity(0.95))
-                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: -5)
-                        
-                        ScrollView(.vertical) {
-                            VStack(spacing: T.S.sm) {
-                                // Sentences list
-                                sentencesList
-                                    .padding(.horizontal, 16)
-                                    .padding(.top, 12)
-                                    .padding(.bottom, 20)
+                    let _ = print("🔹 Showing popup for sentence: english='\(sentence.english ?? "nil")', pinyin=\(sentence.pinyin)")
+                    
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation {
+                                showingPopup = false
+                                highlightedSentenceId = nil
                             }
                         }
-                        .scrollIndicators(.hidden)
-                    }
-                    .frame(maxHeight: .infinity)
+                    
+                    SelectedSentencePopup(
+                        sentence: sentence,
+                        vm: vm.createSentenceViewModel(for: sentence),
+                        isShowing: $showingPopup,
+                        position: tapLocation
+                    )
+                    .position(x: geometry.size.width / 2,
+                             y: min(tapLocation.y + 150, geometry.size.height - 200))
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(100)
                 }
                 
-                // Divider - positioned at dividerPosition
-                HStack {
-                    Spacer()
-                    VStack(spacing: 3) {
-                        Capsule()
-                            .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
-                            .frame(width: 40, height: 4)
-                        Capsule()
-                            .fill(isDragging ? T.C.accent : T.C.ink2.opacity(0.5))
-                            .frame(width: 40, height: 4)
+                // Top navigation bar
+                VStack {
+                    HStack {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                                .padding()
+                                .background(Circle().fill(Color.black.opacity(0.5)))
+                        }
+                        
+                        Spacer()
+                        
+                        // Pin/Save button
+                        Button {
+                            vm.toggleImageSave()
+                        } label: {
+                            Image(systemName: vm.document.isSaved ? "pin.fill" : "pin")
+                                .foregroundStyle(vm.document.isSaved ? T.C.accent : .white)
+                                .font(.title2)
+                                .padding()
+                                .background(Circle().fill(Color.black.opacity(0.5)))
+                        }
+                        
+                        // Delete button (if from photos)
+                        if vm.document.assetIdentifier != nil {
+                            Button {
+                                vm.showDeleteImageAlert = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red)
+                                    .font(.title2)
+                                    .padding()
+                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                            }
+                        }
                     }
+                    .padding()
+                    
                     Spacer()
                 }
-                .frame(width: geometry.size.width, height: 30) // Taller with full width hitbox
-                .contentShape(Rectangle())
-                .position(x: geometry.size.width / 2, y: dividerPosition + 15)
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            if !isDragging {
-                                isDragging = true
-                                dragStartPosition = dividerPosition
-                            }
-                            let newPosition = dragStartPosition + value.translation.height
-                            dividerPosition = min(max(newPosition, geometry.size.height * 0.2), geometry.size.height * 0.8)
-                        }
-                        .onEnded { _ in
-                            isDragging = false
-                        }
-                )
             }
         }
-        .ignoresSafeArea(edges: .bottom)
-        .navigationTitle(documentTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
-        .fullScreenCover(isPresented: $showFullScreenImage) {
-            if let imageData = vm.document.imageData, let uiImage = UIImage(data: imageData) {
-                FullScreenImageView(image: uiImage, isPresented: $showFullScreenImage)
-            }
-        }
+        .navigationBarHidden(true)
         .alert("Delete Document", isPresented: $vm.showDeleteImageAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -237,57 +277,21 @@ struct DocumentView: View {
         }
     }
     
-    
-    @ViewBuilder
-    private var actionButtons: some View {
-        HStack(spacing: T.S.sm) {
-            Button {
-                vm.toggleExpandAll()
-            } label: {
-                Image(systemName: vm.areAllExpanded ? "arrow.up.and.down.and.arrow.left.and.right" : "arrow.down.left.and.arrow.up.right")
-                    .foregroundStyle(T.C.ink)
-                    .frame(width: 36, height: 36)
-                    .background(T.C.card.opacity(0.95))
-                    .clipShape(Circle())
-            }
-            
-            Spacer()
-            
-            Button {
-                vm.toggleImageSave()
-            } label: {
-                Image(systemName: vm.document.isSaved ? "pin.fill" : "pin")
-                    .foregroundStyle(vm.document.isSaved ? T.C.accent : T.C.ink)
-                    .frame(width: 36, height: 36)
-                    .background(T.C.card.opacity(0.95))
-                    .clipShape(Circle())
-            }
-            
-            // Only show delete button if we have an asset identifier (photo from "Most Recent")
-            if vm.document.assetIdentifier != nil {
-                Button {
-                    vm.showDeleteImageAlert = true
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                        .frame(width: 36, height: 36)
-                        .background(T.C.card.opacity(0.95))
-                        .clipShape(Circle())
-                }
-            }
+    private func handleTextTap(sentence: Sentence, at location: CGPoint) {
+        print("🎯 Tapped sentence: id=\(sentence.id), text='\(sentence.text)', english='\(sentence.english ?? "nil")'")
+        
+        // Find the current sentence data from the document
+        if let currentSentence = vm.document.sentences.first(where: { $0.id == sentence.id }) {
+            print("🎯 Current sentence data: english='\(currentSentence.english ?? "nil")', pinyin=\(currentSentence.pinyin), status=\(currentSentence.status)")
+        } else {
+            print("🎯 Could not find sentence in current document")
         }
-    }
-    
-    
-    @ViewBuilder
-    private var sentencesList: some View {
-        VStack(spacing: T.S.sm) {
-            ForEach(vm.document.sentences) { sentence in
-                SentenceRowView(
-                    vm: vm.createSentenceViewModel(for: sentence)
-                )
-                .id(sentence.id) // Use stable ID to prevent view recreation
-            }
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedSentenceId = sentence.id
+            highlightedSentenceId = sentence.id
+            tapLocation = location
+            showingPopup = true
         }
     }
     
@@ -298,118 +302,57 @@ struct DocumentView: View {
     }
 }
 
-struct FullScreenImageView: View {
-    let image: UIImage
-    @Binding var isPresented: Bool
-    @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
-    @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
-    @State private var dragOffset: CGSize = .zero
-    @State private var backgroundOpacity: Double = 1.0
+// Extension to add pinch-to-zoom functionality
+extension View {
+    func zoomable(min minScale: CGFloat = 1.0, max maxScale: CGFloat = 5.0) -> some View {
+        ZoomableView(content: self, minScale: minScale, maxScale: maxScale)
+    }
+}
+
+struct ZoomableView<Content: View>: UIViewRepresentable {
+    let content: Content
+    let minScale: CGFloat
+    let maxScale: CGFloat
     
-    var body: some View {
-        ZStack {
-            Color.black
-                .opacity(backgroundOpacity)
-                .ignoresSafeArea(.all)
-            
-            VStack {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        isPresented = false
-                    }
-                    .foregroundStyle(.white)
-                    .padding()
-                }
-                
-                Spacer()
-                
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .scaleEffect(scale)
-                    .offset(x: offset.width, y: offset.height + dragOffset.height)
-                    .gesture(
-                        SimultaneousGesture(
-                            MagnificationGesture()
-                                .onChanged { value in
-                                    scale = lastScale * value
-                                }
-                                .onEnded { _ in
-                                    lastScale = scale
-                                    if scale < 1.0 {
-                                        withAnimation {
-                                            scale = 1.0
-                                            lastScale = 1.0
-                                        }
-                                    } else if scale > 5.0 {
-                                        withAnimation {
-                                            scale = 5.0
-                                            lastScale = 5.0
-                                        }
-                                    }
-                                },
-                            DragGesture()
-                                .onChanged { value in
-                                    if scale > 1.0 {
-                                        // When zoomed in, use drag for panning
-                                        offset = CGSize(
-                                            width: lastOffset.width + value.translation.width,
-                                            height: lastOffset.height + value.translation.height
-                                        )
-                                    } else {
-                                        // When not zoomed, use vertical drag for dismissal
-                                        if value.translation.height > 0 {
-                                            dragOffset = value.translation
-                                            backgroundOpacity = 1.0 - (value.translation.height / 500.0)
-                                        }
-                                    }
-                                }
-                                .onEnded { value in
-                                    if scale > 1.0 {
-                                        // When zoomed in, save pan offset
-                                        lastOffset = offset
-                                    } else {
-                                        // When not zoomed, check for dismissal
-                                        if value.translation.height > 150 {
-                                            isPresented = false
-                                        } else {
-                                            withAnimation(.spring()) {
-                                                dragOffset = .zero
-                                                backgroundOpacity = 1.0
-                                            }
-                                        }
-                                        
-                                        // Reset offsets when at normal scale
-                                        if scale <= 1.0 {
-                                            withAnimation {
-                                                offset = .zero
-                                                lastOffset = .zero
-                                            }
-                                        }
-                                    }
-                                }
-                        )
-                    )
-                    .onTapGesture(count: 2) {
-                        withAnimation {
-                            if scale == 1.0 {
-                                scale = 2.0
-                                lastScale = 2.0
-                            } else {
-                                scale = 1.0
-                                lastScale = 1.0
-                                offset = .zero
-                                lastOffset = .zero
-                            }
-                        }
-                    }
-                
-                Spacer()
-            }
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.delegate = context.coordinator
+        scrollView.minimumZoomScale = minScale
+        scrollView.maximumZoomScale = maxScale
+        scrollView.bouncesZoom = true
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        
+        let hostingController = UIHostingController(rootView: content)
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        
+        scrollView.addSubview(hostingController.view)
+        
+        NSLayoutConstraint.activate([
+            hostingController.view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor)
+        ])
+        
+        return scrollView
+    }
+    
+    func updateUIView(_ uiView: UIScrollView, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        let parent: ZoomableView
+        
+        init(_ parent: ZoomableView) {
+            self.parent = parent
         }
-        .preferredColorScheme(.dark)
+        
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            scrollView.subviews.first
+        }
     }
 }

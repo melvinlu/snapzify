@@ -12,7 +12,6 @@ class DocumentViewModel: ObservableObject {
     @Published var document: Document
     @Published var selectedSentenceId: UUID?
     @Published var isTranslatingBatch = false
-    @Published var expandedSentenceIds: Set<UUID> = []
     @Published var showDeleteImageAlert = false
     @Published var shouldDismiss = false
     
@@ -76,9 +75,6 @@ class DocumentViewModel: ObservableObject {
     }
     
     func createSentenceViewModel(for sentence: Sentence) -> SentenceViewModel {
-        // Always use expandedSentenceIds as source of truth
-        let isExpanded = expandedSentenceIds.contains(sentence.id)
-        
         // Return cached view model if it exists
         if let cachedViewModel = sentenceViewModels[sentence.id] {
             // Only update sentence data if it has actually changed
@@ -86,10 +82,6 @@ class DocumentViewModel: ObservableObject {
                cachedViewModel.sentence.pinyin != sentence.pinyin ||
                cachedViewModel.sentence.audioAsset != sentence.audioAsset {
                 cachedViewModel.sentence = sentence
-            }
-            // Ensure expanded state matches our source of truth without triggering animations
-            if cachedViewModel.isExpanded != isExpanded {
-                cachedViewModel.isExpanded = isExpanded
             }
             return cachedViewModel
         }
@@ -102,15 +94,8 @@ class DocumentViewModel: ObservableObject {
             ttsService: ttsService,
             autoTranslate: autoTranslate,
             autoGenerateAudio: autoGenerateAudio,
-            isExpanded: isExpanded,
-            onToggleExpanded: { [weak self] sentenceId, expanded in
-                guard let self = self else { return }
-                if expanded {
-                    self.expandedSentenceIds.insert(sentenceId)
-                } else {
-                    self.expandedSentenceIds.remove(sentenceId)
-                }
-            },
+            isExpanded: false, // Not used in new design
+            onToggleExpanded: { _, _ in }, // Not used
             onAudioStateChange: { [weak self] sentenceId, isPlaying in
                 guard let self = self else { return }
                 self.handleAudioStateChange(sentenceId: sentenceId, isPlaying: isPlaying)
@@ -152,21 +137,19 @@ class DocumentViewModel: ObservableObject {
     }
     
     func refreshDocument() async {
+        print("📱 DocumentViewModel: Starting refresh for document \(document.id)")
         if let updatedDocument = try? await store.fetch(id: document.id) {
             await MainActor.run {
-                // Update only the sentence content without triggering view recreation
-                for (index, updatedSentence) in updatedDocument.sentences.enumerated() {
-                    if index < self.document.sentences.count {
-                        // Only update if content has changed
-                        if self.document.sentences[index].english != updatedSentence.english ||
-                           self.document.sentences[index].pinyin != updatedSentence.pinyin {
-                            self.document.sentences[index].english = updatedSentence.english
-                            self.document.sentences[index].pinyin = updatedSentence.pinyin
-                            self.document.sentences[index].status = updatedSentence.status
-                        }
-                    }
+                print("📱 DocumentViewModel: Fetched document with \(updatedDocument.sentences.count) sentences")
+                for (index, sentence) in updatedDocument.sentences.enumerated() {
+                    print("📱   Sentence \(index): id=\(sentence.id), text='\(sentence.text)', english='\(sentence.english ?? "nil")', status=\(sentence.status)")
                 }
+                // Update the entire document to trigger view updates
+                self.document = updatedDocument
+                print("📱 DocumentViewModel: Document updated")
             }
+        } else {
+            print("📱 DocumentViewModel: Failed to fetch document")
         }
     }
     
@@ -197,21 +180,6 @@ class DocumentViewModel: ObservableObject {
         }
     }
     
-    func toggleExpandAll() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            if expandedSentenceIds.count == document.sentences.count {
-                // All are expanded, collapse all
-                expandedSentenceIds.removeAll()
-            } else {
-                // Not all are expanded, expand all
-                expandedSentenceIds = Set(document.sentences.map { $0.id })
-            }
-        }
-    }
-    
-    var areAllExpanded: Bool {
-        expandedSentenceIds.count == document.sentences.count
-    }
     
     
     func deleteImage() {

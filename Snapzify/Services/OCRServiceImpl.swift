@@ -25,14 +25,12 @@ class OCRServiceImpl: OCRService {
             throw OCRError.noAPIKey
         }
         
-        // Resize image if too large
-        let resizedImage = resizeImageIfNeeded(image)
+        // Store original image dimensions for coordinate scaling
+        let imageWidth = image.size.width
+        let imageHeight = image.size.height
+        logger.debug("Original image size: \(imageWidth) x \(imageHeight)")
         
-        // Calculate scale factor for coordinate conversion back to original size
-        let scaleFactorX = image.size.width / resizedImage.size.width
-        let scaleFactorY = image.size.height / resizedImage.size.height
-        
-        guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
+        guard let imageData = image.jpegData(compressionQuality: 0.9) else {
             logger.error("Failed to convert image to JPEG")
             throw OCRError.invalidImage
         }
@@ -115,12 +113,12 @@ class OCRServiceImpl: OCRService {
                                 
                                 // Get bounding box for paragraph
                                 if let boundingBox = paragraph["boundingBox"] as? [String: Any],
-                                   let bbox = bboxFrom(boundingBox) {
+                                   let bbox = bboxFromWithImageSize(boundingBox, imageWidth: imageWidth, imageHeight: imageHeight) {
                                     paragraphBbox = CGRect(
-                                        x: bbox.minX * scaleFactorX,
-                                        y: bbox.minY * scaleFactorY,
-                                        width: (bbox.maxX - bbox.minX) * scaleFactorX,
-                                        height: (bbox.maxY - bbox.minY) * scaleFactorY
+                                        x: bbox.minX,
+                                        y: bbox.minY,
+                                        width: bbox.maxX - bbox.minX,
+                                        height: bbox.maxY - bbox.minY
                                     )
                                 }
                                 
@@ -130,7 +128,7 @@ class OCRServiceImpl: OCRService {
                                 if let words = paragraph["words"] as? [[String: Any]] {
                                     for word in words {
                                         guard let wordBox = word["boundingBox"] as? [String: Any],
-                                              let bb = bboxFrom(wordBox) else { continue }
+                                              let bb = bboxFromWithImageSize(wordBox, imageWidth: imageWidth, imageHeight: imageHeight) else { continue }
                                         
                                         var buffer = ""
                                         if let symbols = word["symbols"] as? [[String: Any]] {
@@ -167,10 +165,10 @@ class OCRServiceImpl: OCRService {
                                         if !buffer.isEmpty {
                                             tokens.append(OCRToken(
                                                 text: buffer,
-                                                minX: bb.minX * scaleFactorX,
-                                                maxX: bb.maxX * scaleFactorX,
-                                                minY: bb.minY * scaleFactorY,
-                                                maxY: bb.maxY * scaleFactorY
+                                                minX: bb.minX,
+                                                maxX: bb.maxX,
+                                                minY: bb.minY,
+                                                maxY: bb.maxY
                                             ))
                                         }
                                     }
@@ -326,6 +324,27 @@ class OCRServiceImpl: OCRService {
     }
     
     // MARK: - Helper Functions
+    
+    private func bboxFromWithImageSize(_ box: [String: Any], imageWidth: CGFloat, imageHeight: CGFloat) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? {
+        // Prefer normalizedVertices if present (0..1 coordinates)
+        if let norm = box["normalizedVertices"] as? [[String: Any]], norm.count >= 4 {
+            let xs = norm.compactMap { ($0["x"] as? NSNumber)?.doubleValue }.map { CGFloat($0) }
+            let ys = norm.compactMap { ($0["y"] as? NSNumber)?.doubleValue }.map { CGFloat($0) }
+            guard !xs.isEmpty, !ys.isEmpty else { return nil }
+            // Scale normalized coords to actual image size
+            return (xs.min()! * imageWidth, xs.max()! * imageWidth, ys.min()! * imageHeight, ys.max()! * imageHeight)
+        }
+        
+        // Fall back to regular vertices (already in pixel coordinates)
+        if let verts = box["vertices"] as? [[String: Any]], verts.count >= 4 {
+            // Don't coerce nil to 0 - that ruins gap calculations
+            let xs = verts.compactMap { $0["x"] as? NSNumber }.map { CGFloat(truncating: $0) }
+            let ys = verts.compactMap { $0["y"] as? NSNumber }.map { CGFloat(truncating: $0) }
+            guard xs.count == verts.count, ys.count == verts.count else { return nil }
+            return (xs.min()!, xs.max()!, ys.min()!, ys.max()!)
+        }
+        return nil
+    }
     
     private func bboxFrom(_ box: [String: Any]) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? {
         // Prefer normalizedVertices if present (0..1 coordinates)

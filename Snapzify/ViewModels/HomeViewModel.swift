@@ -448,14 +448,16 @@ class HomeViewModel: ObservableObject {
                 chineseLineIndices.append(sentences.count)
                 
                 // Add placeholder sentence with "Generating..." status
-                sentences.append(Sentence(
+                let newSentence = Sentence(
                     text: normalizedText,
                     rangeInImage: line.bbox, // Use the bbox from OCR
                     tokens: [],
                     pinyin: [],
                     english: "Generating...",
                     status: .ocrOnly
-                ))
+                )
+                logger.debug("📝 Created sentence with ID: \(newSentence.id)")
+                sentences.append(newSentence)
             }
         }
         
@@ -517,17 +519,23 @@ class HomeViewModel: ObservableObject {
                 ) { [weak self] processed in
                     guard let self = self else { return }
                     
+                    logger.info("🔄 Received processed sentence \(processed.index): english='\(processed.english)', pinyin=\(processed.pinyin)")
+                    
                     // Update sentence as soon as it's processed
                     let sentenceIndex = chineseLineIndices[processed.index]
-                    let originalRange = sentences[sentenceIndex].rangeInImage // Preserve the bbox
+                    let originalSentence = sentences[sentenceIndex]
+                    // Preserve the original ID and bbox
                     sentences[sentenceIndex] = Sentence(
+                        id: originalSentence.id, // PRESERVE ORIGINAL ID!
                         text: processed.chinese,
-                        rangeInImage: originalRange, // Keep the original bbox
+                        rangeInImage: originalSentence.rangeInImage, // Keep the original bbox
                         tokens: [],
                         pinyin: processed.pinyin,
                         english: processed.english,
                         status: .translated
                     )
+                    
+                    logger.info("🔄 Updated sentence at index \(sentenceIndex) in memory, ID: \(sentences[sentenceIndex].id)")
                     
                     // Update the document
                     documentToUpdate.sentences = sentences
@@ -537,14 +545,19 @@ class HomeViewModel: ObservableObject {
                         Task.detached { @MainActor in
                             do {
                                 try await self.store.update(documentToUpdate)
-                                self.logger.debug("Updated sentence \(processed.index + 1)/\(chineseLinesToProcess.count)")
+                                self.logger.info("✅ Successfully saved sentence \(processed.index + 1)/\(chineseLinesToProcess.count) to database")
                             } catch {
-                                self.logger.error("Failed to update document: \(error)")
+                                self.logger.error("❌ Failed to update document in database: \(error)")
                             }
                         }
                     } else {
                         Task {
-                            try? await self.store.update(documentToUpdate)
+                            do {
+                                try await self.store.update(documentToUpdate)
+                                self.logger.info("✅ Successfully saved sentence \(processed.index + 1)/\(chineseLinesToProcess.count) to database (non-navigate)")
+                            } catch {
+                                self.logger.error("❌ Failed to update document in database (non-navigate): \(error)")
+                            }
                         }
                     }
                 }
@@ -557,10 +570,12 @@ class HomeViewModel: ObservableObject {
                     for (batchIndex, sentenceIndex) in chineseLineIndices.enumerated() {
                         if batchIndex < processedBatch.count {
                             let processed = processedBatch[batchIndex]
-                            let originalRange = sentences[sentenceIndex].rangeInImage // Preserve the bbox
+                            let originalSentence = sentences[sentenceIndex]
+                            // Preserve the original ID and bbox
                             sentences[sentenceIndex] = Sentence(
+                                id: originalSentence.id, // PRESERVE ORIGINAL ID!
                                 text: processed.chinese,
-                                rangeInImage: originalRange, // Keep the original bbox
+                                rangeInImage: originalSentence.rangeInImage, // Keep the original bbox
                                 tokens: [],
                                 pinyin: processed.pinyin,
                                 english: processed.english,
