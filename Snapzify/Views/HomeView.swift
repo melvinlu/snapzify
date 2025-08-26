@@ -544,9 +544,16 @@ struct HomeView: View {
     }
     
     private func documentTitle(for doc: DocumentMetadata) -> String {
+        // Use custom name if available
+        if let customName = doc.customName, !customName.isEmpty {
+            return customName
+        }
+        
+        // Otherwise use default format
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, h:mm a"
-        return "Screenshot • \(formatter.string(from: doc.createdAt))"
+        let type = doc.isVideo ? "Video" : "Screenshot"
+        return "\(type) • \(formatter.string(from: doc.createdAt))"
     }
     
     private func startPhotoPolling() {

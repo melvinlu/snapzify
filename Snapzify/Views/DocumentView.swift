@@ -51,13 +51,14 @@ struct SelectedSentencePopup: View {
             }
             
             // Action buttons
-            HStack(spacing: T.S.md) {
+            HStack(spacing: T.S.sm) {
                 // Pleco button
                 Button {
                     vm.openInPleco()
                 } label: {
                     Label("Pleco", systemImage: "book")
                         .font(.caption)
+                        .lineLimit(1)
                 }
                 .buttonStyle(PopupButtonStyle())
                 
@@ -71,6 +72,7 @@ struct SelectedSentencePopup: View {
                             .font(.caption)
                             .foregroundStyle(T.C.ink2)
                     }
+                    .frame(minWidth: 60)
                 } else {
                     Button {
                         vm.playOrPauseAudio()
@@ -80,8 +82,10 @@ struct SelectedSentencePopup: View {
                             systemImage: vm.isPlaying ? "pause.fill" : "play.fill"
                         )
                         .font(.caption)
+                        .lineLimit(1)
                     }
                     .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
+                    .frame(minWidth: 60)
                 }
                 
                 // ChatGPT button
@@ -90,6 +94,8 @@ struct SelectedSentencePopup: View {
                 } label: {
                     Label("ChatGPT", systemImage: "message.circle")
                         .font(.caption)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 .buttonStyle(PopupButtonStyle())
                 
@@ -339,6 +345,8 @@ struct DocumentView: View {
     @State private var tapLocation: CGPoint = .zero
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
+    @State private var showingRenameAlert = false
+    @State private var newDocumentName = ""
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -467,6 +475,18 @@ struct DocumentView: View {
                         
                         Spacer()
                         
+                        // Rename button
+                        Button {
+                            newDocumentName = vm.document.customName ?? ""
+                            showingRenameAlert = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(Color.black.opacity(0.5)))
+                        }
+                        
                         // Pin/Save button
                         Button {
                             vm.toggleImageSave()
@@ -505,6 +525,16 @@ struct DocumentView: View {
             }
         } message: {
             Text("This will delete the document from Snapzify AND permanently delete the original photo from your device's photo library. This action cannot be undone.")
+        }
+        .alert("Rename Document", isPresented: $showingRenameAlert) {
+            TextField("Enter name", text: $newDocumentName)
+                .autocorrectionDisabled()
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                vm.renameDocument(newDocumentName)
+            }
+        } message: {
+            Text("Give this document a custom name")
         }
         .task {
             await vm.translateAllPending()

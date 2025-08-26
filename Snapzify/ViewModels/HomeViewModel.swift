@@ -118,9 +118,10 @@ class HomeViewModel: ObservableObject {
         // Update metadata arrays with new metadata
         let updatedMetadata = DocumentMetadata(from: updatedDocument)
         
-        // Update in documents array
+        // Update in documents array - remove and re-insert to trigger SwiftUI update
         if let index = documents.firstIndex(where: { $0.id == updatedDocument.id }) {
-            documents[index] = updatedMetadata
+            documents.remove(at: index)
+            documents.insert(updatedMetadata, at: index)
         }
         
         // Update saved documents array
@@ -130,9 +131,10 @@ class HomeViewModel: ObservableObject {
                 savedDocuments.append(updatedMetadata)
                 savedDocuments.sort { $0.createdAt > $1.createdAt }
             } else {
-                // Update existing
+                // Update existing - remove and re-insert to trigger SwiftUI update
                 if let index = savedDocuments.firstIndex(where: { $0.id == updatedDocument.id }) {
-                    savedDocuments[index] = updatedMetadata
+                    savedDocuments.remove(at: index)
+                    savedDocuments.insert(updatedMetadata, at: index)
                 }
             }
         } else {

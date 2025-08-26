@@ -109,6 +109,8 @@ struct VideoDocumentView: View {
     @State private var tapLocation: CGPoint = .zero
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
+    @State private var showingRenameAlert = false
+    @State private var newDocumentName = ""
     @Environment(\.dismiss) private var dismiss
     
     private let frameInterval: TimeInterval = 0.2 // Must match extraction interval
@@ -203,6 +205,18 @@ struct VideoDocumentView: View {
                         
                         Spacer()
                         
+                        // Rename button
+                        Button {
+                            newDocumentName = vm.document.customName ?? ""
+                            showingRenameAlert = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(Color.black.opacity(0.5)))
+                        }
+                        
                         // Pin/Save button
                         Button {
                             vm.toggleImageSave()
@@ -270,6 +284,16 @@ struct VideoDocumentView: View {
             }
         } message: {
             Text("This will delete the document from Snapzify AND permanently delete the original video from your device's photo library. This action cannot be undone.")
+        }
+        .alert("Rename Document", isPresented: $showingRenameAlert) {
+            TextField("Enter name", text: $newDocumentName)
+                .autocorrectionDisabled()
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                vm.renameDocument(newDocumentName)
+            }
+        } message: {
+            Text("Give this document a custom name")
         }
         .onChange(of: vm.shouldDismiss) { shouldDismiss in
             if shouldDismiss {

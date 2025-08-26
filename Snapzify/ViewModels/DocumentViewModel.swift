@@ -138,6 +138,19 @@ class DocumentViewModel: ObservableObject {
         }
     }
     
+    func renameDocument(_ newName: String) {
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        document.customName = trimmedName.isEmpty ? nil : trimmedName
+        
+        // Post notification for UI update
+        NotificationCenter.default.post(name: .documentSavedStatusChanged, object: document)
+        
+        // Update the database
+        Task {
+            try? await store.update(document)
+        }
+    }
+    
     func refreshDocument() async {
         print("📱 DocumentViewModel: Starting refresh for document \(document.id)")
         if let updatedDocument = try? await store.fetch(id: document.id) {

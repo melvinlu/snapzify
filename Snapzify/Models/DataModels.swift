@@ -69,6 +69,7 @@ struct DocumentMetadata: Identifiable, Codable, Hashable {
     let isVideo: Bool
     let isSaved: Bool
     let assetIdentifier: String?
+    var customName: String?  // User-defined name for the document
     
     // Convert full document to metadata
     init(from document: Document) {
@@ -80,6 +81,7 @@ struct DocumentMetadata: Identifiable, Codable, Hashable {
         self.isVideo = document.isVideo
         self.isSaved = document.isSaved
         self.assetIdentifier = document.assetIdentifier
+        self.customName = document.customName
         
         // Create small thumbnail from image data
         if let imageData = document.imageData,
@@ -107,8 +109,9 @@ struct Document: Identifiable, Codable, Hashable {
     var isVideo: Bool
     var isSaved: Bool
     var assetIdentifier: String?  // PHAsset localIdentifier for photo library deletion
+    var customName: String?  // User-defined name for the document
     
-    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, script: ChineseScript = .simplified, sentences: [Sentence] = [], imageData: Data? = nil, videoData: Data? = nil, isVideo: Bool = false, isSaved: Bool = false, assetIdentifier: String? = nil) {
+    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, script: ChineseScript = .simplified, sentences: [Sentence] = [], imageData: Data? = nil, videoData: Data? = nil, isVideo: Bool = false, isSaved: Bool = false, assetIdentifier: String? = nil, customName: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.source = source
@@ -119,6 +122,7 @@ struct Document: Identifiable, Codable, Hashable {
         self.isVideo = isVideo
         self.isSaved = isSaved
         self.assetIdentifier = assetIdentifier
+        self.customName = customName
     }
 }
 
