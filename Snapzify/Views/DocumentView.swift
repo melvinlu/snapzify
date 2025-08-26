@@ -162,7 +162,7 @@ struct ChatGPTContextInputPopup: View {
                             HStack {
                                 ProgressView()
                                     .scaleEffect(0.8)
-                                Text("Analyzing...")
+                                Text("Prompting...")
                                     .font(.system(size: 14))
                                     .foregroundStyle(T.C.ink2)
                             }
@@ -181,9 +181,16 @@ struct ChatGPTContextInputPopup: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .onChange(of: streamedResponse) { _ in
-                    withAnimation {
-                        proxy.scrollTo("response", anchor: .bottom)
+                .onChange(of: streamedResponse) { newValue in
+                    // Only auto-scroll to show the latest question when user sends a follow-up
+                    if newValue.contains("\n\n**You:**") {
+                        let components = newValue.components(separatedBy: "\n\n**You:**")
+                        if components.count > 1 {
+                            // This is a follow-up question, scroll to show it
+                            withAnimation {
+                                proxy.scrollTo("response", anchor: .bottom)
+                            }
+                        }
                     }
                 }
             }

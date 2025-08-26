@@ -23,12 +23,12 @@ class ChatGPTServiceImpl: ChatGPTService {
     }
     
     func streamBreakdown(chineseText: String) -> AsyncThrowingStream<String, Error> {
-        let prompt = "Breakdown: \(chineseText)"
+        let prompt = "Breakdown: \(chineseText)\n\nDon't use markdown. Don't have any \"Sure! Let's break down...\" just provide the breakdown, nothing else."
         return streamChatGPT(prompt: prompt)
     }
     
     func streamCustomPrompt(chineseText: String, userPrompt: String) -> AsyncThrowingStream<String, Error> {
-        let combinedPrompt = "\(chineseText) \(userPrompt)"
+        let combinedPrompt = "\(chineseText) \(userPrompt)\n\nDon't use markdown."
         return streamChatGPT(prompt: combinedPrompt)
     }
     
