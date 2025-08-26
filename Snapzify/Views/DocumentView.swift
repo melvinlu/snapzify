@@ -6,9 +6,8 @@ struct SelectedSentencePopup: View {
     @ObservedObject var vm: SentenceViewModel
     @Binding var isShowing: Bool
     let position: CGPoint
-    
-    @State private var showingChatGPTInput = false
-    @State private var chatGPTContext = ""
+    @Binding var showingChatGPTInput: Bool
+    @Binding var chatGPTContext: String
     
     var body: some View {
         let _ = print("📱 Popup rendering:")
@@ -93,13 +92,6 @@ struct SelectedSentencePopup: View {
                         .font(.caption)
                 }
                 .buttonStyle(PopupButtonStyle())
-                .sheet(isPresented: $showingChatGPTInput) {
-                    ChatGPTContextInputView(
-                        chineseText: sentence.text,
-                        context: $chatGPTContext,
-                        isPresented: $showingChatGPTInput
-                    )
-                }
                 
                 Spacer()
             }
@@ -130,49 +122,55 @@ struct PopupButtonStyle: ButtonStyle {
     }
 }
 
-struct ChatGPTContextInputView: View {
+struct ChatGPTContextInputPopup: View {
     let chineseText: String
     @Binding var context: String
     @Binding var isPresented: Bool
     @FocusState private var isFocused: Bool
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: T.S.lg) {
-                Text("Add context for ChatGPT")
-                    .font(.headline)
-                    .padding(.top)
-                
-                Text("The Chinese text: \"\(chineseText)\"")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                
-                TextField("What would you like to know? (optional)", text: $context, axis: .vertical)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .lineLimit(3...6)
-                    .padding(.horizontal)
-                    .focused($isFocused)
-                
-                Spacer()
-                
-                HStack(spacing: T.S.md) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    Button("Open ChatGPT") {
-                        openChatGPTWithContext()
-                    }
-                    .buttonStyle(.borderedProminent)
+        VStack(alignment: .leading, spacing: T.S.md) {
+            Text("Add context for ChatGPT")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(T.C.ink)
+            
+            Text("Chinese: \"\(String(chineseText.prefix(50)))\(chineseText.count > 50 ? "..." : "")\"")
+                .font(.system(size: 14))
+                .foregroundStyle(T.C.ink2)
+                .lineLimit(2)
+            
+            TextField("What would you like to know? (optional)", text: $context, axis: .vertical)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .lineLimit(2...4)
+                .focused($isFocused)
+            
+            HStack(spacing: T.S.md) {
+                Button {
+                    isPresented = false
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 14, weight: .medium))
                 }
-                .padding(.bottom)
+                .buttonStyle(PopupButtonStyle())
+                
+                Button {
+                    openChatGPTWithContext()
+                } label: {
+                    Text("Open ChatGPT")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(PopupButtonStyle(isActive: true))
             }
-            .navigationBarHidden(true)
         }
+        .padding(T.S.lg)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(T.C.card)
+                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 340)
         .onAppear {
+            // Focus immediately for faster response
             isFocused = true
         }
     }
@@ -207,6 +205,8 @@ struct DocumentView: View {
     @State private var showingPopup = false
     @State private var tapLocation: CGPoint = .zero
     @State private var highlightedSentenceId: UUID?
+    @State private var showingChatGPTInput = false
+    @State private var chatGPTContext = ""
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -306,12 +306,39 @@ struct DocumentView: View {
                         sentence: sentence,
                         vm: vm.createSentenceViewModel(for: sentence),
                         isShowing: $showingPopup,
-                        position: tapLocation
+                        position: tapLocation,
+                        showingChatGPTInput: $showingChatGPTInput,
+                        chatGPTContext: $chatGPTContext
                     )
                     .position(x: geometry.size.width / 2,
                              y: min(tapLocation.y + 150, geometry.size.height - 200))
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(100)
+                }
+                
+                // ChatGPT context input popup
+                if showingChatGPTInput,
+                   let sentenceId = selectedSentenceId,
+                   let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
+                    
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation {
+                                showingChatGPTInput = false
+                            }
+                        }
+                        .zIndex(200)
+                    
+                    ChatGPTContextInputPopup(
+                        chineseText: sentence.text,
+                        context: $chatGPTContext,
+                        isPresented: $showingChatGPTInput
+                    )
+                    .position(x: geometry.size.width / 2,
+                             y: geometry.size.height / 2)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(201)
                 }
                 
                 // Top navigation bar

@@ -7,9 +7,8 @@ struct VideoSelectedSentencePopup: View {
     @ObservedObject var vm: SentenceViewModel
     @Binding var isShowing: Bool
     let position: CGPoint
-    
-    @State private var showingChatGPTInput = false
-    @State private var chatGPTContext = ""
+    @Binding var showingChatGPTInput: Bool
+    @Binding var chatGPTContext: String
     
     var body: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
@@ -86,13 +85,6 @@ struct VideoSelectedSentencePopup: View {
                         .font(.caption)
                 }
                 .buttonStyle(PopupButtonStyle())
-                .sheet(isPresented: $showingChatGPTInput) {
-                    ChatGPTContextInputView(
-                        chineseText: sentence.text,
-                        context: $chatGPTContext,
-                        isPresented: $showingChatGPTInput
-                    )
-                }
                 
                 Spacer()
             }
@@ -115,6 +107,8 @@ struct VideoDocumentView: View {
     @State private var selectedSentenceId: UUID?
     @State private var showingPopup = false
     @State private var tapLocation: CGPoint = .zero
+    @State private var showingChatGPTInput = false
+    @State private var chatGPTContext = ""
     @Environment(\.dismiss) private var dismiss
     
     private let frameInterval: TimeInterval = 0.2 // Must match extraction interval
@@ -159,12 +153,39 @@ struct VideoDocumentView: View {
                         sentence: sentence,
                         vm: vm.createSentenceViewModel(for: sentence),
                         isShowing: $showingPopup,
-                        position: tapLocation
+                        position: tapLocation,
+                        showingChatGPTInput: $showingChatGPTInput,
+                        chatGPTContext: $chatGPTContext
                     )
                     .position(x: geometry.size.width / 2,
                              y: min(tapLocation.y + 150, geometry.size.height - 200))
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(100)
+                }
+                
+                // ChatGPT context input popup
+                if showingChatGPTInput,
+                   let sentenceId = selectedSentenceId,
+                   let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
+                    
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation {
+                                showingChatGPTInput = false
+                            }
+                        }
+                        .zIndex(200)
+                    
+                    ChatGPTContextInputPopup(
+                        chineseText: sentence.text,
+                        context: $chatGPTContext,
+                        isPresented: $showingChatGPTInput
+                    )
+                    .position(x: geometry.size.width / 2,
+                             y: geometry.size.height / 2)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(201)
                 }
                 
                 // Top navigation bar
