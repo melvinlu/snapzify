@@ -20,13 +20,30 @@ struct VideoDocumentView: View {
                 
                 // Video player with overlay
                 if let videoData = vm.document.videoData {
-                    VideoPlayerWithOverlay(
-                        videoData: videoData,
-                        sentences: vm.document.sentences,
-                        currentTime: $currentTime,
-                        isPlaying: $isPlaying,
-                        onSentenceTap: handleSentenceTap
-                    )
+                    ZStack {
+                        VideoPlayerWithOverlay(
+                            videoData: videoData,
+                            sentences: vm.document.sentences,
+                            currentTime: $currentTime,
+                            isPlaying: $isPlaying,
+                            onSentenceTap: handleSentenceTap
+                        )
+                        
+                        // Play button overlay when paused
+                        if !isPlaying {
+                            Circle()
+                                .fill(Color.black.opacity(0.6))
+                                .frame(width: 80, height: 80)
+                                .overlay(
+                                    Image(systemName: "play.fill")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 40))
+                                )
+                                .transition(.scale.combined(with: .opacity))
+                                .animation(.easeInOut(duration: 0.2), value: isPlaying)
+                                .allowsHitTesting(false) // Don't block taps
+                        }
+                    }
                 }
                 
                 // Popup overlay
@@ -141,6 +158,11 @@ struct VideoPlayerWithOverlay: UIViewRepresentable {
         let view = VideoPlayerUIView()
         view.sentences = sentences
         view.onSentenceTap = onSentenceTap
+        view.onPlaybackStateChanged = { playing in
+            DispatchQueue.main.async {
+                self.isPlaying = playing
+            }
+        }
         
         // Save video to temp file
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_video_\(UUID().uuidString).mov")
@@ -168,6 +190,7 @@ class VideoPlayerUIView: UIView {
     
     var sentences: [Sentence] = []
     var onSentenceTap: ((Sentence, CGPoint) -> Void)?
+    var onPlaybackStateChanged: ((Bool) -> Void)?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -239,6 +262,8 @@ class VideoPlayerUIView: UIView {
         let scaleX = videoRect.width / videoSize.width
         let scaleY = videoRect.height / videoSize.height
         
+        var tappedOnSentence = false
+        
         for sentence in sentences {
             var rect: CGRect? = nil
             
@@ -273,7 +298,19 @@ class VideoPlayerUIView: UIView {
             
             if sentenceFrame.contains(location) {
                 onSentenceTap?(sentence, location)
+                tappedOnSentence = true
                 break
+            }
+        }
+        
+        // If tap was not on any sentence, toggle play/pause
+        if !tappedOnSentence {
+            if player.rate > 0 {
+                player.pause()
+                onPlaybackStateChanged?(false)
+            } else {
+                player.play()
+                onPlaybackStateChanged?(true)
             }
         }
     }
@@ -285,10 +322,12 @@ class VideoPlayerUIView: UIView {
     
     func play() {
         player?.play()
+        onPlaybackStateChanged?(true)
     }
     
     func pause() {
         player?.pause()
+        onPlaybackStateChanged?(false)
     }
     
     deinit {
