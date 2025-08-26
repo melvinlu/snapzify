@@ -197,7 +197,7 @@ struct VideoDocumentView: View {
                             Image(systemName: "chevron.left")
                                 .foregroundColor(.white)
                                 .font(.title2)
-                                .padding()
+                                .frame(width: 44, height: 44)
                                 .background(Circle().fill(Color.black.opacity(0.5)))
                         }
                         
@@ -210,7 +210,7 @@ struct VideoDocumentView: View {
                             Image(systemName: vm.document.isSaved ? "pin.fill" : "pin")
                                 .foregroundStyle(vm.document.isSaved ? T.C.accent : .white)
                                 .font(.title2)
-                                .padding()
+                                .frame(width: 44, height: 44)
                                 .background(Circle().fill(Color.black.opacity(0.5)))
                         }
                         
@@ -222,7 +222,7 @@ struct VideoDocumentView: View {
                                 Image(systemName: "trash")
                                     .foregroundStyle(.red)
                                     .font(.title2)
-                                    .padding()
+                                    .frame(width: 44, height: 44)
                                     .background(Circle().fill(Color.black.opacity(0.5)))
                             }
                         }

@@ -256,8 +256,9 @@ class HomeViewModel: ObservableObject {
     }
     
     func processPickedVideo(_ videoURL: URL) async {
+        // Note: isProcessing is already set to true by the PhotosPicker onChange handler
+        // Just clear any previous error message
         await MainActor.run {
-            isProcessing = true
             errorMessage = nil
         }
         
@@ -279,38 +280,34 @@ class HomeViewModel: ObservableObject {
             var textAppearances: [String: [FrameAppearance]] = [:]
             let frameInterval = 0.2 // seconds between frames (must match extraction interval)
             
-            logger.info("Starting concurrent OCR processing for \(frames.count) frames")
+            logger.info("Starting ULTRA-FAST concurrent OCR processing for \(frames.count) frames")
             
-            // Process frames in concurrent batches to avoid overwhelming the API
-            // Google Cloud Vision allows up to 30 requests per second by default
-            let batchSize = 10 // Process 10 frames concurrently at a time
+            // Process ALL frames concurrently with smart batching
+            // Google Cloud Vision allows up to 30 requests per second, but we can queue more
+            let maxConcurrentRequests = 25 // Process up to 25 frames at once
             
-            for batchStart in stride(from: 0, to: frames.count, by: batchSize) {
-                let batchEnd = min(batchStart + batchSize, frames.count)
-                let batch = Array(frames[batchStart..<batchEnd])
-                let batchIndices = Array(batchStart..<batchEnd)
+            // Process all frames in one go if under the limit, otherwise use batches
+            if frames.count <= maxConcurrentRequests {
+                // Process ALL frames at once if we're under the limit
+                logger.info("Processing all \(frames.count) frames in a single concurrent batch!")
                 
-                logger.debug("Processing OCR batch: frames \(batchStart + 1)-\(batchEnd)/\(frames.count)")
-                
-                // Process this batch concurrently
-                let batchResults = try await withThrowingTaskGroup(of: (Int, [OCRLine]).self) { group in
-                    for (localIndex, frame) in batch.enumerated() {
-                        let frameIndex = batchIndices[localIndex]
+                let results = try await withThrowingTaskGroup(of: (Int, [OCRLine]).self) { group in
+                    for (index, frame) in frames.enumerated() {
                         group.addTask {
                             let ocrLines = try await self.ocrService.recognizeText(in: frame)
-                            return (frameIndex, ocrLines)
+                            return (index, ocrLines)
                         }
                     }
                     
-                    var results: [(Int, [OCRLine])] = []
+                    var allResults: [(Int, [OCRLine])] = []
                     for try await result in group {
-                        results.append(result)
+                        allResults.append(result)
                     }
-                    return results
+                    return allResults
                 }
                 
-                // Process results from this batch
-                for (frameIndex, ocrLines) in batchResults {
+                // Process all results
+                for (frameIndex, ocrLines) in results {
                     let timestamp = Double(frameIndex) * frameInterval
                     
                     for line in ocrLines {
@@ -319,7 +316,6 @@ class HomeViewModel: ObservableObject {
                                 scriptConversionService.toSimplified(line.text) :
                                 scriptConversionService.toTraditional(line.text)
                             
-                            // Track this appearance
                             let appearance = FrameAppearance(timestamp: timestamp, bbox: line.bbox)
                             
                             if textAppearances[normalizedText] == nil {
@@ -329,14 +325,60 @@ class HomeViewModel: ObservableObject {
                         }
                     }
                 }
+            } else {
+                // For larger videos, process in larger concurrent batches
+                logger.info("Processing \(frames.count) frames in batches of \(maxConcurrentRequests)")
                 
-                // Small delay between batches to avoid rate limiting (optional, can be removed if not needed)
-                if batchEnd < frames.count {
-                    try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second pause between batches
+                for batchStart in stride(from: 0, to: frames.count, by: maxConcurrentRequests) {
+                    let batchEnd = min(batchStart + maxConcurrentRequests, frames.count)
+                    let batch = Array(frames[batchStart..<batchEnd])
+                    let batchIndices = Array(batchStart..<batchEnd)
+                    
+                    logger.debug("Processing mega-batch: frames \(batchStart + 1)-\(batchEnd)/\(frames.count)")
+                    
+                    // Process this batch with maximum concurrency
+                    let batchResults = try await withThrowingTaskGroup(of: (Int, [OCRLine]).self) { group in
+                        for (localIndex, frame) in batch.enumerated() {
+                            let frameIndex = batchIndices[localIndex]
+                            group.addTask(priority: .high) { // High priority for faster processing
+                                let ocrLines = try await self.ocrService.recognizeText(in: frame)
+                                return (frameIndex, ocrLines)
+                            }
+                        }
+                        
+                        var results: [(Int, [OCRLine])] = []
+                        for try await result in group {
+                            results.append(result)
+                        }
+                        return results
+                    }
+                    
+                    // Process results from this batch
+                    for (frameIndex, ocrLines) in batchResults {
+                        let timestamp = Double(frameIndex) * frameInterval
+                        
+                        for line in ocrLines {
+                            if containsChinese(line.text) {
+                                let normalizedText = ChineseScript(rawValue: selectedScript) == .simplified ?
+                                    scriptConversionService.toSimplified(line.text) :
+                                    scriptConversionService.toTraditional(line.text)
+                                
+                                let appearance = FrameAppearance(timestamp: timestamp, bbox: line.bbox)
+                                
+                                if textAppearances[normalizedText] == nil {
+                                    textAppearances[normalizedText] = []
+                                }
+                                textAppearances[normalizedText]?.append(appearance)
+                            }
+                        }
+                    }
+                    
+                    // NO DELAY between batches - process as fast as possible!
+                    // The API will handle rate limiting if needed
                 }
             }
             
-            logger.info("Completed concurrent OCR processing for all frames")
+            logger.info("Completed ULTRA-FAST concurrent OCR processing for all frames")
             
             // Convert to sentences with all their frame appearances
             var allSentences: [Sentence] = []

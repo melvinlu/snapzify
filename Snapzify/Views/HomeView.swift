@@ -112,18 +112,32 @@ struct HomeView: View {
                 if let newValue {
                     print("Media selected, loading data...")
                     
+                    // Show processing indicator IMMEDIATELY
+                    await MainActor.run {
+                        vm.isProcessing = true
+                    }
+                    
                     // Check if it's a video
                     if let movie = try? await newValue.loadTransferable(type: Movie.self) {
                         print("Video loaded successfully, processing...")
+                        // isProcessing is already true, just process the video
                         await vm.processPickedVideo(movie.url)
                     }
                     // Otherwise try as image
                     else if let data = try? await newValue.loadTransferable(type: Data.self),
                             let image = UIImage(data: data) {
                         print("Image loaded successfully, snapzifying...")
+                        // For images, processPickedImage will handle setting isProcessing
+                        await MainActor.run {
+                            vm.isProcessing = false // Reset before calling processPickedImage
+                        }
                         vm.processPickedImage(image)
                     } else {
                         print("Failed to load media data")
+                        await MainActor.run {
+                            vm.isProcessing = false
+                            vm.errorMessage = "Failed to load media file"
+                        }
                     }
                     selectedPhoto = nil
                 }
