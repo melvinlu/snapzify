@@ -51,16 +51,18 @@ struct SelectedSentencePopup: View {
             }
             
             // Action buttons
-            HStack(spacing: T.S.sm) {
+            HStack(alignment: .center, spacing: 0) {
                 // Pleco button
                 Button {
                     vm.openInPleco()
                 } label: {
                     Label("Pleco", systemImage: "book")
                         .font(.caption)
-                        .lineLimit(1)
                 }
                 .buttonStyle(PopupButtonStyle())
+                
+                // Spacing after Pleco
+                Spacer().frame(width: T.S.sm)
                 
                 // Audio button
                 if vm.isGeneratingAudio || vm.isPreparingAudio {
@@ -68,11 +70,18 @@ struct SelectedSentencePopup: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
                             .scaleEffect(0.6)
-                        Text("Loading...")
+                        Text("Load")
                             .font(.caption)
                             .foregroundStyle(T.C.ink2)
+                            .fixedSize()
                     }
-                    .frame(minWidth: 60)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(T.C.ink.opacity(0.1))
+                    )
+                    .fixedSize()
                 } else {
                     Button {
                         vm.playOrPauseAudio()
@@ -82,11 +91,12 @@ struct SelectedSentencePopup: View {
                             systemImage: vm.isPlaying ? "pause.fill" : "play.fill"
                         )
                         .font(.caption)
-                        .lineLimit(1)
                     }
                     .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
-                    .frame(minWidth: 60)
                 }
+                
+                // Spacing after Audio
+                Spacer().frame(width: T.S.sm)
                 
                 // ChatGPT button
                 Button {
@@ -94,12 +104,11 @@ struct SelectedSentencePopup: View {
                 } label: {
                     Label("ChatGPT", systemImage: "message.circle")
                         .font(.caption)
-                        .lineLimit(1)
-                        .fixedSize()
                 }
                 .buttonStyle(PopupButtonStyle())
                 
-                Spacer()
+                // Push remaining space
+                Spacer(minLength: 0)
             }
         }
         .padding(T.S.lg)

@@ -44,7 +44,7 @@ struct VideoSelectedSentencePopup: View {
             }
             
             // Action buttons
-            HStack(spacing: T.S.md) {
+            HStack(alignment: .center, spacing: 0) {
                 // Pleco button
                 Button {
                     vm.openInPleco()
@@ -54,16 +54,27 @@ struct VideoSelectedSentencePopup: View {
                 }
                 .buttonStyle(PopupButtonStyle())
                 
+                // Spacing after Pleco
+                Spacer().frame(width: T.S.sm)
+                
                 // Audio button
                 if vm.isGeneratingAudio || vm.isPreparingAudio {
                     HStack(spacing: 4) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
                             .scaleEffect(0.6)
-                        Text("Loading...")
+                        Text("Load")
                             .font(.caption)
                             .foregroundStyle(T.C.ink2)
+                            .fixedSize()
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(T.C.ink.opacity(0.1))
+                    )
+                    .fixedSize()
                 } else {
                     Button {
                         vm.playOrPauseAudio()
@@ -77,6 +88,9 @@ struct VideoSelectedSentencePopup: View {
                     .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
                 }
                 
+                // Spacing after Audio
+                Spacer().frame(width: T.S.sm)
+                
                 // ChatGPT button
                 Button {
                     showingChatGPTInput = true
@@ -86,7 +100,8 @@ struct VideoSelectedSentencePopup: View {
                 }
                 .buttonStyle(PopupButtonStyle())
                 
-                Spacer()
+                // Push remaining space
+                Spacer(minLength: 0)
             }
         }
         .padding(T.S.lg)
