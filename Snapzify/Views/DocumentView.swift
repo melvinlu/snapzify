@@ -204,7 +204,6 @@ struct DocumentView: View {
     @State private var selectedSentenceId: UUID?
     @State private var showingPopup = false
     @State private var tapLocation: CGPoint = .zero
-    @State private var highlightedSentenceId: UUID?
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
     @Environment(\.dismiss) private var dismiss
@@ -243,26 +242,6 @@ struct DocumentView: View {
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: displayWidth, height: displayHeight)
                             
-                            // Highlight overlays for all sentences
-                            ForEach(vm.document.sentences.filter { $0.rangeInImage != nil }) { sentence in
-                                if let rect = sentence.rangeInImage {
-                                    Rectangle()
-                                        .fill(highlightedSentenceId == sentence.id ? 
-                                              Color.green.opacity(0.3) : Color.blue.opacity(0.1))
-                                        .overlay(
-                                            Rectangle()
-                                                .strokeBorder(highlightedSentenceId == sentence.id ? 
-                                                            Color.green.opacity(0.8) : Color.blue.opacity(0.4), 
-                                                            lineWidth: highlightedSentenceId == sentence.id ? 2 : 1)
-                                        )
-                                        .frame(width: rect.width * scale,
-                                               height: rect.height * scale)
-                                        .position(x: rect.midX * scale,
-                                                 y: rect.midY * scale)
-                                        .animation(.easeInOut(duration: 0.2), value: highlightedSentenceId)
-                                }
-                            }
-                            
                             // Invisible tap areas for each sentence
                             ForEach(vm.document.sentences.filter { $0.rangeInImage != nil }) { sentence in
                                 if let rect = sentence.rangeInImage {
@@ -298,7 +277,6 @@ struct DocumentView: View {
                         .onTapGesture {
                             withAnimation {
                                 showingPopup = false
-                                highlightedSentenceId = nil
                             }
                         }
                     
@@ -426,7 +404,6 @@ struct DocumentView: View {
         
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedSentenceId = sentence.id
-            highlightedSentenceId = sentence.id
             tapLocation = location
             showingPopup = true
         }

@@ -108,6 +108,8 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @State private var showSettings = false
     @State private var selectedDocument: Document?
+    @State private var navigationPath = NavigationPath()
+    @State private var actionExtensionImage: IdentifiableImage?
     @StateObject private var homeVM: HomeViewModel
     
     private let logger = Logger(subsystem: "com.snapzify.app", category: "ContentView")
@@ -122,13 +124,29 @@ struct ContentView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             HomeView(vm: homeVM)
                 .navigationDestination(item: $selectedDocument) { document in
                     if document.isVideo {
                         VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
                     } else {
                         DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                    }
+                }
+                .navigationDestination(for: Document.self) { document in
+                    if document.isVideo {
+                        VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                    } else {
+                        DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                    }
+                }
+                .fullScreenCover(item: $actionExtensionImage) { identifiableImage in
+                    NavigationStack {
+                        ActionExtensionLoadingView(image: identifiableImage.image, navigationPath: .constant(NavigationPath())) { document in
+                            // Dismiss loading view and navigate to document
+                            actionExtensionImage = nil
+                            selectedDocument = document
+                        }
                     }
                 }
         }
@@ -166,6 +184,40 @@ struct ContentView: View {
                         appState.shouldProcessSharedImage = false
                         appState.pendingSharedImage = nil
                     }
+                }
+            }
+        }
+        .onChange(of: appState.shouldProcessActionImage) { shouldProcess in
+            if shouldProcess, let fileName = appState.pendingActionImage {
+                logger.info("Processing action extension image: \(fileName)")
+                
+                // Load image from shared container
+                guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") else { return }
+                
+                let tempDirectory = sharedContainerURL.appendingPathComponent("ActionTemp")
+                let fileURL = tempDirectory.appendingPathComponent(fileName)
+                
+                if let imageData = try? Data(contentsOf: fileURL),
+                   let image = UIImage(data: imageData) {
+                    // Show loading view
+                    actionExtensionImage = IdentifiableImage(image: image)
+                    
+                    // Clear the pending state
+                    appState.pendingActionImage = nil
+                    appState.shouldProcessActionImage = false
+                    
+                    // Clean up the temp file
+                    try? FileManager.default.removeItem(at: fileURL)
+                    
+                    // Clean up the temp directory if empty
+                    if let contents = try? FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil),
+                       contents.isEmpty {
+                        try? FileManager.default.removeItem(at: tempDirectory)
+                    }
+                } else {
+                    // Clear invalid pending image
+                    appState.pendingActionImage = nil
+                    appState.shouldProcessActionImage = false
                 }
             }
         }

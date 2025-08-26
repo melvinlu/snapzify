@@ -192,10 +192,7 @@ struct HomeView: View {
             // Start polling for new photos every 2 seconds
             startPhotoPolling()
             
-            // Shared images are checked at app level
-            
-            // Check for images from ActionExtension
-            checkForActionExtensionImage()
+            // Shared images and action extension images are checked at app level
             
             // Only refresh saved documents if not just launching
             if vm.hasLoadedDocuments {
@@ -218,10 +215,7 @@ struct HomeView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
-                // Shared images are checked at app level when app becomes active
-                
-                // Check for ActionExtension images
-                checkForActionExtensionImage()
+                // Shared images and action extension images are checked at app level when app becomes active
                 
                 // Resume polling when app becomes active
                 startPhotoPolling()
@@ -238,11 +232,6 @@ struct HomeView: View {
             } else if phase == .background {
                 // Stop polling when app goes to background
                 stopPhotoPolling()
-            }
-        }
-        .onChange(of: appState.shouldProcessActionImage) { shouldProcess in
-            if shouldProcess {
-                checkForActionExtensionImage()
             }
         }
     }
@@ -603,39 +592,5 @@ struct HomeView: View {
         logger.debug("Shared content checking moved to app level")
     }
     
-    private func checkForActionExtensionImage() {
-        // Check if there's a pending image from ActionExtension
-        guard let fileName = appState.pendingActionImage else { return }
-        
-        guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.snapzify.app") else { return }
-        
-        let tempDirectory = sharedContainerURL.appendingPathComponent("ActionTemp")
-        let fileURL = tempDirectory.appendingPathComponent(fileName)
-        
-        if let imageData = try? Data(contentsOf: fileURL),
-           let image = UIImage(data: imageData) {
-            // Clear the pending image
-            appState.pendingActionImage = nil
-            appState.shouldProcessActionImage = false
-            
-            // Process and open the image
-            Task {
-                await vm.processActionExtensionImage(image)
-            }
-            
-            // Clean up the temp file
-            try? FileManager.default.removeItem(at: fileURL)
-            
-            // Clean up the temp directory if empty
-            if let contents = try? FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil),
-               contents.isEmpty {
-                try? FileManager.default.removeItem(at: tempDirectory)
-            }
-        } else {
-            // Clear invalid pending image
-            appState.pendingActionImage = nil
-            appState.shouldProcessActionImage = false
-        }
-    }
 }
 
