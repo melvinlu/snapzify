@@ -39,6 +39,7 @@
 		3D9B1A341234567890123464 /* ShimmerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A351234567890123465 /* ShimmerView.swift */; };
 		3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A371234567890123467 /* VersionHistoryView.swift */; };
 		3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A391234567890123468 /* VideoDocumentView.swift */; };
+		3D9B1A381234567890123470 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A391234567890123469 /* TranscriptView.swift */; };
 		408EE21643E4AE8A216691B0 /* ActionIcon@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */; };
 		48B5B75E4312202E118FFB46 /* ActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5E7351685F648D10E0213F08 /* ActionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0646378E12D0819C51E3B5FA /* ActionViewController.swift */; };
@@ -48,6 +49,7 @@
 		C0047CD5DB0F20CF4724D8B2 /* ActionIcon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = D7C5FB603D1781A9612ED1BD /* ActionIcon@2x.png */; };
 		C45810DDED58D9C91534ABC6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A530A292416FC5D38CDF259F /* Assets.xcassets */; };
 		C8490D8C4CB39322122165AD /* ActionExtensionLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */; };
+		C8490D8C4CB39322122165AE /* ActionExtensionVideoLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */; };
 		E4407D16310FD24BBD223D0A /* ChineseDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875ABEB622C89CF71AF70FD1 /* ChineseDetector.swift */; };
 /* End PBXBuildFile section */
 
@@ -88,6 +90,7 @@
 /* Begin PBXFileReference section */
 		0646378E12D0819C51E3B5FA /* ActionViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActionViewController.swift; path = ActionExtension/ActionViewController.swift; sourceTree = "<group>"; };
 		0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActionExtensionLoadingView.swift; path = ActionExtensionLoadingView.swift; sourceTree = "<group>"; };
+		0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActionExtensionVideoLoadingView.swift; path = ActionExtensionVideoLoadingView.swift; sourceTree = "<group>"; };
 		15627FBFFEB1AFE5A161B98D /* ActionIcon.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = ActionIcon.png; path = ActionExtension/Resources/ActionIcon.png; sourceTree = "<group>"; };
 		189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; name = ActionExtension.appex; path = ActionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1EE13F3C9DF4F4B275E2EE1E /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ActionExtension/Info.plist; sourceTree = "<group>"; };
@@ -124,6 +127,7 @@
 		3D9B1A351234567890123465 /* ShimmerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShimmerView.swift; sourceTree = "<group>"; };
 		3D9B1A371234567890123467 /* VersionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionHistoryView.swift; sourceTree = "<group>"; };
 		3D9B1A391234567890123468 /* VideoDocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDocumentView.swift; sourceTree = "<group>"; };
+		3D9B1A391234567890123469 /* TranscriptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptView.swift; sourceTree = "<group>"; };
 		518E226ED0401075BE5C372C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		7FBD0CFE852306298E69989D /* MainInterface.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; name = MainInterface.storyboard; path = ActionExtension/MainInterface.storyboard; sourceTree = "<group>"; };
 		875ABEB622C89CF71AF70FD1 /* ChineseDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChineseDetector.swift; path = ChineseDetector.swift; sourceTree = "<group>"; };
@@ -229,7 +233,9 @@
 				3D9B1A371234567890123467 /* VersionHistoryView.swift */,
 				3D9B1A1F1234567890123456 /* SettingsView.swift */,
 				3D9B1A391234567890123468 /* VideoDocumentView.swift */,
+				3D9B1A391234567890123469 /* TranscriptView.swift */,
 				0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */,
+				0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -437,6 +443,7 @@
 				3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */,
 				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
 				3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */,
+				3D9B1A381234567890123470 /* TranscriptView.swift in Sources */,
 				3D9B1A341234567890123464 /* ShimmerView.swift in Sources */,
 				3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */,
 				3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */,
@@ -447,6 +454,7 @@
 				6C10D521A75AB7C28AB8B387 /* DocumentStoreImpl.swift in Sources */,
 				2400A106E61C6BD7F823EE8D /* ServiceContainer.swift in Sources */,
 				C8490D8C4CB39322122165AD /* ActionExtensionLoadingView.swift in Sources */,
+				C8490D8C4CB39322122165AE /* ActionExtensionVideoLoadingView.swift in Sources */,
 				3A8B6CC2165AB2A2EDC1A366 /* UIImageWrapper.swift in Sources */,
 				E4407D16310FD24BBD223D0A /* ChineseDetector.swift in Sources */,
 			);

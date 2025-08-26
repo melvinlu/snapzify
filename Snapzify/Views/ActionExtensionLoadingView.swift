@@ -128,11 +128,43 @@ class ActionExtensionLoadingViewModel: ObservableObject {
                     )
                 }
                 
+                // Save image data to temporary file for now
+                let documentId = UUID()
+                let tempURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("\(documentId.uuidString).jpg")
+                if let imageData = imageData {
+                    try imageData.write(to: tempURL)
+                } else {
+                    throw NSError(domain: "ActionExtension", code: 1, userInfo: [NSLocalizedDescriptionKey: "No image data"])
+                }
+                
+                // Generate thumbnail
+                let thumbnailURL: URL?
+                if let imageData = imageData, let image = UIImage(data: imageData) {
+                    let thumbnailSize = CGSize(width: 120, height: 120)
+                    let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+                    let thumbnail = renderer.image { context in
+                        image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                    }
+                    if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) {
+                        let thumbURL = FileManager.default.temporaryDirectory
+                            .appendingPathComponent("\(documentId.uuidString)_thumb.jpg")
+                        try thumbnailData.write(to: thumbURL)
+                        thumbnailURL = thumbURL
+                    } else {
+                        thumbnailURL = nil
+                    }
+                } else {
+                    thumbnailURL = nil
+                }
+                
                 let document = Document(
+                    id: documentId,
                     source: .shareExtension,
                     script: script,
                     sentences: sentences,
-                    imageData: imageData,
+                    mediaURL: tempURL,
+                    thumbnailURL: thumbnailURL,
                     isVideo: false,
                     isSaved: false
                 )

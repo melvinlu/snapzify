@@ -245,15 +245,6 @@ struct ChatGPTContextInputPopup: View {
                 .font(.title2)
                 .disabled(!isStreaming && userPrompt.isEmpty)
             }
-            
-            // External ChatGPT button
-            Button {
-                openInChatGPTApp()
-            } label: {
-                Label("Open in ChatGPT", systemImage: "arrow.up.forward.app")
-                    .font(.system(size: 14, weight: .medium))
-            }
-            .buttonStyle(PopupButtonStyle())
         }
         .padding(T.S.lg)
         .background(
@@ -330,21 +321,6 @@ struct ChatGPTContextInputPopup: View {
             }
         }
     }
-    
-    private func openInChatGPTApp() {
-        let prompt = chineseText + (userPrompt.isEmpty ? "" : " " + userPrompt)
-        let encodedPrompt = prompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        
-        // Try ChatGPT app first
-        if let url = URL(string: "chatgpt://message?prompt=\(encodedPrompt)"),
-           UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url)
-        } 
-        // Fall back to web version
-        else if let url = URL(string: "https://chat.openai.com/?q=\(encodedPrompt)") {
-            UIApplication.shared.open(url)
-        }
-    }
 }
 
 struct DocumentView: View {
@@ -356,6 +332,7 @@ struct DocumentView: View {
     @State private var chatGPTContext = ""
     @State private var showingRenameAlert = false
     @State private var newDocumentName = ""
+    @State private var showingTranscript = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -366,7 +343,8 @@ struct DocumentView: View {
                     .ignoresSafeArea()
                 
                 // Full-screen image with tap detection
-                if let imageData = vm.document.imageData,
+                if let mediaURL = vm.document.mediaURL,
+                   let imageData = try? Data(contentsOf: mediaURL),
                    let uiImage = UIImage(data: imageData) {
                     
                     // Calculate the image size to fit screen like Photos app
@@ -496,6 +474,17 @@ struct DocumentView: View {
                                 .background(Circle().fill(Color.black.opacity(0.5)))
                         }
                         
+                        // Transcript button
+                        Button {
+                            showingTranscript = true
+                        } label: {
+                            Image(systemName: "doc.text")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(Color.black.opacity(0.5)))
+                        }
+                        
                         // Pin/Save button
                         Button {
                             vm.toggleImageSave()
@@ -544,6 +533,9 @@ struct DocumentView: View {
             }
         } message: {
             Text("Give this document a custom name")
+        }
+        .sheet(isPresented: $showingTranscript) {
+            TranscriptView(document: vm.document, documentVM: vm)
         }
         .task {
             await vm.translateAllPending()

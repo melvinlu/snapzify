@@ -628,12 +628,29 @@ class HomeViewModel: ObservableObject {
             let videoData = try Data(contentsOf: videoURL)
             
             // Create document with OCR-only sentences (no translations yet)
+            let documentId = UUID()
+            let savedVideoURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(documentId.uuidString).mov")
+            try videoData.write(to: savedVideoURL)
+            
+            // Create thumbnail
+            let thumbnailURL: URL?
+            if let imageData = representativeImage.pngData() {
+                let thumbURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("\(documentId.uuidString)_thumb.jpg")
+                try imageData.write(to: thumbURL)
+                thumbnailURL = thumbURL
+            } else {
+                thumbnailURL = nil
+            }
+            
             let document = Document(
+                id: documentId,
                 source: .imported,
                 script: script,
                 sentences: allSentences,
-                imageData: representativeImage.pngData(),
-                videoData: videoData,
+                mediaURL: savedVideoURL,
+                thumbnailURL: thumbnailURL,
                 isVideo: true
             )
             
@@ -660,7 +677,12 @@ class HomeViewModel: ObservableObject {
         } catch {
             logger.error("Failed to process video: \(error.localizedDescription)")
             await MainActor.run {
-                isProcessing = false
+                // Remove the processing task on error
+                self.activeProcessingTasks.removeAll { $0.id == taskId }
+                // Clear isProcessing if no more tasks remain
+                if self.activeProcessingTasks.isEmpty {
+                    isProcessing = false
+                }
                 if error is TimeoutError {
                     errorMessage = "Video processing timed out. Please try a shorter video."
                 } else if let processingError = error as? ProcessingError {
@@ -998,11 +1020,38 @@ class HomeViewModel: ObservableObject {
         // Create document with initial sentences (including placeholders)
         logger.info("Created document with \(sentences.count) sentences")
         
+        // Save image to file
+        let documentId = UUID()
+        let imageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(documentId.uuidString).jpg")
+        if let imageData = image.pngData() {
+            try imageData.write(to: imageURL)
+        }
+        
+        // Create thumbnail
+        let thumbnailURL: URL?
+        let thumbnailSize = CGSize(width: 120, height: 120)
+        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+        let thumbnail = renderer.image { context in
+            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+        }
+        if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) {
+            let thumbURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(documentId.uuidString)_thumb.jpg")
+            try thumbnailData.write(to: thumbURL)
+            thumbnailURL = thumbURL
+        } else {
+            thumbnailURL = nil
+        }
+        
         let document = Document(
+            id: documentId,
             source: source,
             script: script,
             sentences: sentences,
-            imageData: image.pngData(),
+            mediaURL: imageURL,
+            thumbnailURL: thumbnailURL,
+            isVideo: false,
             assetIdentifier: assetIdentifier
         )
         

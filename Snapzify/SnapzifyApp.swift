@@ -110,7 +110,7 @@ struct ContentView: View {
     @State private var selectedDocument: Document?
     @State private var navigationPath = NavigationPath()
     @State private var actionExtensionImage: IdentifiableImage?
-    @State private var actionExtensionVideoURL: URL?
+    @State private var actionExtensionVideo: IdentifiableVideoURL?
     @StateObject private var homeVM: HomeViewModel
     
     private let logger = Logger(subsystem: "com.snapzify.app", category: "ContentView")
@@ -146,6 +146,26 @@ struct ContentView: View {
                         ActionExtensionLoadingView(image: identifiableImage.image, navigationPath: .constant(NavigationPath())) { document in
                             // Dismiss loading view and navigate to document
                             actionExtensionImage = nil
+                            
+                            // If a document is already selected, dismiss it first
+                            if selectedDocument != nil {
+                                selectedDocument = nil
+                                // Small delay to allow dismissal before setting new document
+                                Task { @MainActor in
+                                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                                    selectedDocument = document
+                                }
+                            } else {
+                                selectedDocument = document
+                            }
+                        }
+                    }
+                }
+                .fullScreenCover(item: $actionExtensionVideo) { identifiableVideo in
+                    NavigationStack {
+                        ActionExtensionVideoLoadingView(videoURL: identifiableVideo.url, navigationPath: .constant(NavigationPath())) { document in
+                            // Dismiss loading view and navigate to document
+                            actionExtensionVideo = nil
                             
                             // If a document is already selected, dismiss it first
                             if selectedDocument != nil {
@@ -244,42 +264,14 @@ struct ContentView: View {
                 let fileURL = tempDirectory.appendingPathComponent(fileName)
                 
                 if FileManager.default.fileExists(atPath: fileURL.path) {
-                    // Process video directly without loading screen
-                    Task {
-                        // Create a processing task
-                        let taskId = UUID()
-                        await MainActor.run {
-                            homeVM.activeProcessingTasks.append(HomeViewModel.ProcessingTask(
-                                id: taskId,
-                                name: "Shared Video",
-                                progress: "0%",
-                                progressValue: 0.0,
-                                totalFrames: 0,
-                                processedFrames: 0,
-                                type: .video,
-                                thumbnail: nil
-                            ))
-                            homeVM.isProcessing = true
-                        }
-                        
-                        // Process the video
-                        await homeVM.processPickedVideoWithTask(fileURL, taskId: taskId, checkVisibility: { true })
-                        
-                        // Clear the pending state
-                        await MainActor.run {
-                            appState.pendingActionVideo = nil
-                            appState.shouldProcessActionVideo = false
-                        }
-                        
-                        // Clean up the temp file
-                        try? FileManager.default.removeItem(at: fileURL)
-                        
-                        // Clean up the temp directory if empty
-                        if let contents = try? FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil),
-                           contents.isEmpty {
-                            try? FileManager.default.removeItem(at: tempDirectory)
-                        }
-                    }
+                    // Show loading view for video processing
+                    actionExtensionVideo = IdentifiableVideoURL(url: fileURL)
+                    
+                    // Clear the pending state
+                    appState.pendingActionVideo = nil
+                    appState.shouldProcessActionVideo = false
+                    
+                    // Note: Cleanup will be handled after processing in the loading view
                 } else {
                     // Clear invalid pending video
                     appState.pendingActionVideo = nil

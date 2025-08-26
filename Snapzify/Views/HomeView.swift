@@ -342,7 +342,8 @@ struct HomeView: View {
     private func documentRow(_ doc: DocumentMetadata, showPinIcon: Bool = true) -> some View {
         HStack(spacing: T.S.md) {
             Group {
-                if let thumbnailData = doc.thumbnailData,
+                if let thumbnailURL = doc.thumbnailURL,
+                   let thumbnailData = try? Data(contentsOf: thumbnailURL),
                    let uiImage = UIImage(data: thumbnailData) {
                     Image(uiImage: uiImage)
                         .resizable()

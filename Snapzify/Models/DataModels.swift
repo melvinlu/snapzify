@@ -58,14 +58,14 @@ enum SentenceStatus: Codable, Equatable, Hashable {
     }
 }
 
-// Lightweight version for list views (no image/video data)
+// Lightweight version for list views (no media data)
 struct DocumentMetadata: Identifiable, Codable, Hashable {
     let id: UUID
     let createdAt: Date
     let source: DocumentSource
     let script: ChineseScript
     let sentenceCount: Int
-    let thumbnailData: Data?  // Small thumbnail only
+    let thumbnailURL: URL?  // URL to thumbnail file
     let isVideo: Bool
     let isSaved: Bool
     let assetIdentifier: String?
@@ -82,19 +82,7 @@ struct DocumentMetadata: Identifiable, Codable, Hashable {
         self.isSaved = document.isSaved
         self.assetIdentifier = document.assetIdentifier
         self.customName = document.customName
-        
-        // Create small thumbnail from image data
-        if let imageData = document.imageData,
-           let image = UIImage(data: imageData) {
-            let targetSize = CGSize(width: 120, height: 120)
-            let renderer = UIGraphicsImageRenderer(size: targetSize)
-            let thumbnail = renderer.image { context in
-                image.draw(in: CGRect(origin: .zero, size: targetSize))
-            }
-            self.thumbnailData = thumbnail.jpegData(compressionQuality: 0.7)
-        } else {
-            self.thumbnailData = nil
-        }
+        self.thumbnailURL = document.thumbnailURL
     }
 }
 
@@ -104,21 +92,24 @@ struct Document: Identifiable, Codable, Hashable {
     let source: DocumentSource
     var script: ChineseScript
     var sentences: [Sentence]
-    var imageData: Data?
-    var videoData: Data?  // Store video data for playback
+    var mediaURL: URL?  // URL to media file (image or video)
+    var thumbnailURL: URL?  // URL to thumbnail file
     var isVideo: Bool
     var isSaved: Bool
     var assetIdentifier: String?  // PHAsset localIdentifier for photo library deletion
     var customName: String?  // User-defined name for the document
     
-    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, script: ChineseScript = .simplified, sentences: [Sentence] = [], imageData: Data? = nil, videoData: Data? = nil, isVideo: Bool = false, isSaved: Bool = false, assetIdentifier: String? = nil, customName: String? = nil) {
+    init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, 
+         script: ChineseScript = .simplified, sentences: [Sentence] = [], 
+         mediaURL: URL? = nil, thumbnailURL: URL? = nil, isVideo: Bool = false, 
+         isSaved: Bool = false, assetIdentifier: String? = nil, customName: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.source = source
         self.script = script
         self.sentences = sentences
-        self.imageData = imageData
-        self.videoData = videoData
+        self.mediaURL = mediaURL
+        self.thumbnailURL = thumbnailURL
         self.isVideo = isVideo
         self.isSaved = isSaved
         self.assetIdentifier = assetIdentifier

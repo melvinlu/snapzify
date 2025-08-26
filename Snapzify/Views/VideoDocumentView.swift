@@ -126,6 +126,7 @@ struct VideoDocumentView: View {
     @State private var chatGPTContext = ""
     @State private var showingRenameAlert = false
     @State private var newDocumentName = ""
+    @State private var showingTranscript = false
     @Environment(\.dismiss) private var dismiss
     
     private let frameInterval: TimeInterval = 0.2 // Must match extraction interval
@@ -138,9 +139,11 @@ struct VideoDocumentView: View {
                     .ignoresSafeArea()
                 
                 // Video frame viewer
-                if let videoData = vm.document.videoData {
+                if let mediaURL = vm.document.mediaURL {
+                    let _ = print("📹 VideoDocumentView: Loading video from URL: \(mediaURL)")
+                    let _ = print("📹 VideoDocumentView: File exists: \(FileManager.default.fileExists(atPath: mediaURL.path))")
                     VideoFrameViewer(
-                        videoData: videoData,
+                        videoURL: mediaURL,
                         sentences: vm.document.sentences,
                         currentFrameIndex: $currentFrameIndex,
                         totalFrames: $totalFrames,
@@ -232,6 +235,17 @@ struct VideoDocumentView: View {
                                 .background(Circle().fill(Color.black.opacity(0.5)))
                         }
                         
+                        // Transcript button
+                        Button {
+                            showingTranscript = true
+                        } label: {
+                            Image(systemName: "doc.text")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(Color.black.opacity(0.5)))
+                        }
+                        
                         // Pin/Save button
                         Button {
                             vm.toggleImageSave()
@@ -262,7 +276,7 @@ struct VideoDocumentView: View {
                 }
                 
                 // Frame navigation slider - always on top
-                if vm.document.videoData != nil {
+                if vm.document.mediaURL != nil {
                     VStack {
                         Spacer()
                         
@@ -310,6 +324,9 @@ struct VideoDocumentView: View {
         } message: {
             Text("Give this document a custom name")
         }
+        .sheet(isPresented: $showingTranscript) {
+            TranscriptView(document: vm.document, documentVM: vm)
+        }
         .onChange(of: vm.shouldDismiss) { shouldDismiss in
             if shouldDismiss {
                 dismiss()
@@ -351,7 +368,7 @@ struct VideoDocumentView: View {
 }
 
 struct VideoFrameViewer: UIViewRepresentable {
-    let videoData: Data
+    let videoURL: URL
     let sentences: [Sentence]
     @Binding var currentFrameIndex: Int
     @Binding var totalFrames: Int
@@ -365,11 +382,7 @@ struct VideoFrameViewer: UIViewRepresentable {
         view.frameInterval = frameInterval
         view.onSentenceTap = onSentenceTap
         
-        // Save video to temp file
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_video_\(UUID().uuidString).mov")
-        try? videoData.write(to: tempURL)
-        
-        view.setupVideo(with: tempURL) { duration, frames in
+        view.setupVideo(with: videoURL) { duration, frames in
             DispatchQueue.main.async {
                 self.videoDuration = duration
                 self.totalFrames = frames
@@ -405,6 +418,9 @@ class VideoFrameUIView: UIView {
     }
     
     func setupVideo(with url: URL, completion: @escaping (TimeInterval, Int) -> Void) {
+        print("📹 VideoFrameUIView: Setting up video with URL: \(url)")
+        print("📹 VideoFrameUIView: File exists: \(FileManager.default.fileExists(atPath: url.path))")
+        
         asset = AVAsset(url: url)
         
         // Setup player for displaying frames
@@ -436,19 +452,27 @@ class VideoFrameUIView: UIView {
             let durationSeconds = CMTimeGetSeconds(duration)
             let totalFrames = Int(ceil(durationSeconds / frameInterval))
             
+            print("📹 VideoFrameUIView: Video duration: \(durationSeconds) seconds, total frames: \(totalFrames)")
+            
             await MainActor.run {
                 completion(durationSeconds, totalFrames)
+                // Show first frame
+                self.showFrame(at: 0)
             }
         }
     }
     
     func showFrame(at frameIndex: Int) {
-        guard frameIndex != currentFrameIndex else { return }
+        // Allow showing frame 0 even if currentFrameIndex is 0 for initial setup
+        if frameIndex == currentFrameIndex && frameIndex != 0 { return }
+        
+        print("📹 VideoFrameUIView: Showing frame \(frameIndex) (was \(currentFrameIndex))")
         currentFrameIndex = frameIndex
         
         let timeInSeconds = Double(frameIndex) * frameInterval
         let time = CMTime(seconds: timeInSeconds, preferredTimescale: 600)
         
+        print("📹 VideoFrameUIView: Seeking to time \(timeInSeconds) seconds")
         // Seek to the specific frame
         player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
