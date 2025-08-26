@@ -313,7 +313,7 @@ class HomeViewModel: ObservableObject {
                     rangeInImage: primaryBbox,
                     tokens: [],
                     pinyin: [],
-                    english: "Generating...",
+                    english: nil, // Don't set "Generating..." - will translate on-demand
                     status: .ocrOnly,
                     timestamp: appearances.first?.timestamp, // Keep first timestamp for compatibility
                     frameAppearances: appearances // Store all appearances
@@ -326,74 +326,8 @@ class HomeViewModel: ObservableObject {
             
             logger.info("Found \(allSentences.count) unique Chinese sentences across all frames")
             
-            // Process translations BEFORE creating the document
+            // Skip translations - will be done on-demand
             let script = ChineseScript(rawValue: selectedScript) ?? .simplified
-            let chineseTexts = allSentences.map { $0.text }
-            
-            logger.info("Processing translations for \(chineseTexts.count) sentences")
-            
-            var translatedSentences = allSentences
-            
-            // Process in batches of 20 sentences to avoid API limits
-            let batchSize = 20
-            var allProcessed: [StreamingProcessedSentence] = []
-            
-            for batchStart in stride(from: 0, to: chineseTexts.count, by: batchSize) {
-                let batchEnd = min(batchStart + batchSize, chineseTexts.count)
-                let batchTexts = Array(chineseTexts[batchStart..<batchEnd])
-                
-                logger.info("Processing batch \(batchStart/batchSize + 1) of \(Int(ceil(Double(chineseTexts.count)/Double(batchSize)))): sentences \(batchStart+1)-\(batchEnd)")
-                
-                do {
-                    var batchProcessed: [StreamingProcessedSentence] = []
-                    
-                    try await streamingChineseProcessingService.processStreamingBatch(
-                        batchTexts,
-                        script: script
-                    ) { processedSentence in
-                        // Adjust index to be relative to the full array
-                        let adjustedSentence = StreamingProcessedSentence(
-                            chinese: processedSentence.chinese,
-                            pinyin: processedSentence.pinyin,
-                            english: processedSentence.english,
-                            index: batchStart + processedSentence.index
-                        )
-                        batchProcessed.append(adjustedSentence)
-                    }
-                    
-                    allProcessed.append(contentsOf: batchProcessed)
-                    logger.info("Successfully processed batch with \(batchProcessed.count) sentences")
-                    
-                    // Small delay between batches to avoid rate limiting
-                    if batchEnd < chineseTexts.count {
-                        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
-                    }
-                } catch {
-                    logger.error("Failed to process batch starting at \(batchStart): \(error)")
-                    // Continue with next batch even if this one fails
-                }
-            }
-            
-            // Update all sentences with their processed data
-            for processedItem in allProcessed {
-                let index = processedItem.index
-                guard index < translatedSentences.count else { continue }
-                
-                let originalSentence = translatedSentences[index]
-                translatedSentences[index] = Sentence(
-                    id: originalSentence.id,
-                    text: processedItem.chinese,
-                    rangeInImage: originalSentence.rangeInImage,
-                    tokens: [],
-                    pinyin: processedItem.pinyin,
-                    english: processedItem.english,
-                    status: .translated,
-                    timestamp: originalSentence.timestamp,
-                    frameAppearances: originalSentence.frameAppearances // Preserve frame appearances
-                )
-            }
-            
-            logger.info("Successfully processed \(allProcessed.count) translations out of \(chineseTexts.count) total")
             
             // Use the first frame as the representative image
             let representativeImage = frames.first!
@@ -401,11 +335,11 @@ class HomeViewModel: ObservableObject {
             // Load video data
             let videoData = try Data(contentsOf: videoURL)
             
-            // Create document with fully translated sentences
+            // Create document with OCR-only sentences (no translations yet)
             let document = Document(
                 source: .imported,
                 script: script,
-                sentences: translatedSentences,
+                sentences: allSentences,
                 imageData: representativeImage.pngData(),
                 videoData: videoData,
                 isVideo: true

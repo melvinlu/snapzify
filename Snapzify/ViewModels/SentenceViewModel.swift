@@ -74,7 +74,7 @@ class SentenceViewModel: ObservableObject {
     }
     
     func translateIfNeeded() async {
-        guard sentence.english == nil,
+        guard sentence.english == nil || sentence.english == "Generating...",
               translationService.isConfigured() else { return }
         
         isTranslating = true

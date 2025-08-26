@@ -3,13 +3,15 @@ import AVKit
 
 struct VideoDocumentView: View {
     @StateObject var vm: DocumentViewModel
-    @State private var player: AVPlayer?
-    @State private var isPlaying = true
-    @State private var currentTime: TimeInterval = 0
+    @State private var currentFrameIndex: Int = 0
+    @State private var totalFrames: Int = 1
+    @State private var videoDuration: TimeInterval = 0
     @State private var selectedSentenceId: UUID?
     @State private var showingPopup = false
     @State private var tapLocation: CGPoint = .zero
     @Environment(\.dismiss) private var dismiss
+    
+    private let frameInterval: TimeInterval = 0.2 // Must match extraction interval
     
     var body: some View {
         GeometryReader { geometry in
@@ -18,35 +20,20 @@ struct VideoDocumentView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                // Video player with overlay
+                // Video frame viewer
                 if let videoData = vm.document.videoData {
-                    ZStack {
-                        VideoPlayerWithOverlay(
-                            videoData: videoData,
-                            sentences: vm.document.sentences,
-                            currentTime: $currentTime,
-                            isPlaying: $isPlaying,
-                            onSentenceTap: handleSentenceTap
-                        )
-                        
-                        // Play button overlay when paused
-                        if !isPlaying {
-                            Circle()
-                                .fill(Color.black.opacity(0.6))
-                                .frame(width: 80, height: 80)
-                                .overlay(
-                                    Image(systemName: "play.fill")
-                                        .foregroundColor(.white)
-                                        .font(.system(size: 40))
-                                )
-                                .transition(.scale.combined(with: .opacity))
-                                .animation(.easeInOut(duration: 0.2), value: isPlaying)
-                                .allowsHitTesting(false) // Don't block taps
-                        }
-                    }
+                    VideoFrameViewer(
+                        videoData: videoData,
+                        sentences: vm.document.sentences,
+                        currentFrameIndex: $currentFrameIndex,
+                        totalFrames: $totalFrames,
+                        videoDuration: $videoDuration,
+                        frameInterval: frameInterval,
+                        onSentenceTap: handleSentenceTap
+                    )
                 }
                 
-                // Popup overlay
+                // Popup overlay (behind slider)
                 if showingPopup,
                    let sentenceId = selectedSentenceId,
                    let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
@@ -58,7 +45,7 @@ struct VideoDocumentView: View {
                         .onTapGesture {
                             withAnimation {
                                 showingPopup = false
-                                isPlaying = true // Resume video
+                                // Keep video paused - user needs to tap again to resume
                             }
                         }
                     
@@ -117,6 +104,35 @@ struct VideoDocumentView: View {
                     
                     Spacer()
                 }
+                
+                // Frame navigation slider - always on top
+                if vm.document.videoData != nil {
+                    VStack {
+                        Spacer()
+                        
+                        Slider(
+                            value: Binding(
+                                get: { Double(currentFrameIndex) },
+                                set: { newValue in
+                                    currentFrameIndex = Int(newValue)
+                                    // Dismiss popup when slider is used
+                                    if showingPopup {
+                                        withAnimation {
+                                            showingPopup = false
+                                        }
+                                    }
+                                }
+                            ),
+                            in: 0...Double(max(totalFrames - 1, 1)),
+                            step: 1
+                        )
+                        .tint(.white)
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+                        .background(Color.black.opacity(0.8))
+                    }
+                    .zIndex(100) // Always on top
+                }
             }
         }
         .navigationBarHidden(true)
@@ -136,61 +152,72 @@ struct VideoDocumentView: View {
     }
     
     private func handleSentenceTap(_ sentence: Sentence, at location: CGPoint) {
-        print("🎯 Tapped sentence in video: text='\(sentence.text)', timestamp=\(sentence.timestamp ?? -1)")
+        print("🎯 Tapped sentence in video: text='\(sentence.text)', frame=\(currentFrameIndex)")
         
+        // Always show popup immediately
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedSentenceId = sentence.id
             tapLocation = location
             showingPopup = true
-            isPlaying = false // Pause video when showing popup
+        }
+        
+        // Check if sentence needs translation
+        if sentence.english == nil || sentence.english == "Generating..." {
+            // Get or create the sentence view model to handle translation
+            let sentenceVM = vm.createSentenceViewModel(for: sentence)
+            
+            // Trigger translation in background
+            Task {
+                await sentenceVM.translateIfNeeded()
+            }
         }
     }
 }
 
-struct VideoPlayerWithOverlay: UIViewRepresentable {
+struct VideoFrameViewer: UIViewRepresentable {
     let videoData: Data
     let sentences: [Sentence]
-    @Binding var currentTime: TimeInterval
-    @Binding var isPlaying: Bool
+    @Binding var currentFrameIndex: Int
+    @Binding var totalFrames: Int
+    @Binding var videoDuration: TimeInterval
+    let frameInterval: TimeInterval
     let onSentenceTap: (Sentence, CGPoint) -> Void
     
-    func makeUIView(context: Context) -> VideoPlayerUIView {
-        let view = VideoPlayerUIView()
+    func makeUIView(context: Context) -> VideoFrameUIView {
+        let view = VideoFrameUIView()
         view.sentences = sentences
+        view.frameInterval = frameInterval
         view.onSentenceTap = onSentenceTap
-        view.onPlaybackStateChanged = { playing in
-            DispatchQueue.main.async {
-                self.isPlaying = playing
-            }
-        }
         
         // Save video to temp file
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_video_\(UUID().uuidString).mov")
         try? videoData.write(to: tempURL)
         
-        view.setupPlayer(with: tempURL)
+        view.setupVideo(with: tempURL) { duration, frames in
+            DispatchQueue.main.async {
+                self.videoDuration = duration
+                self.totalFrames = frames
+            }
+        }
+        
         return view
     }
     
-    func updateUIView(_ uiView: VideoPlayerUIView, context: Context) {
-        if isPlaying {
-            uiView.play()
-        } else {
-            uiView.pause()
-        }
+    func updateUIView(_ uiView: VideoFrameUIView, context: Context) {
+        uiView.showFrame(at: currentFrameIndex)
     }
 }
 
-class VideoPlayerUIView: UIView {
+class VideoFrameUIView: UIView {
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
-    private var highlightLayers: [CALayer] = []
-    private var timeObserver: Any?
-    private var currentPlaybackTime: TimeInterval = 0
+    private var asset: AVAsset?
+    private var imageGenerator: AVAssetImageGenerator?
+    private var currentFrameIndex: Int = 0
     
     var sentences: [Sentence] = []
+    var frameInterval: TimeInterval = 0.2
     var onSentenceTap: ((Sentence, CGPoint) -> Void)?
-    var onPlaybackStateChanged: ((Bool) -> Void)?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -201,7 +228,10 @@ class VideoPlayerUIView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
     
-    func setupPlayer(with url: URL) {
+    func setupVideo(with url: URL, completion: @escaping (TimeInterval, Int) -> Void) {
+        asset = AVAsset(url: url)
+        
+        // Setup player for displaying frames
         player = AVPlayer(url: url)
         playerLayer = AVPlayerLayer(player: player)
         playerLayer?.videoGravity = .resizeAspect
@@ -210,26 +240,41 @@ class VideoPlayerUIView: UIView {
             layer.addSublayer(playerLayer)
         }
         
+        // Pause immediately - we'll seek to show specific frames
+        player?.pause()
+        
+        // Setup image generator for frame extraction
+        imageGenerator = AVAssetImageGenerator(asset: asset!)
+        imageGenerator?.appliesPreferredTrackTransform = true
+        imageGenerator?.requestedTimeToleranceAfter = .zero
+        imageGenerator?.requestedTimeToleranceBefore = .zero
+        
         // Add tap gesture recognizer
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         addGestureRecognizer(tapGesture)
         
-        // Start playback
-        player?.play()
-        
-        // Observe time to track current playback position for tap detection
-        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            self?.currentPlaybackTime = CMTimeGetSeconds(time)
+        // Calculate total frames
+        Task {
+            guard let asset = asset else { return }
+            let duration = try await asset.load(.duration)
+            let durationSeconds = CMTimeGetSeconds(duration)
+            let totalFrames = Int(ceil(durationSeconds / frameInterval))
+            
+            await MainActor.run {
+                completion(durationSeconds, totalFrames)
+            }
         }
+    }
+    
+    func showFrame(at frameIndex: Int) {
+        guard frameIndex != currentFrameIndex else { return }
+        currentFrameIndex = frameIndex
         
-        // Loop video
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(playerItemDidReachEnd),
-            name: .AVPlayerItemDidPlayToEndTime,
-            object: player?.currentItem
-        )
+        let timeInSeconds = Double(frameIndex) * frameInterval
+        let time = CMTime(seconds: timeInSeconds, preferredTimescale: 600)
+        
+        // Seek to the specific frame
+        player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
     
     override func layoutSubviews() {
@@ -262,17 +307,18 @@ class VideoPlayerUIView: UIView {
         let scaleX = videoRect.width / videoSize.width
         let scaleY = videoRect.height / videoSize.height
         
-        var tappedOnSentence = false
+        // Calculate current timestamp from frame index
+        let currentTimestamp = Double(currentFrameIndex) * frameInterval
         
         for sentence in sentences {
             var rect: CGRect? = nil
             
-            // If this is a video with frame appearances, find the appropriate bbox for current time
+            // If this is a video with frame appearances, find the appropriate bbox for current frame
             if let appearances = sentence.frameAppearances, !appearances.isEmpty {
-                // Find the frame appearance closest to current time
-                // We consider a sentence visible if we're within 0.15 seconds of a frame where it appears
+                // Find the frame appearance closest to current timestamp
+                // We consider a sentence visible if we're within 0.15 seconds (most of a frame)
                 for appearance in appearances {
-                    if abs(currentPlaybackTime - appearance.timestamp) <= 0.15 {
+                    if abs(currentTimestamp - appearance.timestamp) <= 0.15 {
                         rect = appearance.bbox
                         break
                     }
@@ -298,42 +344,16 @@ class VideoPlayerUIView: UIView {
             
             if sentenceFrame.contains(location) {
                 onSentenceTap?(sentence, location)
-                tappedOnSentence = true
-                break
+                return // Found a sentence, exit
             }
         }
         
-        // If tap was not on any sentence, toggle play/pause
-        if !tappedOnSentence {
-            if player.rate > 0 {
-                player.pause()
-                onPlaybackStateChanged?(false)
-            } else {
-                player.play()
-                onPlaybackStateChanged?(true)
-            }
-        }
-    }
-    
-    @objc private func playerItemDidReachEnd() {
-        player?.seek(to: .zero)
-        player?.play()
-    }
-    
-    func play() {
-        player?.play()
-        onPlaybackStateChanged?(true)
-    }
-    
-    func pause() {
-        player?.pause()
-        onPlaybackStateChanged?(false)
+        // Tap was not on any sentence - do nothing (no-op)
+        // The slider handles frame navigation
     }
     
     deinit {
-        if let observer = timeObserver {
-            player?.removeTimeObserver(observer)
-        }
+        // Clean up if needed
     }
 }
 

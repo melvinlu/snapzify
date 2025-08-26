@@ -37,8 +37,16 @@ struct SelectedSentencePopup: View {
                     .foregroundStyle(T.C.ink2)
             }
             
-            // English translation
-            if let english = sentence.english {
+            // English translation or loading indicator
+            if vm.isTranslating {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Translating...")
+                        .font(.system(size: 16))
+                        .foregroundStyle(T.C.ink2)
+                }
+            } else if let english = sentence.english, english != "Generating..." {
                 Text(english)
                     .font(.system(size: 16))
                     .foregroundStyle(T.C.ink2)
