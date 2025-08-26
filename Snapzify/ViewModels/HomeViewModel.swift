@@ -16,6 +16,25 @@ class HomeViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var showPhotoPicker = false
     @Published var errorMessage: String?
+    @Published var processingProgress: String = ""
+    @Published var activeProcessingTasks: [ProcessingTask] = []
+    
+    struct ProcessingTask: Identifiable {
+        let id: UUID
+        var name: String
+        var progress: String
+        var progressValue: Double // 0.0 to 1.0
+        var totalFrames: Int
+        var processedFrames: Int
+        var type: ProcessingType
+        var thumbnail: UIImage?
+        
+        enum ProcessingType {
+            case image
+            case video
+            case shared
+        }
+    }
     
     private var hasLoadedDocuments = false
     private let store: DocumentStore
@@ -146,11 +165,40 @@ class HomeViewModel: ObservableObject {
         guard let info = latestInfo else { return }
         
         Task {
-            isProcessing = true
-            // Note: isProcessing is cleared in processImage after document is created
+            // Create processing task immediately
+            let taskId = UUID()
+            
+            await MainActor.run {
+                let task = ProcessingTask(
+                    id: taskId,
+                    name: "Photo",
+                    progress: "Loading",
+                    progressValue: 0.0,
+                    totalFrames: 0,
+                    processedFrames: 0,
+                    type: .image,
+                    thumbnail: nil
+                )
+                self.activeProcessingTasks.append(task)
+                isProcessing = true
+            }
             
             do {
                 let image = try await loadImage(from: info.asset)
+                
+                // Create and update thumbnail
+                let thumbnailSize = CGSize(width: 60, height: 60)
+                await MainActor.run {
+                    UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
+                    image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                    let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
+                    UIGraphicsEndImageContext()
+                    
+                    if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                        self.activeProcessingTasks[index].thumbnail = thumbnailImage
+                        self.activeProcessingTasks[index].progress = "Processing"
+                    }
+                }
                 
                 // Add 60-second timeout to image processing
                 _ = try await withTimeout(seconds: 60) {
@@ -160,10 +208,14 @@ class HomeViewModel: ObservableObject {
                 // Document is already saved in processImage
                 shouldSuggestLatest = false
                 
-                // No need to refresh - document is already added to the list in processImage
+                // Remove task after successful completion
+                await MainActor.run {
+                    self.activeProcessingTasks.removeAll { $0.id == taskId }
+                }
             } catch {
                 print("Failed to snapzify screenshot: \(error)")
                 await MainActor.run {
+                    self.activeProcessingTasks.removeAll { $0.id == taskId }
                     isProcessing = false  // Clear on error
                     if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
@@ -218,11 +270,34 @@ class HomeViewModel: ObservableObject {
     
     func processPickedImage(_ image: UIImage) {
         Task {
+            // Create processing task immediately
+            let taskId = UUID()
+            
+            // Create thumbnail
+            let thumbnailSize = CGSize(width: 60, height: 60)
+            let thumbnail = await MainActor.run {
+                UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
+                image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
+                UIGraphicsEndImageContext()
+                return thumbnailImage
+            }
+            
             await MainActor.run {
+                let task = ProcessingTask(
+                    id: taskId,
+                    name: "Image",
+                    progress: "Processing",
+                    progressValue: 0.0,
+                    totalFrames: 0,
+                    processedFrames: 0,
+                    type: .image,
+                    thumbnail: thumbnail
+                )
+                self.activeProcessingTasks.append(task)
                 isProcessing = true
                 errorMessage = nil
             }
-            // Note: isProcessing is cleared in processImage after document is created
             
             do {
                 logger.info("Starting image snapzifying")
@@ -237,9 +312,15 @@ class HomeViewModel: ObservableObject {
                 // Document is also already added to the list in processImage
                 logger.info("Snapzifying completed, updating UI")
                 logger.debug("Documents reloaded")
+                
+                // Remove task after successful completion
+                await MainActor.run {
+                    self.activeProcessingTasks.removeAll { $0.id == taskId }
+                }
             } catch {
                 logger.error("Failed to snapzify picked image: \(error.localizedDescription)")
                 await MainActor.run {
+                    self.activeProcessingTasks.removeAll { $0.id == taskId }
                     isProcessing = false  // Clear on error
                     if error is TimeoutError {
                         errorMessage = "Snapzifying timed out. Please try again with a simpler image."
@@ -256,8 +337,27 @@ class HomeViewModel: ObservableObject {
     }
     
     func processPickedVideo(_ videoURL: URL) async {
-        // Note: isProcessing is already set to true by the PhotosPicker onChange handler
-        // Just clear any previous error message
+        // Create a task ID and delegate to the new method
+        let taskId = UUID()
+        await MainActor.run {
+            let task = ProcessingTask(
+                id: taskId,
+                name: "Video",
+                progress: "Processing",
+                progressValue: 0.0,
+                totalFrames: 0,
+                processedFrames: 0,
+                type: .video,
+                thumbnail: nil
+            )
+            self.activeProcessingTasks.append(task)
+            self.isProcessing = true
+        }
+        await processPickedVideoWithTask(videoURL, taskId: taskId)
+    }
+    
+    func processPickedVideoWithTask(_ videoURL: URL, taskId: UUID) async {
+        // The task is already created with "Uploading" status
         await MainActor.run {
             errorMessage = nil
         }
@@ -265,15 +365,47 @@ class HomeViewModel: ObservableObject {
         do {
             logger.info("Starting video processing from URL: \(videoURL)")
             
+            // Update task status from "Uploading" to processing
+            await MainActor.run {
+                if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                    self.activeProcessingTasks[index].progress = "Processing"
+                }
+            }
+            
             // Extract frames from video
             // Extract frames every 0.2 seconds for real-time tappability
             let frames = try await extractFramesFromVideo(videoURL, frameInterval: 0.2)
             
             guard !frames.isEmpty else {
+                await MainActor.run {
+                    self.activeProcessingTasks.removeAll { $0.id == taskId }
+                }
                 throw ProcessingError.noFramesExtracted
             }
             
             logger.info("Extracted \(frames.count) frames from video")
+            
+            // Create thumbnail from first frame and update task
+            if let firstFrame = frames.first {
+                let thumbnailSize = CGSize(width: 60, height: 60)
+                let thumbnail = await MainActor.run {
+                    UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
+                    firstFrame.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                    let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
+                    UIGraphicsEndImageContext()
+                    
+                    // Update task with thumbnail and frame count
+                    if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                        self.activeProcessingTasks[index].thumbnail = thumbnailImage
+                        self.activeProcessingTasks[index].totalFrames = frames.count
+                        self.activeProcessingTasks[index].processedFrames = 0
+                        self.activeProcessingTasks[index].progressValue = 0.0
+                        self.activeProcessingTasks[index].progress = "0%"
+                    }
+                    
+                    return thumbnailImage
+                }
+            }
             
             // Process all frames concurrently for OCR
             // Dictionary to track all appearances of each unique text
@@ -281,6 +413,8 @@ class HomeViewModel: ObservableObject {
             let frameInterval = 0.2 // seconds between frames (must match extraction interval)
             
             logger.info("Starting ULTRA-FAST concurrent OCR processing for \(frames.count) frames")
+            
+            var processedCount = 0
             
             // Process ALL frames concurrently with smart batching
             // Google Cloud Vision allows up to 30 requests per second, but we can queue more
@@ -302,6 +436,17 @@ class HomeViewModel: ObservableObject {
                     var allResults: [(Int, [OCRLine])] = []
                     for try await result in group {
                         allResults.append(result)
+                        processedCount += 1
+                        
+                        // Update progress percentage
+                        let percentage = Int((Double(processedCount) / Double(frames.count)) * 100)
+                        await MainActor.run {
+                            if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                                self.activeProcessingTasks[index].processedFrames = processedCount
+                                self.activeProcessingTasks[index].progressValue = Double(processedCount) / Double(frames.count)
+                                self.activeProcessingTasks[index].progress = "\(percentage)%"
+                            }
+                        }
                     }
                     return allResults
                 }
@@ -349,6 +494,17 @@ class HomeViewModel: ObservableObject {
                         var results: [(Int, [OCRLine])] = []
                         for try await result in group {
                             results.append(result)
+                            processedCount += 1
+                            
+                            // Update progress percentage
+                            let percentage = Int((Double(processedCount) / Double(frames.count)) * 100)
+                            await MainActor.run {
+                                if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                                    self.activeProcessingTasks[index].processedFrames = processedCount
+                                    self.activeProcessingTasks[index].progressValue = Double(processedCount) / Double(frames.count)
+                                    self.activeProcessingTasks[index].progress = "\(percentage)%"
+                                }
+                            }
                         }
                         return results
                     }
@@ -430,6 +586,8 @@ class HomeViewModel: ObservableObject {
             await MainActor.run {
                 self.documents.insert(savedDocument, at: 0)
                 self.isProcessing = false
+                // Remove the processing task
+                self.activeProcessingTasks.removeAll { $0.id == taskId }
                 self.onOpenDocument(savedDocument)
             }
             
@@ -642,6 +800,51 @@ class HomeViewModel: ObservableObject {
         assetIdentifier: String? = nil,
         shouldNavigate: Bool
     ) async throws -> Document {
+        // Create a new processing task
+        let taskId = UUID()
+        let taskName = source == .shareExtension ? "Shared Image" : 
+                       source == .photos ? "Photo" : "Image"
+        
+        // Create a small thumbnail
+        let thumbnailSize = CGSize(width: 60, height: 60)
+        let thumbnail = await MainActor.run {
+            UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
+            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+            let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+            return thumbnailImage
+        }
+        
+        await MainActor.run {
+            let task = ProcessingTask(
+                id: taskId,
+                name: taskName,
+                progress: "Processing",
+                progressValue: 0.0,
+                totalFrames: 0,
+                processedFrames: 0,
+                type: source == .shareExtension ? .shared : .image,
+                thumbnail: thumbnail
+            )
+            self.activeProcessingTasks.append(task)
+        }
+        
+        // Helper to update task progress
+        @Sendable func updateTaskProgress(_ progress: String) async {
+            await MainActor.run {
+                if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                    self.activeProcessingTasks[index].progress = progress
+                }
+            }
+        }
+        
+        // Helper to remove task when done
+        @Sendable func removeTask() async {
+            await MainActor.run {
+                self.activeProcessingTasks.removeAll { $0.id == taskId }
+            }
+        }
+        
         logger.info("About to call OCR service")
         let ocrLines = try await ocrService.recognizeText(in: image)
         logger.info("OCR completed, got \(ocrLines.count) lines")
@@ -704,8 +907,11 @@ class HomeViewModel: ObservableObject {
         // If no Chinese content found, throw an error
         if !hasChineseContent {
             logger.warning("No Chinese content detected, throwing error")
+            await removeTask()
             throw ProcessingError.noChineseDetected
         }
+        
+        // No need to update progress for images - they process quickly
         
         // Create document with initial sentences (including placeholders)
         logger.info("Created document with \(sentences.count) sentences")
@@ -740,11 +946,21 @@ class HomeViewModel: ObservableObject {
                 // Clear processing flag for shared images since document is now visible
                 self.isProcessingSharedImage = false
             }
+            
+            // Remove the task when navigation happens
+            if shouldNavigate {
+                self.activeProcessingTasks.removeAll { $0.id == taskId }
+            }
         }
         
         // Second pass: stream process Chinese lines with concurrent requests
         if !chineseLinesToProcess.isEmpty {
             logger.info("Stream processing \(chineseLinesToProcess.count) Chinese lines")
+            
+            // Update progress
+            await MainActor.run {
+                self.processingProgress = "Translating \(chineseLinesToProcess.count) sentences..."
+            }
             
             do {
                 // Store a reference to the document for updates
@@ -757,6 +973,15 @@ class HomeViewModel: ObservableObject {
                     guard let self = self else { return }
                     
                     logger.info("🔄 Received processed sentence \(processed.index): english='\(processed.english)', pinyin=\(processed.pinyin)")
+                    
+                    // Update progress (Note: This callback is not async)
+                    Task { @MainActor in
+                        self.processingProgress = "Translating... (\(processed.index + 1)/\(chineseLinesToProcess.count))"
+                        
+                        if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
+                            self.activeProcessingTasks[index].progress = "Translating... (\(processed.index + 1)/\(chineseLinesToProcess.count))"
+                        }
+                    }
                     
                     // Update sentence as soon as it's processed
                     let sentenceIndex = chineseLineIndices[processed.index]
@@ -830,6 +1055,9 @@ class HomeViewModel: ObservableObject {
                 }
             }
         }
+        
+        // Clean up task if not already removed (e.g., when not navigating)
+        await removeTask()
         
         return savedDocument
     }

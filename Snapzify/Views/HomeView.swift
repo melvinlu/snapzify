@@ -38,7 +38,17 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: T.S.lg) {
                         
-                        if vm.isProcessing {
+                        // Show all active processing tasks
+                        ForEach(vm.activeProcessingTasks) { task in
+                            processingTaskView(task: task)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                    removal: .move(edge: .top).combined(with: .opacity)
+                                ))
+                        }
+                        
+                        // Legacy processing indicator (fallback)
+                        if vm.isProcessing && vm.activeProcessingTasks.isEmpty {
                             processingIndicator
                         }
                         
@@ -112,29 +122,43 @@ struct HomeView: View {
                 if let newValue {
                     print("Media selected, loading data...")
                     
-                    // Show processing indicator IMMEDIATELY
+                    // Create processing task IMMEDIATELY with "Uploading" status
+                    let taskId = UUID()
                     await MainActor.run {
+                        let task = HomeViewModel.ProcessingTask(
+                            id: taskId,
+                            name: "Media",
+                            progress: "Uploading",
+                            progressValue: 0.0,
+                            totalFrames: 0,
+                            processedFrames: 0,
+                            type: .video,
+                            thumbnail: nil
+                        )
+                        vm.activeProcessingTasks.append(task)
                         vm.isProcessing = true
                     }
                     
                     // Check if it's a video
                     if let movie = try? await newValue.loadTransferable(type: Movie.self) {
                         print("Video loaded successfully, processing...")
-                        // isProcessing is already true, just process the video
-                        await vm.processPickedVideo(movie.url)
+                        // Pass the taskId to continue tracking
+                        await vm.processPickedVideoWithTask(movie.url, taskId: taskId)
                     }
                     // Otherwise try as image
                     else if let data = try? await newValue.loadTransferable(type: Data.self),
                             let image = UIImage(data: data) {
                         print("Image loaded successfully, snapzifying...")
-                        // For images, processPickedImage will handle setting isProcessing
+                        // Remove the upload task and let processPickedImage create its own
                         await MainActor.run {
-                            vm.isProcessing = false // Reset before calling processPickedImage
+                            vm.activeProcessingTasks.removeAll { $0.id == taskId }
+                            vm.isProcessing = false
                         }
                         vm.processPickedImage(image)
                     } else {
                         print("Failed to load media data")
                         await MainActor.run {
+                            vm.activeProcessingTasks.removeAll { $0.id == taskId }
                             vm.isProcessing = false
                             vm.errorMessage = "Failed to load media file"
                         }
@@ -446,6 +470,38 @@ struct HomeView: View {
             Text("Snapzifying...")
                 .foregroundStyle(T.C.ink2)
                 .font(.subheadline)
+        }
+        .padding()
+        .card()
+    }
+    
+    @ViewBuilder
+    private func processingTaskView(task: HomeViewModel.ProcessingTask) -> some View {
+        HStack(spacing: T.S.md) {
+            // Thumbnail
+            if let thumbnail = task.thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(T.C.ink.opacity(0.1))
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                    }
+            }
+            
+            Spacer()
+            
+            // Just show the percentage
+            Text(task.progress)
+                .font(.system(size: 18, weight: .medium, design: .monospaced))
+                .foregroundStyle(T.C.ink)
+                .frame(minWidth: 50, alignment: .trailing)
         }
         .padding()
         .card()
