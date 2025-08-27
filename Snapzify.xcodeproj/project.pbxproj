@@ -40,6 +40,7 @@
 		3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A371234567890123467 /* VersionHistoryView.swift */; };
 		3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A391234567890123468 /* VideoDocumentView.swift */; };
 		3D9B1A381234567890123470 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A391234567890123469 /* TranscriptView.swift */; };
+		3D9B1A381234567890123471 /* SentenceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A39123456789012346A /* SentenceDetailView.swift */; };
 		408EE21643E4AE8A216691B0 /* ActionIcon@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */; };
 		48B5B75E4312202E118FFB46 /* ActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5E7351685F648D10E0213F08 /* ActionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0646378E12D0819C51E3B5FA /* ActionViewController.swift */; };
@@ -128,6 +129,7 @@
 		3D9B1A371234567890123467 /* VersionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionHistoryView.swift; sourceTree = "<group>"; };
 		3D9B1A391234567890123468 /* VideoDocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDocumentView.swift; sourceTree = "<group>"; };
 		3D9B1A391234567890123469 /* TranscriptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptView.swift; sourceTree = "<group>"; };
+		3D9B1A39123456789012346A /* SentenceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceDetailView.swift; sourceTree = "<group>"; };
 		518E226ED0401075BE5C372C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		7FBD0CFE852306298E69989D /* MainInterface.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; name = MainInterface.storyboard; path = ActionExtension/MainInterface.storyboard; sourceTree = "<group>"; };
 		875ABEB622C89CF71AF70FD1 /* ChineseDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChineseDetector.swift; path = ChineseDetector.swift; sourceTree = "<group>"; };
@@ -234,6 +236,7 @@
 				3D9B1A1F1234567890123456 /* SettingsView.swift */,
 				3D9B1A391234567890123468 /* VideoDocumentView.swift */,
 				3D9B1A391234567890123469 /* TranscriptView.swift */,
+				3D9B1A39123456789012346A /* SentenceDetailView.swift */,
 				0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */,
 				0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */,
 			);
@@ -444,6 +447,7 @@
 				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
 				3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */,
 				3D9B1A381234567890123470 /* TranscriptView.swift in Sources */,
+				3D9B1A381234567890123471 /* SentenceDetailView.swift in Sources */,
 				3D9B1A341234567890123464 /* ShimmerView.swift in Sources */,
 				3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */,
 				3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */,
