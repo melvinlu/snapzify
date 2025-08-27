@@ -332,6 +332,9 @@ struct DocumentView: View {
     @State private var chatGPTContext = ""
     @State private var showingRenameAlert = false
     @State private var newDocumentName = ""
+    @State private var showingTranscript = false
+    @State private var transcriptDragOffset: CGFloat = 0
+    @State private var isDraggingTranscript = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -475,9 +478,13 @@ struct DocumentView: View {
                         }
                         
                         // Transcript button
-                        NavigationLink(destination: 
-                            TranscriptView(document: vm.document, documentVM: vm)
-                        ) {
+                        Button {
+                            withAnimation(.spring()) {
+                                showingTranscript = true
+                                isDraggingTranscript = true
+                                transcriptDragOffset = -geometry.size.width
+                            }
+                        } label: {
                             Image(systemName: "doc.text")
                                 .foregroundColor(.white)
                                 .font(.title2)
@@ -514,6 +521,71 @@ struct DocumentView: View {
                     Spacer()
                 }
             }
+            
+            // Dynamic transcript view that slides in from right
+            if isDraggingTranscript || transcriptDragOffset < 0 {
+                TranscriptView(document: vm.document, documentVM: vm)
+                    .frame(width: geometry.size.width)
+                    .background(Color.black)
+                    .offset(x: geometry.size.width + transcriptDragOffset)
+                    .transition(.move(edge: .trailing))
+                    .zIndex(200)
+                    .highPriorityGesture(
+                        DragGesture()
+                            .onChanged { value in
+                                // Allow dragging back to the right to dismiss
+                                if value.translation.width > 0 {
+                                    transcriptDragOffset = -geometry.size.width + value.translation.width
+                                }
+                            }
+                            .onEnded { value in
+                                withAnimation(.spring()) {
+                                    if value.translation.width > 100 {
+                                        // Dismiss if dragged right more than 100 points
+                                        transcriptDragOffset = 0
+                                        isDraggingTranscript = false
+                                        showingTranscript = false
+                                    } else {
+                                        // Snap back to open position
+                                        transcriptDragOffset = -geometry.size.width
+                                    }
+                                }
+                            }
+                    )
+            }
+            
+            // Invisible swipe area on the right edge
+            HStack {
+                Spacer()
+                Color.clear
+                    .frame(width: 30)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                isDraggingTranscript = true
+                                // Make the offset negative to pull view from right
+                                let dragAmount = min(0, value.translation.width)
+                                // Limit how far it can be pulled
+                                transcriptDragOffset = max(dragAmount, -geometry.size.width)
+                            }
+                            .onEnded { value in
+                                withAnimation(.spring()) {
+                                    if value.translation.width < -50 {
+                                        // If dragged enough, fully show transcript
+                                        transcriptDragOffset = -geometry.size.width
+                                        showingTranscript = true
+                                    } else {
+                                        // Otherwise, hide it
+                                        transcriptDragOffset = 0
+                                        isDraggingTranscript = false
+                                        showingTranscript = false
+                                    }
+                                }
+                            }
+                    )
+            }
+            .ignoresSafeArea()
         }
         .navigationBarHidden(true)
         .alert("Delete Document", isPresented: $vm.showDeleteImageAlert) {
