@@ -118,15 +118,25 @@ struct ContentView: View {
     
     init() {
         let container = ServiceContainer.shared
-        _homeVM = StateObject(wrappedValue: container.makeHomeViewModel(
+        let homeViewModel = container.makeHomeViewModel(
             onOpenSettings: { },
             onOpenDocument: { _ in }
-        ))
+        )
+        _homeVM = StateObject(wrappedValue: homeViewModel)
     }
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
             HomeView(vm: homeVM)
+                .onAppear {
+                    // Set up the callbacks after view appears
+                    homeVM.onOpenSettings = {
+                        showSettings = true
+                    }
+                    homeVM.onOpenDocument = { document in
+                        selectedDocument = document
+                    }
+                }
                 .navigationDestination(item: $selectedDocument) { document in
                     if document.isVideo {
                         VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))

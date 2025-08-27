@@ -41,8 +41,8 @@ class MediaStorageService {
     
     /// Save media data to disk and return the file URL
     func saveMedia(_ data: Data, id: UUID, isVideo: Bool) throws -> URL {
-        let extension = isVideo ? "mov" : "jpg"
-        let filename = "\(id.uuidString).\(extension)"
+        let fileExtension = isVideo ? "mov" : "jpg"
+        let filename = "\(id.uuidString).\(fileExtension)"
         let fileURL = mediaDirectory.appendingPathComponent(filename)
         
         try data.write(to: fileURL)

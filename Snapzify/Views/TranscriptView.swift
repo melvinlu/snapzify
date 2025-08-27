@@ -6,50 +6,38 @@ struct TranscriptView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(getUniqueSentences(), id: \.id) { sentence in
-                        NavigationLink(destination: 
-                            SentenceDetailView(
-                                sentence: sentence,
-                                document: document,
-                                documentVM: documentVM
-                            )
-                        ) {
-                            TranscriptItemView(sentence: sentence)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Divider between sentences
-                        if sentence.id != getUniqueSentences().last?.id {
-                            Divider()
-                                .background(T.C.divider.opacity(0.3))
-                                .padding(.horizontal, T.S.md)
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(getUniqueSentences(), id: \.id) { sentence in
+                    NavigationLink(destination: 
+                        SentenceDetailView(
+                            sentence: sentence,
+                            document: document,
+                            documentVM: documentVM
+                        )
+                    ) {
+                        TranscriptItemView(sentence: sentence)
                     }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(T.C.card)
-                )
-                .padding(.horizontal, T.S.lg)
-                .padding(.vertical, T.S.md)
-            }
-            .background(Color.black)
-            .navigationTitle("Transcript")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Done")
-                            .foregroundStyle(T.C.accent)
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // Divider between sentences
+                    if sentence.id != getUniqueSentences().last?.id {
+                        Divider()
+                            .background(T.C.divider.opacity(0.3))
+                            .padding(.horizontal, T.S.md)
                     }
                 }
             }
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(T.C.card)
+            )
+            .padding(.horizontal, T.S.lg)
+            .padding(.vertical, T.S.md)
         }
+        .background(Color.black)
+        .navigationTitle("Transcript")
+        .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
     }
     

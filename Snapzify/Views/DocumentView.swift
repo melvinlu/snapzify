@@ -332,10 +332,10 @@ struct DocumentView: View {
     @State private var chatGPTContext = ""
     @State private var showingRenameAlert = false
     @State private var newDocumentName = ""
-    @State private var showingTranscript = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
+        NavigationStack {
         GeometryReader { geometry in
             ZStack {
                 // Background
@@ -475,9 +475,9 @@ struct DocumentView: View {
                         }
                         
                         // Transcript button
-                        Button {
-                            showingTranscript = true
-                        } label: {
+                        NavigationLink(destination: 
+                            TranscriptView(document: vm.document, documentVM: vm)
+                        ) {
                             Image(systemName: "doc.text")
                                 .foregroundColor(.white)
                                 .font(.title2)
@@ -534,9 +534,6 @@ struct DocumentView: View {
         } message: {
             Text("Give this document a custom name")
         }
-        .sheet(isPresented: $showingTranscript) {
-            TranscriptView(document: vm.document, documentVM: vm)
-        }
         .task {
             await vm.translateAllPending()
         }
@@ -554,6 +551,7 @@ struct DocumentView: View {
                 dismiss()
             }
         }
+        }  // End NavigationStack
     }
     
     private func handleTextTap(sentence: Sentence, at location: CGPoint) {

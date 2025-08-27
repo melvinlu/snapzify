@@ -629,19 +629,18 @@ class HomeViewModel: ObservableObject {
             
             // Create document with OCR-only sentences (no translations yet)
             let documentId = UUID()
-            let savedVideoURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(documentId.uuidString).mov")
-            try videoData.write(to: savedVideoURL)
+            let savedVideoURL = try await MainActor.run {
+                try MediaStorageService.shared.saveMedia(videoData, id: documentId, isVideo: true)
+            }
             
             // Create thumbnail
-            let thumbnailURL: URL?
-            if let imageData = representativeImage.pngData() {
-                let thumbURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("\(documentId.uuidString)_thumb.jpg")
-                try imageData.write(to: thumbURL)
-                thumbnailURL = thumbURL
-            } else {
-                thumbnailURL = nil
+            let thumbnailURL: URL? = try? await MainActor.run {
+                let thumbnailSize = CGSize(width: 120, height: 120)
+                let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+                let thumbnail = renderer.image { context in
+                    representativeImage.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                }
+                return try MediaStorageService.shared.saveThumbnail(thumbnail, id: documentId)
             }
             
             let document = Document(
@@ -1022,26 +1021,21 @@ class HomeViewModel: ObservableObject {
         
         // Save image to file
         let documentId = UUID()
-        let imageURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(documentId.uuidString).jpg")
-        if let imageData = image.pngData() {
-            try imageData.write(to: imageURL)
+        guard let imageData = image.pngData() else {
+            throw ProcessingError.failedToSaveImage
+        }
+        let imageURL = try await MainActor.run {
+            try MediaStorageService.shared.saveMedia(imageData, id: documentId, isVideo: false)
         }
         
         // Create thumbnail
-        let thumbnailURL: URL?
-        let thumbnailSize = CGSize(width: 120, height: 120)
-        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
-        let thumbnail = renderer.image { context in
-            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
-        }
-        if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) {
-            let thumbURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(documentId.uuidString)_thumb.jpg")
-            try thumbnailData.write(to: thumbURL)
-            thumbnailURL = thumbURL
-        } else {
-            thumbnailURL = nil
+        let thumbnailURL: URL? = try? await MainActor.run {
+            let thumbnailSize = CGSize(width: 120, height: 120)
+            let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+            let thumbnail = renderer.image { context in
+                image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+            }
+            return try MediaStorageService.shared.saveThumbnail(thumbnail, id: documentId)
         }
         
         let document = Document(
@@ -1230,6 +1224,8 @@ enum ProcessingError: Error, LocalizedError {
     case noChineseDetected
     case noFramesExtracted
     case invalidVideo
+    case failedToSaveImage
+    case failedToReadVideo
     
     var errorDescription: String? {
         switch self {
@@ -1241,6 +1237,10 @@ enum ProcessingError: Error, LocalizedError {
             return "Failed to extract frames from video"
         case .invalidVideo:
             return "Invalid video file"
+        case .failedToSaveImage:
+            return "Failed to save image"
+        case .failedToReadVideo:
+            return "Failed to read video file"
         }
     }
 }
