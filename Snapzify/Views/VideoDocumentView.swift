@@ -215,7 +215,20 @@ struct VideoDocumentView: View {
                 VStack {
                     HStack {
                         Button {
-                            dismiss()
+                            // Ensure transcript is closed before dismissing
+                            if showingTranscript || isDraggingTranscript {
+                                withAnimation(.spring()) {
+                                    transcriptDragOffset = 0
+                                    isDraggingTranscript = false
+                                    showingTranscript = false
+                                }
+                                // Small delay to allow animation to complete
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    dismiss()
+                                }
+                            } else {
+                                dismiss()
+                            }
                         } label: {
                             Image(systemName: "chevron.left")
                                 .foregroundColor(.white)
@@ -281,9 +294,10 @@ struct VideoDocumentView: View {
                     
                     Spacer()
                 }
+                .zIndex(500) // Ensure navigation bar is always on top
                 
                 // Frame navigation slider - always on top
-                if vm.document.mediaURL != nil {
+                if vm.document.mediaURL != nil && !showingTranscript && !isDraggingTranscript {
                     VStack {
                         Spacer()
                         
@@ -308,74 +322,77 @@ struct VideoDocumentView: View {
                         .padding(.vertical, 12)
                         .background(Color.black.opacity(0.8))
                     }
-                    .zIndex(100) // Always on top
+                    .zIndex(300) // Higher than popups to ensure it's always interactive
                 }
             }
+            .gesture(
+                !showingTranscript ?
+                DragGesture(minimumDistance: 30)
+                    .onChanged { value in
+                        // Only handle horizontal swipes
+                        if abs(value.translation.width) > abs(value.translation.height) && value.translation.width < 0 {
+                            if !isDraggingTranscript {
+                                isDraggingTranscript = true
+                            }
+                            transcriptDragOffset = value.translation.width
+                        }
+                    }
+                    .onEnded { value in
+                        let threshold = geometry.size.width * 0.25
+                        let velocity = value.predictedEndTranslation.width - value.translation.width
+                        
+                        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                            if -value.translation.width > threshold || velocity < -200 {
+                                showingTranscript = true
+                                transcriptDragOffset = 0
+                            } else {
+                                showingTranscript = false
+                                isDraggingTranscript = false
+                                transcriptDragOffset = 0
+                            }
+                        }
+                    }
+                : nil
+            )
             
             // Dynamic transcript view that slides in from right
-            if isDraggingTranscript || transcriptDragOffset < 0 {
-                TranscriptView(document: vm.document, documentVM: vm)
-                    .frame(width: geometry.size.width)
-                    .background(Color.black)
-                    .offset(x: geometry.size.width + transcriptDragOffset)
-                    .transition(.move(edge: .trailing))
-                    .zIndex(200)
-                    .highPriorityGesture(
-                        DragGesture()
-                            .onChanged { value in
-                                // Allow dragging back to the right to dismiss
-                                if value.translation.width > 0 {
-                                    transcriptDragOffset = -geometry.size.width + value.translation.width
+            if isDraggingTranscript || showingTranscript {
+                TranscriptView(
+                    document: vm.document, 
+                    documentVM: vm
+                )
+                .frame(width: geometry.size.width)
+                .background(Color.black)
+                .offset(x: showingTranscript ? 0 : geometry.size.width + transcriptDragOffset)
+                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: transcriptDragOffset)
+                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: showingTranscript)
+                .zIndex(200)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            if value.translation.width > 0 {
+                                // Swiping right - dismiss transcript
+                                transcriptDragOffset = value.translation.width
+                            }
+                        }
+                        .onEnded { value in
+                            let threshold = geometry.size.width * 0.25
+                            let velocity = value.predictedEndTranslation.width - value.translation.width
+                            
+                            withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                if value.translation.width > threshold || velocity > 200 {
+                                    // Dismiss transcript
+                                    showingTranscript = false
+                                    isDraggingTranscript = false
+                                    transcriptDragOffset = 0
+                                } else {
+                                    // Snap back to open position
+                                    transcriptDragOffset = 0
                                 }
                             }
-                            .onEnded { value in
-                                withAnimation(.spring()) {
-                                    if value.translation.width > 100 {
-                                        // Dismiss if dragged right more than 100 points
-                                        transcriptDragOffset = 0
-                                        isDraggingTranscript = false
-                                        showingTranscript = false
-                                    } else {
-                                        // Snap back to open position
-                                        transcriptDragOffset = -geometry.size.width
-                                    }
-                                }
-                            }
-                    )
+                        }
+                )
             }
-            
-            // Invisible swipe area on the right edge
-            HStack {
-                Spacer()
-                Color.clear
-                    .frame(width: 30)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                isDraggingTranscript = true
-                                // Make the offset negative to pull view from right
-                                let dragAmount = min(0, value.translation.width)
-                                // Limit how far it can be pulled
-                                transcriptDragOffset = max(dragAmount, -geometry.size.width)
-                            }
-                            .onEnded { value in
-                                withAnimation(.spring()) {
-                                    if value.translation.width < -50 {
-                                        // If dragged enough, fully show transcript
-                                        transcriptDragOffset = -geometry.size.width
-                                        showingTranscript = true
-                                    } else {
-                                        // Otherwise, hide it
-                                        transcriptDragOffset = 0
-                                        isDraggingTranscript = false
-                                        showingTranscript = false
-                                    }
-                                }
-                            }
-                    )
-            }
-            .ignoresSafeArea()
         }
         .navigationBarHidden(true)
         .alert("Delete Document", isPresented: $vm.showDeleteImageAlert) {

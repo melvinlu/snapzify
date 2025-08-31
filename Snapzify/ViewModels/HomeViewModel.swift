@@ -218,8 +218,16 @@ class HomeViewModel: ObservableObject {
                 }
                 
                 // Add 60-second timeout to image processing
+                let script = ChineseScript(rawValue: selectedScript) ?? .simplified
                 _ = try await withTimeout(seconds: 60) {
-                    try await self.processImage(image, source: .photos, assetIdentifier: info.asset.localIdentifier)
+                    try await self.processImageCore(
+                        image,
+                        source: .photos,
+                        script: script,
+                        assetIdentifier: info.asset.localIdentifier,
+                        shouldNavigate: true,
+                        existingTaskId: taskId
+                    )
                 }
                 
                 // Document is already saved in processImage

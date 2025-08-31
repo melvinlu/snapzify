@@ -8,6 +8,12 @@ struct SelectedSentencePopup: View {
     let position: CGPoint
     @Binding var showingChatGPTInput: Bool
     @Binding var chatGPTContext: String
+    @State private var chatGPTBreakdown = ""
+    @State private var isLoadingBreakdown = false
+    @State private var breakdownTask: Task<Void, Never>?
+    @State private var showPinyin = false
+    
+    private let chatGPTService = ServiceContainer.shared.chatGPTService
     
     var body: some View {
         let _ = print("📱 Popup rendering:")
@@ -19,36 +25,49 @@ struct SelectedSentencePopup: View {
         let _ = print("📱   - isTranslating: \(vm.isTranslating)")
         
         VStack(alignment: .leading, spacing: T.S.sm) {
-            // Chinese text
-            Text(sentence.text)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(T.C.ink)
-            
-            // Pinyin
-            if !vm.sentence.pinyin.isEmpty {
-                Text(vm.sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-            } else if !sentence.pinyin.isEmpty {
-                Text(sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-            }
-            
-            // English translation or loading indicator
-            if vm.isTranslating {
-                HStack {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Translating...")
-                        .font(.system(size: 16))
-                        .foregroundStyle(T.C.ink2)
+            // Chinese text with optional pinyin
+            VStack(alignment: .leading, spacing: 4) {
+                Text(sentence.text)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(T.C.ink)
+                
+                if showPinyin {
+                    if !vm.sentence.pinyin.isEmpty {
+                        Text(vm.sentence.pinyin.joined(separator: " "))
+                            .font(.system(size: 14))
+                            .foregroundStyle(T.C.ink2)
+                    } else if !sentence.pinyin.isEmpty {
+                        Text(sentence.pinyin.joined(separator: " "))
+                            .font(.system(size: 14))
+                            .foregroundStyle(T.C.ink2)
+                    }
                 }
-            } else if let english = sentence.english, english != "Generating..." {
-                Text(english)
-                    .font(.system(size: 16))
-                    .foregroundStyle(T.C.ink2)
             }
+            
+            // ChatGPT breakdown - scrollable and streaming
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading breakdown...")
+                                .font(.system(size: 14))
+                                .foregroundStyle(T.C.ink2)
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                    } else if !chatGPTBreakdown.isEmpty {
+                        Text(chatGPTBreakdown)
+                            .font(.system(size: 14))
+                            .foregroundStyle(T.C.ink2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                    }
+                }
+            }
+            .frame(maxHeight: 250)
             
             // Action buttons
             HStack(alignment: .center, spacing: 0) {
@@ -95,18 +114,6 @@ struct SelectedSentencePopup: View {
                     .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
                 }
                 
-                // Spacing after Audio
-                Spacer().frame(width: T.S.sm)
-                
-                // ChatGPT button
-                Button {
-                    showingChatGPTInput = true
-                } label: {
-                    Label("ChatGPT", systemImage: "message.circle")
-                        .font(.caption)
-                }
-                .buttonStyle(PopupButtonStyle())
-                
                 // Push remaining space
                 Spacer(minLength: 0)
             }
@@ -118,6 +125,41 @@ struct SelectedSentencePopup: View {
                 .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
         )
         .frame(maxWidth: 340)
+        .onAppear {
+            loadChatGPTBreakdown()
+        }
+        .onDisappear {
+            breakdownTask?.cancel()
+        }
+    }
+    
+    private func loadChatGPTBreakdown() {
+        guard chatGPTService.isConfigured() else { return }
+        
+        isLoadingBreakdown = true
+        chatGPTBreakdown = ""
+        
+        breakdownTask = Task {
+            do {
+                var isFirstChunk = true
+                for try await chunk in chatGPTService.streamBreakdown(chineseText: sentence.text) {
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            if isFirstChunk {
+                                isLoadingBreakdown = false
+                                isFirstChunk = false
+                            }
+                            chatGPTBreakdown += chunk
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    chatGPTBreakdown = "Error loading breakdown"
+                    isLoadingBreakdown = false
+                }
+            }
+        }
     }
 }
 
@@ -365,36 +407,68 @@ struct DocumentView: View {
                     let _ = print("🔍 Scale factor: \(scale)")
                     let _ = print("📐 Display size: \(displayWidth) x \(displayHeight)")
                     
-                    ScrollView([.horizontal, .vertical], showsIndicators: false) {
-                        ZStack(alignment: .topLeading) {
-                            // Main image - display at calculated size
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: displayWidth, height: displayHeight)
-                            
-                            // Invisible tap areas for each sentence
-                            ForEach(vm.document.sentences.filter { $0.rangeInImage != nil }) { sentence in
-                                if let rect = sentence.rangeInImage {
-                                    Rectangle()
-                                        .fill(Color.clear)
-                                        .contentShape(Rectangle())
-                                        .frame(width: rect.width * scale,
-                                               height: rect.height * scale)
-                                        .position(x: rect.midX * scale,
-                                                 y: rect.midY * scale)
-                                        .onTapGesture { location in
-                                            handleTextTap(sentence: sentence, at: location)
-                                        }
-                                }
+                    ZStack {
+                        // Main image - display at calculated size, centered
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: displayWidth, height: displayHeight)
+                            .position(x: screenSize.width / 2, y: screenSize.height / 2)
+                        
+                        // Invisible tap areas for each sentence
+                        ForEach(vm.document.sentences.filter { $0.rangeInImage != nil }) { sentence in
+                            if let rect = sentence.rangeInImage {
+                                let tapX = (screenSize.width - displayWidth) / 2 + rect.midX * scale
+                                let tapY = (screenSize.height - displayHeight) / 2 + rect.midY * scale
+                                
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .contentShape(Rectangle())
+                                    .frame(width: rect.width * scale,
+                                           height: rect.height * scale)
+                                    .position(x: tapX, y: tapY)
+                                    .onTapGesture {
+                                        print("🟡 DEBUG: Tapped on sentence area")
+                                        print("🟡 DEBUG: Sentence text: \(sentence.text)")
+                                        print("🟡 DEBUG: Tap rect: x=\(tapX), y=\(tapY), w=\(rect.width * scale), h=\(rect.height * scale)")
+                                        handleTextTap(sentence: sentence, at: CGPoint(x: tapX, y: tapY))
+                                    }
                             }
                         }
-                        .frame(width: max(displayWidth, screenSize.width),
-                               height: max(displayHeight, screenSize.height))
                     }
                     .frame(width: screenSize.width, height: screenSize.height)
-                    .zoomable(min: 1.0, max: 3.0)
+                    .gesture(
+                        !showingTranscript ?
+                        DragGesture(minimumDistance: 30)
+                            .onChanged { value in
+                                // Only handle horizontal swipes
+                                if abs(value.translation.width) > abs(value.translation.height) && value.translation.width < 0 {
+                                    if !isDraggingTranscript {
+                                        isDraggingTranscript = true
+                                    }
+                                    transcriptDragOffset = value.translation.width
+                                }
+                            }
+                            .onEnded { value in
+                                let threshold = geometry.size.width * 0.25
+                                let velocity = value.predictedEndTranslation.width - value.translation.width
+                                
+                                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                    if -value.translation.width > threshold || velocity < -200 {
+                                        showingTranscript = true
+                                        transcriptDragOffset = 0
+                                    } else {
+                                        showingTranscript = false
+                                        isDraggingTranscript = false
+                                        transcriptDragOffset = 0
+                                    }
+                                }
+                            }
+                        : nil
+                    )
                 }
+                
+                
                 
                 // Popup overlay
                 if showingPopup, 
@@ -454,7 +528,28 @@ struct DocumentView: View {
                 VStack {
                     HStack {
                         Button {
-                            dismiss()
+                            print("🔴 DEBUG: Back button tapped")
+                            print("🔴 DEBUG: showingTranscript = \(showingTranscript)")
+                            print("🔴 DEBUG: isDraggingTranscript = \(isDraggingTranscript)")
+                            print("🔴 DEBUG: transcriptDragOffset = \(transcriptDragOffset)")
+                            
+                            // Ensure transcript is closed before dismissing
+                            if showingTranscript || isDraggingTranscript || transcriptDragOffset < 0 {
+                                print("🔴 DEBUG: Closing transcript first")
+                                withAnimation(.spring()) {
+                                    transcriptDragOffset = 0
+                                    isDraggingTranscript = false
+                                    showingTranscript = false
+                                }
+                                // Small delay to allow animation to complete
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    print("🔴 DEBUG: Now dismissing view")
+                                    dismiss()
+                                }
+                            } else {
+                                print("🔴 DEBUG: Dismissing view immediately")
+                                dismiss()
+                            }
                         } label: {
                             Image(systemName: "chevron.left")
                                 .foregroundColor(.white)
@@ -479,10 +574,10 @@ struct DocumentView: View {
                         
                         // Transcript button
                         Button {
-                            withAnimation(.spring()) {
+                            withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
                                 showingTranscript = true
                                 isDraggingTranscript = true
-                                transcriptDragOffset = -geometry.size.width
+                                transcriptDragOffset = 0
                             }
                         } label: {
                             Image(systemName: "doc.text")
@@ -520,72 +615,48 @@ struct DocumentView: View {
                     
                     Spacer()
                 }
+                .zIndex(500) // Ensure navigation bar is always on top
             }
             
             // Dynamic transcript view that slides in from right
-            if isDraggingTranscript || transcriptDragOffset < 0 {
-                TranscriptView(document: vm.document, documentVM: vm)
-                    .frame(width: geometry.size.width)
-                    .background(Color.black)
-                    .offset(x: geometry.size.width + transcriptDragOffset)
-                    .transition(.move(edge: .trailing))
-                    .zIndex(200)
-                    .highPriorityGesture(
-                        DragGesture()
-                            .onChanged { value in
-                                // Allow dragging back to the right to dismiss
-                                if value.translation.width > 0 {
-                                    transcriptDragOffset = -geometry.size.width + value.translation.width
+            if isDraggingTranscript || showingTranscript {
+                TranscriptView(
+                    document: vm.document, 
+                    documentVM: vm
+                )
+                .frame(width: geometry.size.width)
+                .background(Color.black)
+                .offset(x: showingTranscript ? 0 : geometry.size.width + transcriptDragOffset)
+                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: transcriptDragOffset)
+                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: showingTranscript)
+                .zIndex(200)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            if value.translation.width > 0 {
+                                // Swiping right - dismiss transcript
+                                transcriptDragOffset = value.translation.width
+                            }
+                        }
+                        .onEnded { value in
+                            let threshold = geometry.size.width * 0.25
+                            let velocity = value.predictedEndTranslation.width - value.translation.width
+                            
+                            withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                if value.translation.width > threshold || velocity > 200 {
+                                    // Dismiss transcript
+                                    showingTranscript = false
+                                    isDraggingTranscript = false
+                                    transcriptDragOffset = 0
+                                } else {
+                                    // Snap back to open position
+                                    transcriptDragOffset = 0
                                 }
                             }
-                            .onEnded { value in
-                                withAnimation(.spring()) {
-                                    if value.translation.width > 100 {
-                                        // Dismiss if dragged right more than 100 points
-                                        transcriptDragOffset = 0
-                                        isDraggingTranscript = false
-                                        showingTranscript = false
-                                    } else {
-                                        // Snap back to open position
-                                        transcriptDragOffset = -geometry.size.width
-                                    }
-                                }
-                            }
-                    )
+                        }
+                )
             }
             
-            // Invisible swipe area on the right edge
-            HStack {
-                Spacer()
-                Color.clear
-                    .frame(width: 30)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                isDraggingTranscript = true
-                                // Make the offset negative to pull view from right
-                                let dragAmount = min(0, value.translation.width)
-                                // Limit how far it can be pulled
-                                transcriptDragOffset = max(dragAmount, -geometry.size.width)
-                            }
-                            .onEnded { value in
-                                withAnimation(.spring()) {
-                                    if value.translation.width < -50 {
-                                        // If dragged enough, fully show transcript
-                                        transcriptDragOffset = -geometry.size.width
-                                        showingTranscript = true
-                                    } else {
-                                        // Otherwise, hide it
-                                        transcriptDragOffset = 0
-                                        isDraggingTranscript = false
-                                        showingTranscript = false
-                                    }
-                                }
-                            }
-                    )
-            }
-            .ignoresSafeArea()
         }
         .navigationBarHidden(true)
         .alert("Delete Document", isPresented: $vm.showDeleteImageAlert) {
@@ -627,96 +698,45 @@ struct DocumentView: View {
     }
     
     private func handleTextTap(sentence: Sentence, at location: CGPoint) {
-        print("🎯 Tapped sentence: id=\(sentence.id), text='\(sentence.text)', english='\(sentence.english ?? "nil")'")
+        print("🎯 DEBUG: handleTextTap called")
+        print("🎯 DEBUG: Sentence id=\(sentence.id), text='\(sentence.text)'")
+        print("🎯 DEBUG: Current popup state: showingPopup=\(showingPopup)")
         
         // Find the current sentence data from the document
         if let currentSentence = vm.document.sentences.first(where: { $0.id == sentence.id }) {
-            print("🎯 Current sentence data: english='\(currentSentence.english ?? "nil")', pinyin=\(currentSentence.pinyin), status=\(currentSentence.status)")
+            print("🎯 DEBUG: Found sentence in document")
+            print("🎯 DEBUG: English='\(currentSentence.english ?? "nil")', pinyin=\(currentSentence.pinyin)")
             
             // Check if sentence needs translation (either English or pinyin missing)
             if currentSentence.english == nil || currentSentence.english == "Generating..." || currentSentence.pinyin.isEmpty {
-                print("🎯 Sentence needs translation (missing English or pinyin), creating view model")
+                print("🎯 DEBUG: Sentence needs translation")
                 // Get or create the sentence view model to handle translation
                 let sentenceVM = vm.createSentenceViewModel(for: currentSentence)
-                print("🎯 View model created, triggering translation")
                 
                 // Trigger translation in background
                 Task {
                     await sentenceVM.translateIfNeeded()
-                    print("🎯 Translation completed")
+                    print("🎯 DEBUG: Translation completed")
                 }
             } else {
-                print("🎯 Sentence already fully translated (has both English and pinyin)")
+                print("🎯 DEBUG: Sentence already translated")
             }
         } else {
-            print("🎯 Could not find sentence in current document")
+            print("🎯 DEBUG: ERROR - Could not find sentence in document")
         }
         
+        print("🎯 DEBUG: Setting showingPopup to true")
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedSentenceId = sentence.id
             tapLocation = location
             showingPopup = true
         }
+        print("🎯 DEBUG: After animation - showingPopup=\(showingPopup)")
     }
     
     private var documentTitle: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, h:mm a"
         return formatter.string(from: vm.document.createdAt)
-    }
-}
-
-// Extension to add pinch-to-zoom functionality
-extension View {
-    func zoomable(min minScale: CGFloat = 1.0, max maxScale: CGFloat = 5.0) -> some View {
-        ZoomableView(content: self, minScale: minScale, maxScale: maxScale)
-    }
-}
-
-struct ZoomableView<Content: View>: UIViewRepresentable {
-    let content: Content
-    let minScale: CGFloat
-    let maxScale: CGFloat
-    
-    func makeUIView(context: Context) -> UIScrollView {
-        let scrollView = UIScrollView()
-        scrollView.delegate = context.coordinator
-        scrollView.minimumZoomScale = minScale
-        scrollView.maximumZoomScale = maxScale
-        scrollView.bouncesZoom = true
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.showsVerticalScrollIndicator = false
-        
-        let hostingController = UIHostingController(rootView: content)
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        
-        scrollView.addSubview(hostingController.view)
-        
-        NSLayoutConstraint.activate([
-            hostingController.view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            hostingController.view.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            hostingController.view.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            hostingController.view.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor)
-        ])
-        
-        return scrollView
-    }
-    
-    func updateUIView(_ uiView: UIScrollView, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, UIScrollViewDelegate {
-        let parent: ZoomableView
-        
-        init(_ parent: ZoomableView) {
-            self.parent = parent
-        }
-        
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-            scrollView.subviews.first
-        }
     }
 }

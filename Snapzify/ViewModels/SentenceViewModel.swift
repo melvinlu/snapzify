@@ -124,8 +124,6 @@ class SentenceViewModel: ObservableObject {
                 print("🔍   - sentence.pinyin: \(sentence.pinyin)")
                 
                 onUpdate(sentence)
-                
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
             } else {
                 print("🔍 No result received from streaming service")
             }

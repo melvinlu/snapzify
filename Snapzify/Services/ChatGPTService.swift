@@ -23,7 +23,7 @@ class ChatGPTServiceImpl: ChatGPTService {
     }
     
     func streamBreakdown(chineseText: String) -> AsyncThrowingStream<String, Error> {
-        let prompt = "Breakdown: \(chineseText)\n\nDon't use markdown. Don't have any \"Sure! Let's break down...\" just provide the breakdown, nothing else."
+        let prompt = "Analyze this Chinese sentence: \(chineseText)\n\nFirst give the overall meaning/translation of the complete sentence by itself. Do not preface with \"The overall meaning is:\" or \"The sentence means:\" - just give the translation directly.\n\nThen provide the breakdown of each character/word and how it contributes to the meaning.\n\nDo not number sections, no introductions, no repetition of the Chinese sentence, no markdown formatting. Just the translation followed by the breakdown."
         return streamChatGPT(prompt: prompt)
     }
     

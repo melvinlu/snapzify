@@ -40,7 +40,6 @@
 		3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A371234567890123467 /* VersionHistoryView.swift */; };
 		3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A391234567890123468 /* VideoDocumentView.swift */; };
 		3D9B1A381234567890123470 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A391234567890123469 /* TranscriptView.swift */; };
-		3D9B1A381234567890123471 /* SentenceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A39123456789012346A /* SentenceDetailView.swift */; };
 		3D9B1B351234567890123465 /* ChatGPTService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1B341234567890123464 /* ChatGPTService.swift */; };
 		408EE21643E4AE8A216691B0 /* ActionIcon@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */; };
 		48B5B75E4312202E118FFB46 /* ActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -450,7 +449,6 @@
 				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
 				3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */,
 				3D9B1A381234567890123470 /* TranscriptView.swift in Sources */,
-				3D9B1A381234567890123471 /* SentenceDetailView.swift in Sources */,
 				3D9B1A341234567890123464 /* ShimmerView.swift in Sources */,
 				3D9B1A361234567890123466 /* VersionHistoryView.swift in Sources */,
 				3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */,

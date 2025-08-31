@@ -25,6 +25,11 @@ struct SentencePopup: View {
     let position: CGPoint
     @Binding var showingChatGPTInput: Bool
     @Binding var chatGPTContext: String
+    @State private var chatGPTBreakdown = ""
+    @State private var isLoadingBreakdown = false
+    @State private var breakdownTask: Task<Void, Never>?
+    
+    private let chatGPTService = ServiceContainer.shared.chatGPTService
     
     var body: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
@@ -44,19 +49,21 @@ struct SentencePopup: View {
                     .foregroundStyle(T.C.ink2)
             }
             
-            // English translation or loading indicator
-            if vm.isTranslating {
+            // ChatGPT breakdown instead of English translation
+            if isLoadingBreakdown {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("Translating...")
-                        .font(.system(size: 16))
+                    Text("Loading breakdown...")
+                        .font(.system(size: 14))
                         .foregroundStyle(T.C.ink2)
                 }
-            } else if let english = sentence.english, english != "Generating..." {
-                Text(english)
-                    .font(.system(size: 16))
+            } else if !chatGPTBreakdown.isEmpty {
+                Text(chatGPTBreakdown)
+                    .font(.system(size: 14))
                     .foregroundStyle(T.C.ink2)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             // Action buttons
@@ -72,6 +79,39 @@ struct SentencePopup: View {
                 .shadow(color: .black.opacity(0.2), radius: Constants.UI.shadowRadius, x: 0, y: 10)
         )
         .frame(maxWidth: Constants.UI.popupMaxWidth)
+        .onAppear {
+            loadChatGPTBreakdown()
+        }
+        .onDisappear {
+            breakdownTask?.cancel()
+        }
+    }
+    
+    private func loadChatGPTBreakdown() {
+        guard chatGPTService.isConfigured() else { return }
+        
+        isLoadingBreakdown = true
+        chatGPTBreakdown = ""
+        
+        breakdownTask = Task {
+            do {
+                for try await chunk in chatGPTService.streamBreakdown(chineseText: sentence.text) {
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            chatGPTBreakdown += chunk
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    chatGPTBreakdown = "Error loading breakdown"
+                }
+            }
+            
+            await MainActor.run {
+                isLoadingBreakdown = false
+            }
+        }
     }
 }
 
@@ -96,18 +136,6 @@ struct PopupActionButtons: View {
             
             // Audio button
             AudioButton(vm: vm)
-            
-            // Spacing after Audio
-            Spacer().frame(width: T.S.sm)
-            
-            // ChatGPT button
-            Button {
-                showingChatGPTInput = true
-            } label: {
-                Label("ChatGPT", systemImage: "message.circle")
-                    .font(.caption)
-            }
-            .buttonStyle(PopupButtonStyle())
             
             // Push remaining space
             Spacer(minLength: 0)
