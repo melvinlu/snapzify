@@ -201,7 +201,8 @@ struct SelectedSentencePopup: View {
 struct DocumentInteractionView: View {
     let document: Document
     let isActive: Bool
-    let onTranscriptStateChange: ((Bool) -> Void)?
+    let showTranscript: Bool // Whether to show transcript in this view
+    let onTranscriptRequest: (() -> Void)? // Callback to request transcript from parent
     @StateObject private var vm: DocumentViewModel
     @State private var selectedSentenceId: UUID?
     @State private var showingPopup = false
@@ -213,10 +214,11 @@ struct DocumentInteractionView: View {
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
     
-    init(document: Document, isActive: Bool = true, onTranscriptStateChange: ((Bool) -> Void)? = nil) {
+    init(document: Document, isActive: Bool = true, showTranscript: Bool = true, onTranscriptRequest: (() -> Void)? = nil) {
         self.document = document
         self.isActive = isActive
-        self.onTranscriptStateChange = onTranscriptStateChange
+        self.showTranscript = showTranscript
+        self.onTranscriptRequest = onTranscriptRequest
         self._vm = StateObject(wrappedValue: ServiceContainer.shared.makeDocumentViewModel(document: document))
     }
     
@@ -239,8 +241,13 @@ struct DocumentInteractionView: View {
                         isDraggingTranscript: $isDraggingTranscript,
                         onTap: handleTap,
                         onTranscriptSwipe: { 
-                            showingTranscript = true
-                            onTranscriptStateChange?(true)
+                            if showTranscript {
+                                showingTranscript = true
+                            } else {
+                                // Request transcript from parent (for queue view)
+                                print("🎯 Requesting transcript from parent")
+                                onTranscriptRequest?()
+                            }
                         }
                     )
                 }
@@ -283,8 +290,8 @@ struct DocumentInteractionView: View {
                     }
                 }
                 
-                // Transcript overlay - fullscreen
-                if isActive && (showingTranscript || transcriptDragOffset < 0) {
+                // Transcript overlay - only if showTranscript is true (for standalone DocumentView)
+                if showTranscript && isActive && (showingTranscript || transcriptDragOffset < 0) {
                     // Full-width transcript
                     TranscriptView(
                         document: vm.document,
@@ -305,7 +312,6 @@ struct DocumentInteractionView: View {
                                     showingTranscript = false
                                     isDraggingTranscript = false
                                     transcriptDragOffset = 0
-                                    onTranscriptStateChange?(false)
                                 }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
@@ -332,7 +338,6 @@ struct DocumentInteractionView: View {
                                         showingTranscript = false
                                         isDraggingTranscript = false
                                         transcriptDragOffset = 0
-                                        onTranscriptStateChange?(false)
                                     } else {
                                         transcriptDragOffset = 0
                                     }

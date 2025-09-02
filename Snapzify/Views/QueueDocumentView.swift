@@ -7,7 +7,9 @@ struct QueueDocumentView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging = false
-    @State private var isTranscriptShowing = false // Track transcript state
+    @State private var showingTranscript = false // Track transcript state
+    @State private var transcriptDragOffset: CGFloat = 0
+    @State private var isDraggingTranscript = false
     @Environment(\.dismiss) private var dismiss
     
     init(documents: [Document], initialIndex: Int = 0) {
@@ -20,14 +22,14 @@ struct QueueDocumentView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                // Vertical stack of all documents
+                // Vertical stack of all documents - each takes exactly full screen
                 VStack(spacing: 0) {
                     ForEach(Array(documents.enumerated()), id: \.element.id) { index, document in
                         DocumentContentView(
                             document: document,
                             isActive: index == currentIndex,
-                            onTranscriptStateChange: { isShowing in
-                                isTranscriptShowing = isShowing
+                            onTranscriptRequest: {
+                                showingTranscript = true
                             }
                         )
                         .frame(width: geometry.size.width, height: geometry.size.height)
@@ -40,7 +42,7 @@ struct QueueDocumentView: View {
                     DragGesture(minimumDistance: 30)
                         .onChanged { value in
                             // Don't handle vertical drags if transcript is showing
-                            guard !isTranscriptShowing else { 
+                            guard !showingTranscript else { 
                                 print("📍 Ignoring vertical drag - transcript is showing")
                                 return 
                             }
@@ -60,7 +62,7 @@ struct QueueDocumentView: View {
                         }
                         .onEnded { value in
                             // Don't handle if transcript is showing
-                            guard !isTranscriptShowing else { 
+                            guard !showingTranscript else { 
                                 isDragging = false
                                 dragOffset = 0
                                 return 
@@ -104,37 +106,95 @@ struct QueueDocumentView: View {
                         }
                 )
                 
-                // Overlay UI elements
-                VStack {
-                    HStack {
-                        // Back button
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .foregroundColor(.white)
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(Circle().fill(Color.black.opacity(0.5)))
+                // Fullscreen transcript overlay (when active)
+                if showingTranscript && currentIndex < documents.count {
+                    TranscriptView(
+                        document: documents[currentIndex],
+                        documentVM: ServiceContainer.shared.makeDocumentViewModel(document: documents[currentIndex])
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(UIColor.systemBackground))
+                    .offset(x: showingTranscript ? 0 : geometry.size.width + transcriptDragOffset)
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: transcriptDragOffset)
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: showingTranscript)
+                    .zIndex(100) // Above everything else
+                    .overlay(
+                        // Close button for transcript
+                        HStack {
+                            Spacer()
+                            Button {
+                                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                    showingTranscript = false
+                                    isDraggingTranscript = false
+                                    transcriptDragOffset = 0
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
                         }
-                        .padding()
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    )
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                if value.translation.width > 0 {
+                                    transcriptDragOffset = value.translation.width
+                                }
+                            }
+                            .onEnded { value in
+                                let threshold = geometry.size.width * 0.25
+                                let velocity = value.predictedEndTranslation.width - value.translation.width
+                                
+                                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                    if value.translation.width > threshold || velocity > 200 {
+                                        showingTranscript = false
+                                        isDraggingTranscript = false
+                                        transcriptDragOffset = 0
+                                    } else {
+                                        transcriptDragOffset = 0
+                                    }
+                                }
+                            }
+                    )
+                }
+                
+                // Overlay UI elements (only show when transcript is not showing)
+                if !showingTranscript {
+                    VStack {
+                        HStack {
+                            // Back button
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .foregroundColor(.white)
+                                    .font(.title2)
+                                    .frame(width: 44, height: 44)
+                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                            }
+                            .padding()
+                            
+                            Spacer()
+                            
+                            // Queue position
+                            if documents.count > 1 {
+                                Text("\(currentIndex + 1)/\(documents.count)")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().fill(Color.black.opacity(0.5)))
+                                    .padding(.trailing)
+                            }
+                        }
                         
                         Spacer()
-                        
-                        // Queue position
-                        if documents.count > 1 {
-                            Text("\(currentIndex + 1)/\(documents.count)")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(Color.black.opacity(0.5)))
-                                .padding(.trailing)
-                        }
                     }
-                    
-                    Spacer()
+                    .zIndex(90) // Below transcript but above documents
                 }
             }
         }
@@ -142,18 +202,19 @@ struct QueueDocumentView: View {
     }
 }
 
-// Document content view using shared interaction components
+// Document content view using shared interaction components  
 struct DocumentContentView: View {
     let document: Document
     let isActive: Bool
-    let onTranscriptStateChange: (Bool) -> Void
+    let onTranscriptRequest: () -> Void
     
     var body: some View {
-        // Use the shared document interaction view from Components
+        // Use the shared document interaction view from Components (without transcript)
         DocumentInteractionView(
             document: document, 
             isActive: isActive,
-            onTranscriptStateChange: onTranscriptStateChange
+            showTranscript: false, // Never show transcript in child view
+            onTranscriptRequest: onTranscriptRequest
         )
     }
 }
