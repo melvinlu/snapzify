@@ -11,38 +11,16 @@ struct SelectedSentencePopup: View {
     @State private var chatGPTBreakdown = ""
     @State private var isLoadingBreakdown = false
     @State private var breakdownTask: Task<Void, Never>?
-    @State private var showPinyin = false
     
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     
     var body: some View {
-        let _ = print("📱 Popup rendering:")
-        let _ = print("📱   - Text: '\(sentence.text)'")
-        let _ = print("📱   - English: '\(sentence.english ?? "nil")'")
-        let _ = print("📱   - Pinyin count: \(sentence.pinyin.count)")
-        let _ = print("📱   - Pinyin: \(sentence.pinyin)")
-        let _ = print("📱   - vm.sentence.pinyin: \(vm.sentence.pinyin)")
-        let _ = print("📱   - isTranslating: \(vm.isTranslating)")
         
         VStack(alignment: .leading, spacing: T.S.sm) {
-            // Chinese text with optional pinyin
-            VStack(alignment: .leading, spacing: 4) {
-                Text(sentence.text)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(T.C.ink)
-                
-                if showPinyin {
-                    if !vm.sentence.pinyin.isEmpty {
-                        Text(vm.sentence.pinyin.joined(separator: " "))
-                            .font(.system(size: 14))
-                            .foregroundStyle(T.C.ink2)
-                    } else if !sentence.pinyin.isEmpty {
-                        Text(sentence.pinyin.joined(separator: " "))
-                            .font(.system(size: 14))
-                            .foregroundStyle(T.C.ink2)
-                    }
-                }
-            }
+            // Chinese text
+            Text(sentence.text)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(T.C.ink)
             
             // ChatGPT breakdown - scrollable and streaming
             ScrollView {
@@ -381,6 +359,12 @@ struct DocumentView: View {
     
     var body: some View {
         NavigationStack {
+            content
+        }
+    }
+    
+    @ViewBuilder
+    private var content: some View {
         GeometryReader { geometry in
             ZStack {
                 // Background
@@ -401,11 +385,11 @@ struct DocumentView: View {
                     let displayWidth = imageSize.width * scale
                     let displayHeight = imageSize.height * scale
                     
-                    // Debug logs
-                    let _ = print("🖼️ Image original size: \(imageSize)")
-                    let _ = print("📱 Screen size: \(screenSize)")
-                    let _ = print("🔍 Scale factor: \(scale)")
-                    let _ = print("📐 Display size: \(displayWidth) x \(displayHeight)")
+                    // Debug logs - commented out for compilation
+                    // let _ = print("🖼️ Image original size: \(imageSize)")
+                    // let _ = print("📱 Screen size: \(screenSize)")
+                    // let _ = print("🔍 Scale factor: \(scale)")
+                    // let _ = print("📐 Display size: \(displayWidth) x \(displayHeight)")
                     
                     ZStack {
                         // Main image - display at calculated size, centered
@@ -475,7 +459,7 @@ struct DocumentView: View {
                    let sentenceId = selectedSentenceId,
                    let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
                     
-                    let _ = print("🔹 Showing popup for sentence: english='\(sentence.english ?? "nil")', pinyin=\(sentence.pinyin)")
+                    // let _ = print("🔹 Showing popup for sentence: text='\(sentence.text)'")
                     
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
@@ -681,11 +665,11 @@ struct DocumentView: View {
             await vm.translateAllPending()
         }
         .task {
-            // Start refresh timer if any sentences are still generating
-            let hasGenerating = vm.document.sentences.contains { sentence in
-                sentence.english == "Generating..."
+            // Start refresh timer if any sentences are not translated
+            let hasUntranslated = vm.document.sentences.contains { sentence in
+                sentence.status != .translated
             }
-            if hasGenerating {
+            if hasUntranslated {
                 vm.startRefreshTimer()
             }
         }
@@ -694,7 +678,6 @@ struct DocumentView: View {
                 dismiss()
             }
         }
-        }  // End NavigationStack
     }
     
     private func handleTextTap(sentence: Sentence, at location: CGPoint) {
@@ -705,19 +688,13 @@ struct DocumentView: View {
         // Find the current sentence data from the document
         if let currentSentence = vm.document.sentences.first(where: { $0.id == sentence.id }) {
             print("🎯 DEBUG: Found sentence in document")
-            print("🎯 DEBUG: English='\(currentSentence.english ?? "nil")', pinyin=\(currentSentence.pinyin)")
+            print("🎯 DEBUG: Status='\(currentSentence.status)'")
             
-            // Check if sentence needs translation (either English or pinyin missing)
-            if currentSentence.english == nil || currentSentence.english == "Generating..." || currentSentence.pinyin.isEmpty {
+            // Check if sentence needs translation
+            if currentSentence.status != .translated {
                 print("🎯 DEBUG: Sentence needs translation")
-                // Get or create the sentence view model to handle translation
+                // Get or create the sentence view model
                 let sentenceVM = vm.createSentenceViewModel(for: currentSentence)
-                
-                // Trigger translation in background
-                Task {
-                    await sentenceVM.translateIfNeeded()
-                    print("🎯 DEBUG: Translation completed")
-                }
             } else {
                 print("🎯 DEBUG: Sentence already translated")
             }

@@ -39,28 +39,6 @@ struct SentenceRowView: View {
     @ViewBuilder
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
-            if !vm.sentence.pinyin.isEmpty {
-                Text(vm.sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-            }
-            
-            if vm.isTranslating {
-                HStack(spacing: T.S.xs) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
-                        .scaleEffect(0.7)
-                    
-                    Text("Translating...")
-                        .font(.caption)
-                        .foregroundStyle(T.C.ink2)
-                }
-            } else if let english = vm.sentence.english {
-                Text(english)
-                    .font(.system(size: 16))
-                    .foregroundStyle(T.C.ink2)
-            }
-            
             actionButtons
         }
     }
@@ -68,18 +46,6 @@ struct SentenceRowView: View {
     @ViewBuilder
     private var actionButtons: some View {
         HStack(spacing: T.S.sm) {
-            if vm.sentence.english == nil {
-                Button {
-                    Task {
-                        await vm.translateIfNeeded()
-                    }
-                } label: {
-                    Label("Translate", systemImage: "globe")
-                        .font(.caption)
-                }
-                .buttonStyle(ActionButtonStyle())
-            }
-            
             Button {
                 vm.openInPleco()
             } label: {

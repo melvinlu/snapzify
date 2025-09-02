@@ -52,7 +52,7 @@ class DocumentViewModel: ObservableObject {
         isTranslatingBatch = true
         defer { isTranslatingBatch = false }
         
-        let pendingSentences = document.sentences.filter { $0.english == nil }
+        let pendingSentences = document.sentences.filter { $0.status != .translated }
         guard !pendingSentences.isEmpty else { return }
         
         let texts = pendingSentences.map { $0.text }
@@ -64,8 +64,6 @@ class DocumentViewModel: ObservableObject {
             
             for (index, result) in processedResults.enumerated() {
                 if let sentenceIndex = document.sentences.firstIndex(where: { $0.id == pendingSentences[index].id }) {
-                    document.sentences[sentenceIndex].pinyin = result.pinyin
-                    document.sentences[sentenceIndex].english = result.english
                     document.sentences[sentenceIndex].status = .translated
                 }
             }
@@ -80,9 +78,7 @@ class DocumentViewModel: ObservableObject {
         // Return cached view model if it exists
         if let cachedViewModel = sentenceViewModels[sentence.id] {
             // Only update sentence data if it has actually changed
-            if cachedViewModel.sentence.english != sentence.english ||
-               cachedViewModel.sentence.pinyin != sentence.pinyin ||
-               cachedViewModel.sentence.audioAsset != sentence.audioAsset {
+            if cachedViewModel.sentence.audioAsset != sentence.audioAsset {
                 cachedViewModel.sentence = sentence
             }
             return cachedViewModel
@@ -157,7 +153,7 @@ class DocumentViewModel: ObservableObject {
             await MainActor.run {
                 print("📱 DocumentViewModel: Fetched document with \(updatedDocument.sentences.count) sentences")
                 for (index, sentence) in updatedDocument.sentences.enumerated() {
-                    print("📱   Sentence \(index): id=\(sentence.id), text='\(sentence.text)', english='\(sentence.english ?? "nil")', status=\(sentence.status)")
+                    print("📱   Sentence \(index): id=\(sentence.id), text='\(sentence.text)', status=\(sentence.status)")
                 }
                 // Update the entire document to trigger view updates
                 self.document = updatedDocument
@@ -183,8 +179,7 @@ class DocumentViewModel: ObservableObject {
                 
                 // Stop refreshing once all sentences are translated
                 let allTranslated = document.sentences.allSatisfy { sentence in
-                    sentence.status == .translated || 
-                    (sentence.english != nil && sentence.english != "Generating...")
+                    sentence.status == .translated
                 }
                 if allTranslated {
                     break

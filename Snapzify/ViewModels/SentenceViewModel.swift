@@ -59,80 +59,9 @@ class SentenceViewModel: ObservableObject {
         withAnimation(.easeInOut(duration: 0.2)) {
             isExpanded.toggle()
             onToggleExpanded(sentence.id, isExpanded)
-            
-            if isExpanded {
-                Task {
-                    // Don't translate if we're still generating
-                    if autoTranslate && sentence.english == nil && sentence.english != "Generating..." {
-                        await translateIfNeeded()
-                    }
-                    
-                    // Remove auto audio generation - it will be done on-demand when play is clicked
-                }
-            }
         }
     }
     
-    func translateIfNeeded() async {
-        print("🔍 translateIfNeeded called for text: '\(sentence.text)'")
-        print("🔍 Current english: \(sentence.english ?? "nil")")
-        print("🔍 Current pinyin: \(sentence.pinyin)")
-        print("🔍 Current script: \(script)")
-        
-        // Need translation if either English or pinyin is missing
-        guard (sentence.english == nil || sentence.english == "Generating..." || sentence.pinyin.isEmpty),
-              translationService.isConfigured() else { 
-            print("🔍 Skipping translation - both english and pinyin exist, or service not configured")
-            return 
-        }
-        
-        isTranslating = true
-        defer { isTranslating = false }
-        
-        // Use streaming service to get both English and pinyin
-        let streamingService = ServiceContainer.shared.streamingChineseProcessingService
-        print("🔍 Using streaming service for translation")
-        
-        do {
-            var processedResult: StreamingProcessedSentence?
-            
-            print("🔍 Calling processStreamingBatch with text: '\(sentence.text)'")
-            try await streamingService.processStreamingBatch(
-                [sentence.text],
-                script: script
-            ) { processed in
-                print("🔍 Received processed result:")
-                print("🔍   - Index: \(processed.index)")
-                print("🔍   - Chinese: '\(processed.chinese)'")
-                print("🔍   - English: '\(processed.english)'")
-                print("🔍   - Pinyin: \(processed.pinyin)")
-                processedResult = processed
-            }
-            
-            if let result = processedResult {
-                print("🔍 Updating sentence with result:")
-                print("🔍   - English: '\(result.english)'")
-                print("🔍   - Pinyin count: \(result.pinyin.count)")
-                print("🔍   - Pinyin: \(result.pinyin)")
-                
-                sentence.english = result.english
-                sentence.pinyin = result.pinyin
-                sentence.status = .translated
-                
-                print("🔍 After update:")
-                print("🔍   - sentence.english: '\(sentence.english ?? "nil")'")
-                print("🔍   - sentence.pinyin: \(sentence.pinyin)")
-                
-                onUpdate(sentence)
-            } else {
-                print("🔍 No result received from streaming service")
-            }
-        } catch {
-            print("🔍 Translation failed: \(error)")
-            sentence.status = .error("Translation failed")
-            onUpdate(sentence)
-        }
-    }
     
     func generateAudioIfNeeded() async {
         print("AudioGeneration: generateAudioIfNeeded called")
@@ -140,8 +69,7 @@ class SentenceViewModel: ObservableObject {
         print("AudioGeneration: TTS configured: \(ttsService.isConfigured())")
         
         guard sentence.audioAsset == nil,
-              ttsService.isConfigured(),
-              sentence.english != "Generating..." else { 
+              ttsService.isConfigured() else { 
             print("AudioGeneration: Skipping generation - audioAsset exists, TTS not configured, or still generating translation")
             return 
         }

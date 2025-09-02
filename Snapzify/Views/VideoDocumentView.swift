@@ -17,31 +17,7 @@ struct VideoSelectedSentencePopup: View {
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(T.C.ink)
             
-            // Pinyin
-            if !vm.sentence.pinyin.isEmpty {
-                Text(vm.sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-            } else if !sentence.pinyin.isEmpty {
-                Text(sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-            }
             
-            // English translation or loading indicator
-            if vm.isTranslating {
-                HStack {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Translating...")
-                        .font(.system(size: 16))
-                        .foregroundStyle(T.C.ink2)
-                }
-            } else if let english = sentence.english, english != "Generating..." {
-                Text(english)
-                    .font(.system(size: 16))
-                    .foregroundStyle(T.C.ink2)
-            }
             
             // Action buttons
             HStack(alignment: .center, spacing: 0) {
@@ -161,7 +137,7 @@ struct VideoDocumentView: View {
                    let sentenceId = selectedSentenceId,
                    let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
                     
-                    let _ = print("🔹 Showing popup for sentence: english='\(sentence.english ?? "nil")', pinyin=\(sentence.pinyin)")
+                    let _ = print("🔹 Showing popup for sentence: text='\(sentence.text)'")
                     
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
@@ -425,8 +401,6 @@ struct VideoDocumentView: View {
         print("🎯 Tapped sentence in video: text='\(sentence.text)', frame=\(currentFrameIndex)")
         print("🎯 Sentence details:")
         print("🎯   - ID: \(sentence.id)")
-        print("🎯   - English: '\(sentence.english ?? "nil")'")
-        print("🎯   - Pinyin: \(sentence.pinyin)")
         print("🎯   - Status: \(sentence.status)")
         
         // Always show popup immediately
@@ -436,20 +410,14 @@ struct VideoDocumentView: View {
             showingPopup = true
         }
         
-        // Check if sentence needs translation (either English or pinyin missing)
-        if sentence.english == nil || sentence.english == "Generating..." || sentence.pinyin.isEmpty {
-            print("🎯 Sentence needs translation (missing English or pinyin), creating view model")
+        // Check if sentence needs translation
+        if sentence.status != .translated {
+            print("🎯 Sentence needs translation, creating view model")
             // Get or create the sentence view model to handle translation
             let sentenceVM = vm.createSentenceViewModel(for: sentence)
-            print("🎯 View model created, triggering translation")
-            
-            // Trigger translation in background
-            Task {
-                await sentenceVM.translateIfNeeded()
-                print("🎯 Translation completed")
-            }
+            print("🎯 View model created")
         } else {
-            print("🎯 Sentence already fully translated (has both English and pinyin)")
+            print("🎯 Sentence already translated")
         }
     }
 }

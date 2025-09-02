@@ -127,21 +127,17 @@ struct Sentence: Identifiable, Codable, Hashable {
     let text: String
     let rangeInImage: CGRect? // For static images
     var tokens: [Token]
-    var pinyin: [String]
-    var english: String?
     var plecoURL: URL
     var audioAsset: AudioAsset?
     var status: SentenceStatus
     var timestamp: TimeInterval? // Deprecated - kept for backwards compatibility
     var frameAppearances: [FrameAppearance]? // For videos: all frames where this text appears
     
-    init(id: UUID = UUID(), text: String, rangeInImage: CGRect? = nil, tokens: [Token] = [], pinyin: [String] = [], english: String? = nil, plecoURL: URL? = nil, audioAsset: AudioAsset? = nil, status: SentenceStatus = .pending, timestamp: TimeInterval? = nil, frameAppearances: [FrameAppearance]? = nil) {
+    init(id: UUID = UUID(), text: String, rangeInImage: CGRect? = nil, tokens: [Token] = [], plecoURL: URL? = nil, audioAsset: AudioAsset? = nil, status: SentenceStatus = .pending, timestamp: TimeInterval? = nil, frameAppearances: [FrameAppearance]? = nil) {
         self.id = id
         self.text = text
         self.rangeInImage = rangeInImage
         self.tokens = tokens
-        self.pinyin = pinyin
-        self.english = english
         self.plecoURL = plecoURL ?? URL(string: "plecoapi://x-callback-url/s?q=\(text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
         self.audioAsset = audioAsset
         self.status = status

@@ -70,35 +70,6 @@ struct ExpandedSentenceView: View {
                 .foregroundStyle(T.C.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            // Pinyin
-            if !sentenceVM.sentence.pinyin.isEmpty {
-                Text(sentenceVM.sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 16))
-                    .foregroundStyle(T.C.ink2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if !sentence.pinyin.isEmpty {
-                Text(sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 16))
-                    .foregroundStyle(T.C.ink2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            
-            // English translation or loading indicator
-            if sentenceVM.isTranslating {
-                HStack {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Translating...")
-                        .font(.system(size: 16))
-                        .foregroundStyle(T.C.ink2.opacity(0.7))
-                }
-            } else if let english = sentenceVM.sentence.english ?? sentence.english,
-                      english != "Generating..." {
-                Text(english)
-                    .font(.system(size: 16))
-                    .foregroundStyle(T.C.ink2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
             
             // Action buttons
             HStack(alignment: .center, spacing: 0) {
@@ -166,10 +137,6 @@ struct ExpandedSentenceView: View {
                 context: $chatGPTContext,
                 isPresented: $showingChatGPTInput
             )
-        }
-        .task {
-            // Trigger translation if needed
-            await sentenceVM.translateIfNeeded()
         }
     }
 }

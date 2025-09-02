@@ -612,8 +612,6 @@ class HomeViewModel: ObservableObject {
                     text: text,
                     rangeInImage: primaryBbox,
                     tokens: [],
-                    pinyin: [],
-                    english: nil, // Don't set "Generating..." - will translate on-demand
                     status: .ocrOnly,
                     timestamp: appearances.first?.timestamp, // Keep first timestamp for compatibility
                     frameAppearances: appearances // Store all appearances
@@ -984,8 +982,6 @@ class HomeViewModel: ObservableObject {
                         text: normalizedChinese,
                         rangeInImage: line.bbox, // Use the bbox from OCR
                         tokens: [],
-                        pinyin: [pinyin],
-                        english: english,
                         status: .translated
                     ))
                 }
@@ -1003,8 +999,6 @@ class HomeViewModel: ObservableObject {
                     text: normalizedText,
                     rangeInImage: line.bbox, // Use the bbox from OCR
                     tokens: [],
-                    pinyin: [],
-                    english: "Generating...",
                     status: .ocrOnly
                 )
                 logger.debug("📝 Created sentence with ID: \(newSentence.id)")
@@ -1106,7 +1100,7 @@ class HomeViewModel: ObservableObject {
                 ) { [weak self] processed in
                     guard let self = self else { return }
                     
-                    logger.info("🔄 Received processed sentence \(processed.index): english='\(processed.english)', pinyin=\(processed.pinyin)")
+                    logger.info("🔄 Received processed sentence \(processed.index): chinese='\(processed.chinese)'")
                     
                     // Update progress (Note: This callback is not async)
                     Task { @MainActor in
@@ -1126,8 +1120,6 @@ class HomeViewModel: ObservableObject {
                         text: processed.chinese,
                         rangeInImage: originalSentence.rangeInImage, // Keep the original bbox
                         tokens: [],
-                        pinyin: processed.pinyin,
-                        english: processed.english,
                         status: .translated
                     )
                     
@@ -1173,8 +1165,6 @@ class HomeViewModel: ObservableObject {
                                 text: processed.chinese,
                                 rangeInImage: originalSentence.rangeInImage, // Keep the original bbox
                                 tokens: [],
-                                pinyin: processed.pinyin,
-                                english: processed.english,
                                 status: .translated
                             )
                         }
