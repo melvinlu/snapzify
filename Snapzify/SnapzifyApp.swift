@@ -29,6 +29,7 @@ struct SnapzifyApp: App {
                     checkForSharedContent()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    logger.info("App became active - checking for shared content and queued media")
                     checkForSharedContent()
                     checkForQueuedMedia()
                 }
@@ -75,17 +76,35 @@ struct SnapzifyApp: App {
     }
     
     private func checkForQueuedMedia() {
-        // Check for queued media items
-        guard let sharedContainerURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
-        ) else { return }
+        logger.info("Checking for queued media...")
         
-        let queueFileURL = sharedContainerURL.appendingPathComponent("mediaQueue.json")
+        // Check for queued media items - try app group first, then fallback to app container
+        var containerURL: URL
+        
+        if let sharedContainerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
+        ) {
+            containerURL = sharedContainerURL
+            logger.info("Using shared container for queue")
+        } else {
+            // Fallback to app's Documents directory
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            containerURL = documentsPath.deletingLastPathComponent()
+            logger.info("App group unavailable, using app container for queue")
+        }
+        
+        let queueFileURL = containerURL.appendingPathComponent("mediaQueue.json")
+        logger.info("Queue file path: \(queueFileURL.path)")
         
         // Load queue metadata
-        guard let data = try? Data(contentsOf: queueFileURL),
-              let queueItems = try? JSONDecoder().decode([QueueItem].self, from: data),
+        guard let data = try? Data(contentsOf: queueFileURL) else {
+            logger.info("No queue file found or unable to read")
+            return
+        }
+        
+        guard let queueItems = try? JSONDecoder().decode([QueueItem].self, from: data),
               !queueItems.isEmpty else {
+            logger.info("Queue is empty or failed to decode")
             return
         }
         
@@ -98,32 +117,51 @@ struct SnapzifyApp: App {
             appState.shouldProcessQueue = true
             
             // Load and process the media file
-            let queueDirectory = sharedContainerURL.appendingPathComponent("QueuedMedia")
+            let queueDirectory = containerURL.appendingPathComponent("QueuedMedia")
             let fileURL = queueDirectory.appendingPathComponent(oldestItem.fileName)
             
-            if let mediaData = try? Data(contentsOf: fileURL) {
-                if oldestItem.isVideo {
-                    // Process as video
-                    appState.pendingActionVideo = oldestItem.fileName
-                    appState.shouldProcessActionVideo = true
-                } else {
-                    // Process as image
-                    if let image = UIImage(data: mediaData) {
-                        appState.pendingSharedImage = image
-                        appState.shouldProcessSharedImage = true
+            logger.info("Looking for media file at: \(fileURL.path)")
+            
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                logger.info("Media file exists, loading...")
+                
+                if let mediaData = try? Data(contentsOf: fileURL) {
+                    logger.info("Media data loaded, size: \(mediaData.count) bytes")
+                    
+                    if oldestItem.isVideo {
+                        // Process as video
+                        logger.info("Processing as video")
+                        appState.pendingActionVideo = oldestItem.fileName
+                        appState.shouldProcessActionVideo = true
+                    } else {
+                        // Process as image
+                        if let image = UIImage(data: mediaData) {
+                            logger.info("Processing as image, size: \(image.size.width)x\(image.size.height)")
+                            appState.pendingSharedImage = image
+                            appState.shouldProcessSharedImage = true
+                            appState.shouldProcessQueue = true  // Mark that this is from queue
+                        } else {
+                            logger.error("Failed to create UIImage from data")
+                        }
                     }
+                    
+                    // Remove from queue after processing starts
+                    var updatedItems = queueItems
+                    updatedItems.removeAll { $0.id == oldestItem.id }
+                    
+                    if let updatedData = try? JSONEncoder().encode(updatedItems) {
+                        try? updatedData.write(to: queueFileURL)
+                        logger.info("Updated queue, remaining items: \(updatedItems.count)")
+                    }
+                    
+                    // Clean up the file
+                    try? FileManager.default.removeItem(at: fileURL)
+                    logger.info("Cleaned up media file")
+                } else {
+                    logger.error("Failed to load media data from file")
                 }
-                
-                // Remove from queue after processing starts
-                var updatedItems = queueItems
-                updatedItems.removeAll { $0.id == oldestItem.id }
-                
-                if let updatedData = try? JSONEncoder().encode(updatedItems) {
-                    try? updatedData.write(to: queueFileURL)
-                }
-                
-                // Clean up the file
-                try? FileManager.default.removeItem(at: fileURL)
+            } else {
+                logger.error("Media file does not exist at path: \(fileURL.path)")
             }
         }
     }
@@ -200,6 +238,8 @@ struct ContentView: View {
                     homeVM.onOpenDocument = { document in
                         selectedDocument = document
                     }
+                    // Set appState reference
+                    homeVM.appState = appState
                 }
                 .navigationDestination(item: $selectedDocument) { document in
                     if document.isVideo {
@@ -279,18 +319,33 @@ struct ContentView: View {
                     selectedDocument = document
                 }
             }
+            // Set appState reference
+            homeVM.appState = appState
         }
         .onChange(of: appState.shouldProcessSharedImage) { shouldProcess in
+            logger.info("onChange shouldProcessSharedImage triggered: \(shouldProcess)")
             if shouldProcess, let image = appState.pendingSharedImage {
-                logger.info("Processing shared image from app state")
+                logger.info("Processing shared image from app state - isQueue: \(appState.shouldProcessQueue)")
                 
                 Task {
-                    await homeVM.processSharedImage(image)
+                    // Use processQueuedImage if this is from the queue, otherwise use processSharedImage
+                    if appState.shouldProcessQueue {
+                        logger.info("Processing as queued image")
+                        await homeVM.processQueuedImage(image)
+                        await MainActor.run {
+                            appState.shouldProcessQueue = false
+                        }
+                    } else {
+                        logger.info("Processing as shared image")
+                        await homeVM.processSharedImage(image)
+                    }
                     await MainActor.run {
                         appState.shouldProcessSharedImage = false
                         appState.pendingSharedImage = nil
                     }
                 }
+            } else {
+                logger.info("Skipping processing - shouldProcess: \(shouldProcess), hasImage: \(appState.pendingSharedImage != nil)")
             }
         }
         .onChange(of: appState.shouldProcessActionImage) { shouldProcess in

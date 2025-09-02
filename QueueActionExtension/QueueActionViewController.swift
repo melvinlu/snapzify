@@ -6,7 +6,6 @@ import AVFoundation
 class QueueActionViewController: UIViewController {
     
     private var statusLabel: UILabel?
-    private var imageView: UIImageView?
     private var mediaData: Data?
     private var isVideo: Bool = false
     
@@ -25,14 +24,6 @@ class QueueActionViewController: UIViewController {
         container.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(container)
         
-        let imageView = UIImageView()
-        imageView.image = UIImage(systemName: "plus.square.on.square")
-        imageView.tintColor = .systemBlue
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(imageView)
-        self.imageView = imageView
-        
         let label = UILabel()
         label.text = "Adding to Queue..."
         label.font = .systemFont(ofSize: 16, weight: .medium)
@@ -45,16 +36,10 @@ class QueueActionViewController: UIViewController {
             container.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             container.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             container.widthAnchor.constraint(equalToConstant: 200),
-            container.heightAnchor.constraint(equalToConstant: 140),
+            container.heightAnchor.constraint(equalToConstant: 80),
             
-            imageView.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            imageView.topAnchor.constraint(equalTo: container.topAnchor, constant: 20),
-            imageView.widthAnchor.constraint(equalToConstant: 40),
-            imageView.heightAnchor.constraint(equalToConstant: 40),
-            
-            label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 15),
-            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
-            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20)
+            label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: container.centerYAnchor)
         ])
     }
     
@@ -119,20 +104,21 @@ class QueueActionViewController: UIViewController {
     
     private func addToQueue() {
         guard let data = mediaData else {
+            print("QueueAction: No media data to queue")
             done()
             return
         }
-        
-        // Update UI
-        imageView?.image = UIImage(systemName: isVideo ? "video.fill" : "photo.fill")
         
         // Save to shared container queue directory
         guard let sharedContainerURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
         ) else {
+            print("QueueAction: Failed to get shared container URL")
             done()
             return
         }
+        
+        print("QueueAction: Got shared container URL: \(sharedContainerURL.path)")
         
         let queueDirectory = sharedContainerURL.appendingPathComponent("QueuedMedia")
         try? FileManager.default.createDirectory(at: queueDirectory, withIntermediateDirectories: true)
@@ -150,8 +136,6 @@ class QueueActionViewController: UIViewController {
             // Update UI to show success
             DispatchQueue.main.async {
                 self.statusLabel?.text = "Added to Queue ✓"
-                self.imageView?.image = UIImage(systemName: "checkmark.circle.fill")
-                self.imageView?.tintColor = .systemGreen
                 
                 // Dismiss after short delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -173,12 +157,16 @@ class QueueActionViewController: UIViewController {
         }
         
         let queueFileURL = containerURL.appendingPathComponent("mediaQueue.json")
+        print("Queue file URL: \(queueFileURL.path)")
         
         // Load existing queue
         var queueItems: [QueueItem] = []
         if let data = try? Data(contentsOf: queueFileURL),
            let items = try? JSONDecoder().decode([QueueItem].self, from: data) {
             queueItems = items
+            print("Loaded \(queueItems.count) existing queue items")
+        } else {
+            print("No existing queue file or failed to load")
         }
         
         // Add new item
@@ -190,10 +178,18 @@ class QueueActionViewController: UIViewController {
             source: "queueActionExtension"
         )
         queueItems.append(newItem)
+        print("Adding new item: \(fileName), total items: \(queueItems.count)")
         
         // Save updated queue
         if let data = try? JSONEncoder().encode(queueItems) {
-            try? data.write(to: queueFileURL)
+            do {
+                try data.write(to: queueFileURL)
+                print("Successfully saved queue with \(queueItems.count) items")
+            } catch {
+                print("Failed to save queue: \(error)")
+            }
+        } else {
+            print("Failed to encode queue items")
         }
     }
     
