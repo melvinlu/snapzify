@@ -21,7 +21,7 @@ struct QueueProcessingView: View {
                         value: isAnimating
                     )
                 
-                Text("Processing media \(appState.currentQueueItemIndex) of \(appState.totalQueueItems) • \(appState.queueProcessingProgress)%")
+                Text("Processing media \(appState.currentQueueItemIndex) of \(appState.totalQueueItems)")
                     .font(.title3)
                     .fontWeight(.medium)
                     .foregroundColor(.white)

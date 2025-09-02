@@ -10,6 +10,10 @@ struct QueueItem: Codable {
     let source: String
 }
 
+extension Notification.Name {
+    static let openQueueDocument = Notification.Name("openQueueDocument")
+}
+
 @main
 struct SnapzifyApp: App {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "Main")
@@ -112,63 +116,105 @@ struct SnapzifyApp: App {
         
         // Set total queue items for progress display
         appState.totalQueueItems = queueItems.count
-        appState.currentQueueItemIndex = 1
+        appState.currentQueueItemIndex = 1  // Start at 1 for display
         appState.queueProcessingProgress = 0
+        appState.isProcessingQueue = true  // Show processing screen
         
-        // Process the oldest item
+        // Process ALL items in queue
+        Task {
+            await processAllQueuedItems(queueItems, containerURL: containerURL, queueFileURL: queueFileURL)
+        }
+    }
+    
+    private func processAllQueuedItems(_ queueItems: [QueueItem], containerURL: URL, queueFileURL: URL) async {
         let sortedItems = queueItems.sorted { $0.queuedAt < $1.queuedAt }
-        if let oldestItem = sortedItems.first {
-            logger.info("Processing queued item from \(oldestItem.source)")
-            appState.shouldProcessQueue = true
+        var processedDocuments: [Document] = []
+        
+        for (index, item) in sortedItems.enumerated() {
+            logger.info("Processing queue item \(index + 1) of \(sortedItems.count)")
             
-            // Load and process the media file
+            // Update progress - show which item we're processing
+            await MainActor.run {
+                appState.currentQueueItemIndex = index + 1
+                appState.queueProcessingProgress = 0  // Start at 0% for each item
+            }
+            
             let queueDirectory = containerURL.appendingPathComponent("QueuedMedia")
-            let fileURL = queueDirectory.appendingPathComponent(oldestItem.fileName)
-            
-            logger.info("Looking for media file at: \(fileURL.path)")
+            let fileURL = queueDirectory.appendingPathComponent(item.fileName)
             
             if FileManager.default.fileExists(atPath: fileURL.path) {
-                logger.info("Media file exists, loading...")
-                
                 if let mediaData = try? Data(contentsOf: fileURL) {
-                    logger.info("Media data loaded, size: \(mediaData.count) bytes")
-                    
-                    if oldestItem.isVideo {
-                        // Process as video
-                        logger.info("Processing as video")
-                        appState.pendingActionVideo = oldestItem.fileName
-                        appState.shouldProcessActionVideo = true
+                    if item.isVideo {
+                        // TODO: Process video
+                        logger.info("Video processing not yet implemented for batch queue")
                     } else {
                         // Process as image
                         if let image = UIImage(data: mediaData) {
-                            logger.info("Processing as image, size: \(image.size.width)x\(image.size.height)")
-                            appState.pendingSharedImage = image
-                            appState.shouldProcessSharedImage = true
-                            appState.shouldProcessQueue = true  // Mark that this is from queue
-                            appState.isProcessingQueue = true  // Show processing screen
-                        } else {
-                            logger.error("Failed to create UIImage from data")
+                            logger.info("Processing image \(index + 1) of \(sortedItems.count)")
+                            
+                            // Process the image and get the document
+                            if let document = await processQueuedImage(image, progressIndex: index, totalItems: sortedItems.count) {
+                                processedDocuments.append(document)
+                            }
                         }
-                    }
-                    
-                    // Remove from queue after processing starts
-                    var updatedItems = queueItems
-                    updatedItems.removeAll { $0.id == oldestItem.id }
-                    
-                    if let updatedData = try? JSONEncoder().encode(updatedItems) {
-                        try? updatedData.write(to: queueFileURL)
-                        logger.info("Updated queue, remaining items: \(updatedItems.count)")
                     }
                     
                     // Clean up the file
                     try? FileManager.default.removeItem(at: fileURL)
-                    logger.info("Cleaned up media file")
-                } else {
-                    logger.error("Failed to load media data from file")
+                }
+            }
+        }
+        
+        // Clear the queue file
+        try? FileManager.default.removeItem(at: queueFileURL)
+        
+        // All items processed, now show the first document
+        await MainActor.run {
+            if !processedDocuments.isEmpty {
+                logger.info("📱 QUEUE COMPLETE - Setting \(processedDocuments.count) documents in queue")
+                appState.queueDocuments = processedDocuments
+                appState.currentQueueIndex = 0
+                appState.currentQueueDocument = processedDocuments[0]
+                appState.isProcessingQueue = false
+                
+                logger.info("📱 Queue documents set: \(appState.queueDocuments.map { $0.id })")
+                
+                // Navigate to the first document
+                if let contentView = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController {
+                    // This will trigger navigation through the ContentView's state
+                    NotificationCenter.default.post(name: .openQueueDocument, object: processedDocuments[0])
                 }
             } else {
-                logger.error("Media file does not exist at path: \(fileURL.path)")
+                logger.info("📱 No documents processed from queue")
+                appState.isProcessingQueue = false
             }
+        }
+    }
+    
+    private func processQueuedImage(_ image: UIImage, progressIndex: Int, totalItems: Int) async -> Document? {
+        // Create a temporary HomeViewModel instance to process the image
+        let serviceContainer = ServiceContainer.shared
+        let homeViewModel = serviceContainer.makeHomeViewModel(
+            onOpenSettings: { },
+            onOpenDocument: { _ in }
+        )
+        
+        // Set up progress callback based on Chinese text processing
+        homeViewModel.onProcessingProgress = { progress in
+            Task { @MainActor in
+                // Progress is 0-1 based on Chinese lines processed
+                appState.queueProcessingProgress = Int(progress * 100)
+                logger.info("Queue item \(progressIndex + 1)/\(totalItems) - Chinese lines progress: \(appState.queueProcessingProgress)%")
+            }
+        }
+        
+        do {
+            // Process the image and return the document
+            let document = try await homeViewModel.processImageForQueue(image)
+            return document
+        } catch {
+            logger.error("Failed to process queued image: \(error)")
+            return nil
         }
     }
     
@@ -220,6 +266,7 @@ struct ContentView: View {
     @State private var actionExtensionImage: IdentifiableImage?
     @State private var actionExtensionVideo: IdentifiableVideoURL?
     @State private var showQueueProcessing = false
+    @State private var showingQueueView = false
     @StateObject private var homeVM: HomeViewModel
     
     private let logger = Logger(subsystem: "com.snapzify.app", category: "ContentView")
@@ -248,7 +295,20 @@ struct ContentView: View {
                     // Set appState reference
                     homeVM.appState = appState
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .openQueueDocument)) { notification in
+                    if let document = notification.object as? Document {
+                        // Check if we have multiple queue documents
+                        if appState.queueDocuments.count > 1 {
+                            // Show queue view for multiple documents
+                            showingQueueView = true
+                        } else {
+                            // Show single document
+                            selectedDocument = document
+                        }
+                    }
+                }
                 .navigationDestination(item: $selectedDocument) { document in
+                    // Single document view (when not in queue mode)
                     if document.isVideo {
                         VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
                     } else {
@@ -310,6 +370,15 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $appState.isProcessingQueue) {
             QueueProcessingView()
                 .environmentObject(appState)
+        }
+        .fullScreenCover(isPresented: $showingQueueView) {
+            if !appState.queueDocuments.isEmpty {
+                QueueDocumentView(
+                    documents: appState.queueDocuments,
+                    initialIndex: appState.currentQueueIndex
+                )
+                .environmentObject(appState)
+            }
         }
         .onAppear {
             // Set up callbacks after view is created

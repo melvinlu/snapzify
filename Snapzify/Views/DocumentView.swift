@@ -420,6 +420,13 @@ struct DocumentView: View {
         NavigationStack {
             content
         }
+        .onAppear {
+            print("📱 DocumentView appeared - Queue docs count: \(appState.queueDocuments.count)")
+            if !appState.queueDocuments.isEmpty {
+                print("📱 Queue documents IDs: \(appState.queueDocuments.map { $0.id })")
+                print("📱 Current document ID: \(vm.document.id)")
+            }
+        }
     }
     
     @ViewBuilder
@@ -484,8 +491,19 @@ struct DocumentView: View {
                         !showingTranscript ?
                         DragGesture(minimumDistance: 30)
                             .onChanged { value in
-                                // Only handle horizontal swipes
-                                if abs(value.translation.width) > abs(value.translation.height) && value.translation.width < 0 {
+                                print("🎯 IMAGE GESTURE onChanged - X: \(value.translation.width), Y: \(value.translation.height)")
+                                
+                                // Check if we have queue documents for vertical swipes
+                                let hasQueue = !appState.queueDocuments.isEmpty
+                                let isVertical = abs(value.translation.height) > abs(value.translation.width) * 1.2
+                                let isHorizontal = abs(value.translation.width) > abs(value.translation.height) * 1.2
+                                
+                                if hasQueue && isVertical && !isNavigatingQueue {
+                                    // Handle vertical swipe for queue navigation - update without animation for smooth dragging
+                                    dragOffset = value.translation.height
+                                } else if isHorizontal && value.translation.width < 0 {
+                                    // Handle horizontal swipe for transcript
+                                    print("🎯 HORIZONTAL detected on image - opening transcript")
                                     if !isDraggingTranscript {
                                         isDraggingTranscript = true
                                     }
@@ -493,16 +511,49 @@ struct DocumentView: View {
                                 }
                             }
                             .onEnded { value in
-                                let threshold = geometry.size.width * 0.25
-                                let velocity = value.predictedEndTranslation.width - value.translation.width
+                                print("🎯 IMAGE GESTURE onEnded - X: \(value.translation.width), Y: \(value.translation.height)")
                                 
-                                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
-                                    if -value.translation.width > threshold || velocity < -200 {
-                                        showingTranscript = true
-                                        transcriptDragOffset = 0
-                                    } else {
-                                        showingTranscript = false
-                                        isDraggingTranscript = false
+                                let hasQueue = !appState.queueDocuments.isEmpty
+                                let isVertical = abs(value.translation.height) > abs(value.translation.width)
+                                let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
+                                
+                                if hasQueue && isVertical && !isNavigatingQueue {
+                                    // Handle vertical swipe completion for queue
+                                    let threshold: CGFloat = 50
+                                    let velocity = value.predictedEndTranslation.height - value.translation.height
+                                    
+                                    print("🎯 Processing VERTICAL swipe - threshold: \(threshold), translation: \(value.translation.height)")
+                                    
+                                    withAnimation(.spring()) {
+                                        if value.translation.height > threshold || velocity > 100 {
+                                            print("🎯 Navigate to PREVIOUS")
+                                            navigateToPreviousInQueue()
+                                        } else if value.translation.height < -threshold || velocity < -100 {
+                                            print("🎯 Navigate to NEXT")
+                                            navigateToNextInQueue()
+                                        } else {
+                                            dragOffset = 0
+                                        }
+                                    }
+                                } else if isHorizontal {
+                                    // Handle horizontal swipe completion for transcript
+                                    let threshold = geometry.size.width * 0.25
+                                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                                    
+                                    withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                        if -value.translation.width > threshold || velocity < -200 {
+                                            showingTranscript = true
+                                            transcriptDragOffset = 0
+                                        } else {
+                                            showingTranscript = false
+                                            isDraggingTranscript = false
+                                            transcriptDragOffset = 0
+                                        }
+                                    }
+                                } else {
+                                    // Reset both if gesture is ambiguous
+                                    withAnimation(.spring()) {
+                                        dragOffset = 0
                                         transcriptDragOffset = 0
                                     }
                                 }
@@ -615,6 +666,18 @@ struct DocumentView: View {
                         
                         Spacer()
                         
+                        // Queue position indicator (if in queue)
+                        if !appState.queueDocuments.isEmpty,
+                           let currentIndex = appState.queueDocuments.firstIndex(where: { $0.id == vm.document.id }) {
+                            Text("\(currentIndex + 1)/\(appState.queueDocuments.count)")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(Color.black.opacity(0.5)))
+                        }
+                        
                         // Rename button
                         Button {
                             newDocumentName = vm.document.customName ?? ""
@@ -712,83 +775,10 @@ struct DocumentView: View {
                 )
             }
             
-            // Queue navigation indicator
-            if !appState.queueDocuments.isEmpty {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 4) {
-                            if let currentIndex = appState.queueDocuments.firstIndex(where: { $0.id == vm.document.id }) {
-                                if currentIndex > 0 {
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.6))
-                                }
-                                Text("\(currentIndex + 1)/\(appState.queueDocuments.count)")
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.6))
-                                if currentIndex < appState.queueDocuments.count - 1 {
-                                    Image(systemName: "chevron.up")
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.6))
-                                }
-                            }
-                        }
-                        .padding(8)
-                        .background(Color.black.opacity(0.5))
-                        .cornerRadius(8)
-                        .padding()
-                    }
-                }
-            }
             
         }
         .navigationBarHidden(true)
         .offset(y: dragOffset)
-        .gesture(
-            DragGesture(minimumDistance: 30)
-                .onChanged { value in
-                    // Only allow vertical swipes if we have queue documents and not already navigating
-                    if !appState.queueDocuments.isEmpty && !isNavigatingQueue {
-                        // Only respond to vertical swipes (ignore if horizontal swipe is stronger)
-                        if abs(value.translation.height) > abs(value.translation.width) * 1.5 {
-                            dragOffset = value.translation.height
-                        }
-                    }
-                }
-                .onEnded { value in
-                    guard !appState.queueDocuments.isEmpty && !isNavigatingQueue else {
-                        withAnimation(.spring()) {
-                            dragOffset = 0
-                        }
-                        return
-                    }
-                    
-                    // Lower threshold for easier swiping
-                    let threshold: CGFloat = 50
-                    let velocity = value.predictedEndTranslation.height - value.translation.height
-                    
-                    // Only process if it's primarily a vertical swipe
-                    if abs(value.translation.height) > abs(value.translation.width) {
-                        withAnimation(.spring()) {
-                            if value.translation.height > threshold || velocity > 100 {
-                                // Swipe down - previous in queue
-                                navigateToPreviousInQueue()
-                            } else if value.translation.height < -threshold || velocity < -100 {
-                                // Swipe up - next in queue
-                                navigateToNextInQueue()
-                            } else {
-                                dragOffset = 0
-                            }
-                        }
-                    } else {
-                        withAnimation(.spring()) {
-                            dragOffset = 0
-                        }
-                    }
-                }
-        )
         .alert("Delete Document", isPresented: $vm.showDeleteImageAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -890,22 +880,29 @@ struct DocumentView: View {
     }
     
     private func navigateToPreviousInQueue() {
+        print("📱 NavigateToPrevious - Queue docs count: \(appState.queueDocuments.count)")
+        print("📱 Current document ID: \(vm.document.id)")
+        
         guard let currentIndex = appState.queueDocuments.firstIndex(where: { $0.id == vm.document.id }),
               currentIndex > 0 else {
+            print("📱 Cannot navigate previous - at start or not found in queue")
             dragOffset = 0
             return
         }
         
+        print("📱 Current index: \(currentIndex), navigating to: \(currentIndex - 1)")
         isNavigatingQueue = true
         let previousDocument = appState.queueDocuments[currentIndex - 1]
         appState.currentQueueIndex = currentIndex - 1
         appState.currentQueueDocument = previousDocument
         
+        print("📱 Updating view model to document: \(previousDocument.id)")
         // Update the view model with the new document
         vm.updateDocument(previousDocument)
         
         // Reset offset
         dragOffset = 0
         isNavigatingQueue = false
+        print("📱 Navigation to previous complete")
     }
 }

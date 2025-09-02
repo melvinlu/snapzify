@@ -133,14 +133,9 @@ class QueueActionViewController: UIViewController {
             // Add to queue metadata
             addToQueueMetadata(fileName: fileName, isVideo: isVideo, containerURL: sharedContainerURL)
             
-            // Update UI to show success
+            // Dismiss immediately - no need to show success
             DispatchQueue.main.async {
-                self.statusLabel?.text = "Added to Queue ✓"
-                
-                // Dismiss after very short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.done()
-                }
+                self.done()
             }
         } catch {
             done()

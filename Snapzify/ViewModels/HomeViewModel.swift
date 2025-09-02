@@ -46,6 +46,7 @@ class HomeViewModel: ObservableObject {
     private let streamingChineseProcessingService: StreamingChineseProcessingService = ServiceContainer.shared.streamingChineseProcessingService
     var onOpenSettings: () -> Void
     var onOpenDocument: (Document) -> Void
+    var onProcessingProgress: ((Double) -> Void)?
     @AppStorage("selectedScript") private var selectedScript: String = ChineseScript.simplified.rawValue
     
     struct LatestScreenshotInfo {
@@ -748,6 +749,25 @@ class HomeViewModel: ObservableObject {
         }
     }
     
+    func processImageForQueue(_ image: UIImage, source: DocumentSource = .shareExtension) async throws -> Document {
+        // Process image without navigation and without adding to queue documents
+        let script = ChineseScript(rawValue: selectedScript) ?? .simplified
+        
+        // Report progress based on Chinese text processing
+        let document = try await processImageCore(
+            image,
+            source: source,
+            script: script,
+            assetIdentifier: nil,
+            shouldNavigate: false
+        )
+        
+        // Report completion
+        onProcessingProgress?(1.0)
+        
+        return document
+    }
+    
     func processSharedImage(_ image: UIImage) async {
         // Process shared image with high priority
         await Task(priority: .high) {
@@ -1137,6 +1157,10 @@ class HomeViewModel: ObservableObject {
                         if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
                             self.activeProcessingTasks[index].progress = "Translating... (\(processed.index + 1)/\(chineseLinesToProcess.count))"
                         }
+                        
+                        // Report progress to callback
+                        let progress = Double(processed.index + 1) / Double(chineseLinesToProcess.count)
+                        self.onProcessingProgress?(progress)
                     }
                     
                     // Update sentence as soon as it's processed
