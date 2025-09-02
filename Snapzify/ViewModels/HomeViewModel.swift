@@ -19,6 +19,7 @@ class HomeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var processingProgress: String = ""
     @Published var activeProcessingTasks: [ProcessingTask] = []
+    weak var appState: AppState?
     
     struct ProcessingTask: Identifiable {
         let id: UUID
@@ -739,6 +740,14 @@ class HomeViewModel: ObservableObject {
         return frames
     }
     
+    func processQueuedImage(_ image: UIImage, source: DocumentSource = .shareExtension) async {
+        do {
+            _ = try await processImage(image, source: source, forQueue: true)
+        } catch {
+            logger.error("Failed to process queued image: \(error)")
+        }
+    }
+    
     func processSharedImage(_ image: UIImage) async {
         // Process shared image with high priority
         await Task(priority: .high) {
@@ -887,15 +896,31 @@ class HomeViewModel: ObservableObject {
         return false
     }
     
-    private func processImage(_ image: UIImage, source: DocumentSource, assetIdentifier: String? = nil) async throws -> Document {
+    private func processImage(_ image: UIImage, source: DocumentSource, assetIdentifier: String? = nil, forQueue: Bool = false) async throws -> Document {
         let script = ChineseScript(rawValue: selectedScript) ?? .simplified
-        return try await processImageCore(
+        let document = try await processImageCore(
             image,
             source: source,
             script: script,
             assetIdentifier: assetIdentifier,
-            shouldNavigate: true
+            shouldNavigate: !forQueue  // Don't navigate immediately if processing for queue
         )
+        
+        // If processing for queue, add to queue documents and navigate if it's the first
+        if forQueue {
+            await MainActor.run {
+                appState?.queueDocuments.append(document)
+                
+                // If this is the first queue item, navigate to it
+                if appState?.queueDocuments.count == 1 {
+                    appState?.currentQueueIndex = 0
+                    appState?.currentQueueDocument = document
+                    onOpenDocument(document)
+                }
+            }
+        }
+        
+        return document
     }
     
     private func processImageCore(
@@ -970,7 +995,7 @@ class HomeViewModel: ObservableObject {
             if components.count == 3 {
                 // This is parsed data - handle separately
                 let chinese = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                let pinyin = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                let _ = components[1].trimmingCharacters(in: .whitespacesAndNewlines) // pinyin - no longer used
                 let english = components[2].trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 if containsChinese(chinese) {

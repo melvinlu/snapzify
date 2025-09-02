@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Open in Snapzify</string>
+	<string>Queue in Snapzify</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -36,9 +36,9 @@
 			<key>NSExtensionServiceAllowsTouchBarItem</key>
 			<true/>
 			<key>NSExtensionServiceToolbarDefaultItemIdentifier</key>
-			<string>com.snapzify.app.ActionExtension</string>
+			<string>com.snapzify.app.QueueActionExtension</string>
 			<key>NSExtensionServiceToolbarItemName</key>
-			<string>Snapzify</string>
+			<string>Queue in Snapzify</string>
 		</dict>
 		<key>NSExtensionMainStoryboard</key>
 		<string>MainInterface</string>

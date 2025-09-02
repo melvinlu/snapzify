@@ -3,15 +3,17 @@ import MobileCoreServices
 import UniformTypeIdentifiers
 import AVFoundation
 
-class ActionViewController: UIViewController {
+class QueueActionViewController: UIViewController {
     
     private var statusLabel: UILabel?
     private var imageView: UIImageView?
+    private var mediaData: Data?
+    private var isVideo: Bool = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        processMedia()
+        processAndQueueMedia()
     }
     
     private func setupUI() {
@@ -24,7 +26,7 @@ class ActionViewController: UIViewController {
         view.addSubview(container)
         
         let imageView = UIImageView()
-        imageView.image = UIImage(systemName: "doc.text.viewfinder")
+        imageView.image = UIImage(systemName: "plus.square.on.square")
         imageView.tintColor = .systemBlue
         imageView.contentMode = .scaleAspectFit
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -32,7 +34,7 @@ class ActionViewController: UIViewController {
         self.imageView = imageView
         
         let label = UILabel()
-        label.text = "Opening in Snapzify..."
+        label.text = "Adding to Queue..."
         label.font = .systemFont(ofSize: 16, weight: .medium)
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -56,7 +58,7 @@ class ActionViewController: UIViewController {
         ])
     }
     
-    private func processMedia() {
+    private func processAndQueueMedia() {
         guard let item = extensionContext?.inputItems.first as? NSExtensionItem,
               let attachments = item.attachments else {
             self.done()
@@ -71,8 +73,10 @@ class ActionViewController: UIViewController {
                     
                     if let url = item as? URL {
                         if let videoData = try? Data(contentsOf: url) {
+                            self.mediaData = videoData
+                            self.isVideo = true
                             DispatchQueue.main.async {
-                                self.saveAndOpenInApp(videoData, isVideo: true)
+                                self.addToQueue()
                             }
                         } else {
                             self.done()
@@ -99,8 +103,10 @@ class ActionViewController: UIViewController {
                     }
                     
                     if let imageData = imageData {
+                        self.mediaData = imageData
+                        self.isVideo = false
                         DispatchQueue.main.async {
-                            self.saveAndOpenInApp(imageData, isVideo: false)
+                            self.addToQueue()
                         }
                     } else {
                         self.done()
@@ -111,11 +117,16 @@ class ActionViewController: UIViewController {
         }
     }
     
-    private func saveAndOpenInApp(_ data: Data, isVideo: Bool) {
+    private func addToQueue() {
+        guard let data = mediaData else {
+            done()
+            return
+        }
+        
         // Update UI
         imageView?.image = UIImage(systemName: isVideo ? "video.fill" : "photo.fill")
         
-        // Save to shared container temporarily
+        // Save to shared container queue directory
         guard let sharedContainerURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
         ) else {
@@ -123,45 +134,66 @@ class ActionViewController: UIViewController {
             return
         }
         
-        let tempDirectory = sharedContainerURL.appendingPathComponent("ActionTemp")
-        try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        let queueDirectory = sharedContainerURL.appendingPathComponent("QueuedMedia")
+        try? FileManager.default.createDirectory(at: queueDirectory, withIntermediateDirectories: true)
         
         let fileExtension = isVideo ? "mov" : "jpg"
-        let fileName = "action_\(Date().timeIntervalSince1970).\(fileExtension)"
-        let fileURL = tempDirectory.appendingPathComponent(fileName)
+        let fileName = UUID().uuidString + ".\(fileExtension)"
+        let fileURL = queueDirectory.appendingPathComponent(fileName)
         
         do {
             try data.write(to: fileURL)
             
-            // Create URL to open main app with the media reference
-            let scheme = isVideo ? "process-video" : "process-image"
-            if let url = URL(string: "snapzify://\(scheme)?file=\(fileName)") {
-                // Open the main app
-                DispatchQueue.main.async {
-                    self.openURL(url)
-                    
-                    // Dismiss extension after short delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.done()
-                    }
+            // Add to queue metadata
+            addToQueueMetadata(fileName: fileName, isVideo: isVideo, containerURL: sharedContainerURL)
+            
+            // Update UI to show success
+            DispatchQueue.main.async {
+                self.statusLabel?.text = "Added to Queue ✓"
+                self.imageView?.image = UIImage(systemName: "checkmark.circle.fill")
+                self.imageView?.tintColor = .systemGreen
+                
+                // Dismiss after short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    self.done()
                 }
-            } else {
-                done()
             }
         } catch {
             done()
         }
     }
     
-    @objc private func openURL(_ url: URL) {
-        var responder: UIResponder? = self
-        while responder != nil {
-            if let application = responder as? UIApplication {
-                // Use the non-deprecated open method
-                application.open(url, options: [:], completionHandler: nil)
-                break
-            }
-            responder = responder?.next
+    private func addToQueueMetadata(fileName: String, isVideo: Bool, containerURL: URL) {
+        struct QueueItem: Codable {
+            let id: String
+            let fileName: String
+            let isVideo: Bool
+            let queuedAt: Date
+            let source: String
+        }
+        
+        let queueFileURL = containerURL.appendingPathComponent("mediaQueue.json")
+        
+        // Load existing queue
+        var queueItems: [QueueItem] = []
+        if let data = try? Data(contentsOf: queueFileURL),
+           let items = try? JSONDecoder().decode([QueueItem].self, from: data) {
+            queueItems = items
+        }
+        
+        // Add new item
+        let newItem = QueueItem(
+            id: UUID().uuidString,
+            fileName: fileName,
+            isVideo: isVideo,
+            queuedAt: Date(),
+            source: "queueActionExtension"
+        )
+        queueItems.append(newItem)
+        
+        // Save updated queue
+        if let data = try? JSONEncoder().encode(queueItems) {
+            try? data.write(to: queueFileURL)
         }
     }
     

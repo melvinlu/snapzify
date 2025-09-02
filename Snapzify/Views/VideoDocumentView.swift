@@ -147,7 +147,10 @@ struct VideoDocumentView: View {
     @State private var showingTranscript = false
     @State private var transcriptDragOffset: CGFloat = 0
     @State private var isDraggingTranscript = false
+    @State private var dragOffset: CGFloat = 0
+    @State private var isNavigatingQueue = false
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
     
     private let frameInterval: TimeInterval = 0.2 // Must match extraction interval
     
@@ -445,6 +448,39 @@ struct VideoDocumentView: View {
         } message: {
             Text("Give this document a custom name")
         }
+        .offset(x: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    // Only allow horizontal swipes if we have queue documents
+                    if !appState.queueDocuments.isEmpty && !isNavigatingQueue {
+                        dragOffset = value.translation.width
+                    }
+                }
+                .onEnded { value in
+                    guard !appState.queueDocuments.isEmpty && !isNavigatingQueue else {
+                        withAnimation(.spring()) {
+                            dragOffset = 0
+                        }
+                        return
+                    }
+                    
+                    let threshold: CGFloat = 100
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    
+                    withAnimation(.spring()) {
+                        if value.translation.width > threshold || velocity > 200 {
+                            // Swipe right - previous in queue
+                            navigateToPreviousInQueue()
+                        } else if value.translation.width < -threshold || velocity < -200 {
+                            // Swipe left - next in queue
+                            navigateToNextInQueue()
+                        } else {
+                            dragOffset = 0
+                        }
+                    }
+                }
+        )
         .onChange(of: vm.shouldDismiss) { shouldDismiss in
             if shouldDismiss {
                 dismiss()
@@ -476,6 +512,40 @@ struct VideoDocumentView: View {
         } else {
             print("🎯 Sentence already translated")
         }
+    }
+    
+    private func navigateToNextInQueue() {
+        guard let currentIndex = appState.queueDocuments.firstIndex(where: { $0.id == vm.document.id }),
+              currentIndex < appState.queueDocuments.count - 1 else {
+            dragOffset = 0
+            return
+        }
+        
+        isNavigatingQueue = true
+        let nextDocument = appState.queueDocuments[currentIndex + 1]
+        appState.currentQueueIndex = currentIndex + 1
+        appState.currentQueueDocument = nextDocument
+        
+        // Reset offset and update document
+        dragOffset = 0
+        isNavigatingQueue = false
+    }
+    
+    private func navigateToPreviousInQueue() {
+        guard let currentIndex = appState.queueDocuments.firstIndex(where: { $0.id == vm.document.id }),
+              currentIndex > 0 else {
+            dragOffset = 0
+            return
+        }
+        
+        isNavigatingQueue = true
+        let previousDocument = appState.queueDocuments[currentIndex - 1]
+        appState.currentQueueIndex = currentIndex - 1
+        appState.currentQueueDocument = previousDocument
+        
+        // Reset offset and update document
+        dragOffset = 0
+        isNavigatingQueue = false
     }
 }
 

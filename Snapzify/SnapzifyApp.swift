@@ -1,6 +1,15 @@
 import SwiftUI
 import os.log
 
+// Queue item structure (matches what ActionExtension writes)
+struct QueueItem: Codable {
+    let id: String
+    let fileName: String
+    let isVideo: Bool
+    let queuedAt: Date
+    let source: String
+}
+
 @main
 struct SnapzifyApp: App {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "Main")
@@ -21,6 +30,7 @@ struct SnapzifyApp: App {
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
                     checkForSharedContent()
+                    checkForQueuedMedia()
                 }
         }
     }
@@ -61,6 +71,60 @@ struct SnapzifyApp: App {
     private func handleShareComplete(_ activity: NSUserActivity) {
         if let action = activity.userInfo?["action"] as? String, action == "refresh-documents" {
             appState.shouldRefreshDocuments = true
+        }
+    }
+    
+    private func checkForQueuedMedia() {
+        // Check for queued media items
+        guard let sharedContainerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
+        ) else { return }
+        
+        let queueFileURL = sharedContainerURL.appendingPathComponent("mediaQueue.json")
+        
+        // Load queue metadata
+        guard let data = try? Data(contentsOf: queueFileURL),
+              let queueItems = try? JSONDecoder().decode([QueueItem].self, from: data),
+              !queueItems.isEmpty else {
+            return
+        }
+        
+        logger.info("Found \(queueItems.count) queued items")
+        
+        // Process the oldest item
+        let sortedItems = queueItems.sorted { $0.queuedAt < $1.queuedAt }
+        if let oldestItem = sortedItems.first {
+            logger.info("Processing queued item from \(oldestItem.source)")
+            appState.shouldProcessQueue = true
+            
+            // Load and process the media file
+            let queueDirectory = sharedContainerURL.appendingPathComponent("QueuedMedia")
+            let fileURL = queueDirectory.appendingPathComponent(oldestItem.fileName)
+            
+            if let mediaData = try? Data(contentsOf: fileURL) {
+                if oldestItem.isVideo {
+                    // Process as video
+                    appState.pendingActionVideo = oldestItem.fileName
+                    appState.shouldProcessActionVideo = true
+                } else {
+                    // Process as image
+                    if let image = UIImage(data: mediaData) {
+                        appState.pendingSharedImage = image
+                        appState.shouldProcessSharedImage = true
+                    }
+                }
+                
+                // Remove from queue after processing starts
+                var updatedItems = queueItems
+                updatedItems.removeAll { $0.id == oldestItem.id }
+                
+                if let updatedData = try? JSONEncoder().encode(updatedItems) {
+                    try? updatedData.write(to: queueFileURL)
+                }
+                
+                // Clean up the file
+                try? FileManager.default.removeItem(at: fileURL)
+            }
         }
     }
     
@@ -302,4 +366,8 @@ class AppState: ObservableObject {
     @Published var pendingActionVideo: String?
     @Published var shouldProcessSharedImage = false
     @Published var pendingSharedImage: UIImage?
+    @Published var shouldProcessQueue = false
+    @Published var currentQueueDocument: Document?
+    @Published var queueDocuments: [Document] = []
+    @Published var currentQueueIndex: Int = 0
 }
