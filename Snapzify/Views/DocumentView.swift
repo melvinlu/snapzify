@@ -2,23 +2,39 @@ import SwiftUI
 
 // Structure to hold selected sentence data
 struct SelectedSentencePopup: View {
-    let sentence: Sentence
+    let sentences: [Sentence]  // Changed to array to support extended sentences
+    let allSentences: [Sentence]  // All sentences in document for finding next
     @ObservedObject var vm: SentenceViewModel
     @Binding var isShowing: Bool
     let position: CGPoint
     @Binding var showingChatGPTInput: Bool
     @Binding var chatGPTContext: String
+    @Binding var extendedSentenceIds: [UUID]
     @State private var chatGPTBreakdown = ""
     @State private var isLoadingBreakdown = false
     @State private var breakdownTask: Task<Void, Never>?
     
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     
+    // Computed property for concatenated text
+    private var concatenatedText: String {
+        sentences.map { $0.text }.joined(separator: " ")
+    }
+    
+    // Check if we can extend further
+    private var canExtend: Bool {
+        guard let lastSentence = sentences.last,
+              let currentIndex = allSentences.firstIndex(where: { $0.id == lastSentence.id }) else {
+            return false
+        }
+        return currentIndex < allSentences.count - 1
+    }
+    
     var body: some View {
         
         VStack(alignment: .leading, spacing: T.S.sm) {
-            // Chinese text
-            Text(sentence.text)
+            // Chinese text (concatenated if extended)
+            Text(concatenatedText)
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(T.C.ink)
             
@@ -92,6 +108,20 @@ struct SelectedSentencePopup: View {
                     .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
                 }
                 
+                // Spacing
+                Spacer().frame(width: T.S.sm)
+                
+                // Extend button
+                if canExtend {
+                    Button {
+                        extendWithNextSentence()
+                    } label: {
+                        Label("Extend", systemImage: "plus.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(PopupButtonStyle())
+                }
+                
                 // Push remaining space
                 Spacer(minLength: 0)
             }
@@ -106,13 +136,38 @@ struct SelectedSentencePopup: View {
         .onAppear {
             loadChatGPTBreakdown()
         }
+        .onChange(of: concatenatedText) { _ in
+            // Reload breakdown when text changes (i.e., when extended)
+            breakdownTask?.cancel()
+            chatGPTBreakdown = ""
+            loadChatGPTBreakdown()
+        }
         .onDisappear {
             breakdownTask?.cancel()
         }
     }
     
+    private func extendWithNextSentence() {
+        guard let lastSentence = sentences.last,
+              let currentIndex = allSentences.firstIndex(where: { $0.id == lastSentence.id }),
+              currentIndex < allSentences.count - 1 else {
+            return
+        }
+        
+        let nextSentence = allSentences[currentIndex + 1]
+        print("📝 Extending with next sentence: '\(nextSentence.text)'")
+        print("📝 Current sentences count: \(sentences.count)")
+        print("📝 Extended IDs before: \(extendedSentenceIds)")
+        extendedSentenceIds.append(nextSentence.id)
+        print("📝 Extended IDs after: \(extendedSentenceIds)")
+        // The onChange modifier will detect the change and reload the breakdown
+    }
+    
     private func loadChatGPTBreakdown() {
         guard chatGPTService.isConfigured() else { return }
+        
+        print("📝 Loading ChatGPT breakdown for text: '\(concatenatedText)'")
+        print("📝 Number of sentences: \(sentences.count)")
         
         isLoadingBreakdown = true
         chatGPTBreakdown = ""
@@ -120,7 +175,7 @@ struct SelectedSentencePopup: View {
         breakdownTask = Task {
             do {
                 var isFirstChunk = true
-                for try await chunk in chatGPTService.streamBreakdown(chineseText: sentence.text) {
+                for try await chunk in chatGPTService.streamBreakdown(chineseText: concatenatedText) {
                     if !Task.isCancelled {
                         await MainActor.run {
                             if isFirstChunk {
@@ -350,6 +405,7 @@ struct DocumentView: View {
     @State private var tapLocation: CGPoint = .zero
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
+    @State private var extendedSentenceIds: [UUID] = []
     @State private var showingRenameAlert = false
     @State private var newDocumentName = ""
     @State private var showingTranscript = false
@@ -459,24 +515,31 @@ struct DocumentView: View {
                    let sentenceId = selectedSentenceId,
                    let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
                     
-                    // let _ = print("🔹 Showing popup for sentence: text='\(sentence.text)'")
+                    // Build the array of sentences including any extended ones
+                    let displaySentences = [sentence] + extendedSentenceIds.compactMap { extendedId in
+                        vm.document.sentences.first(where: { $0.id == extendedId })
+                    }
                     
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
                         .onTapGesture {
                             withAnimation {
                                 showingPopup = false
+                                extendedSentenceIds = []  // Reset extended sentences
                             }
                         }
                     
                     SelectedSentencePopup(
-                        sentence: sentence,
+                        sentences: displaySentences,
+                        allSentences: vm.document.sentences,
                         vm: vm.createSentenceViewModel(for: sentence),
                         isShowing: $showingPopup,
                         position: tapLocation,
                         showingChatGPTInput: $showingChatGPTInput,
-                        chatGPTContext: $chatGPTContext
+                        chatGPTContext: $chatGPTContext,
+                        extendedSentenceIds: $extendedSentenceIds
                     )
+                    .id(displaySentences.count) // Force re-render when sentences change
                     .position(x: geometry.size.width / 2,
                              y: min(tapLocation.y + 150, geometry.size.height - 200))
                     .transition(.scale.combined(with: .opacity))
@@ -488,6 +551,11 @@ struct DocumentView: View {
                    let sentenceId = selectedSentenceId,
                    let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
                     
+                    // Build concatenated text including extended sentences
+                    let concatenatedText = ([sentence] + extendedSentenceIds.compactMap { extendedId in
+                        vm.document.sentences.first(where: { $0.id == extendedId })
+                    }).map { $0.text }.joined(separator: " ")
+                    
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
                         .onTapGesture {
@@ -498,7 +566,7 @@ struct DocumentView: View {
                         .zIndex(200)
                     
                     ChatGPTContextInputPopup(
-                        chineseText: sentence.text,
+                        chineseText: concatenatedText,
                         context: $chatGPTContext,
                         isPresented: $showingChatGPTInput
                     )
@@ -706,6 +774,7 @@ struct DocumentView: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedSentenceId = sentence.id
             tapLocation = location
+            extendedSentenceIds = []  // Reset extended sentences when opening new popup
             showingPopup = true
         }
         print("🎯 DEBUG: After animation - showingPopup=\(showingPopup)")

@@ -3,17 +3,33 @@ import AVKit
 
 // Video-specific popup with ChatGPT context input
 struct VideoSelectedSentencePopup: View {
-    let sentence: Sentence
+    let sentences: [Sentence]  // Changed to array to support extended sentences
+    let allSentences: [Sentence]  // All sentences in document for finding next
     @ObservedObject var vm: SentenceViewModel
     @Binding var isShowing: Bool
     let position: CGPoint
     @Binding var showingChatGPTInput: Bool
     @Binding var chatGPTContext: String
+    @Binding var extendedSentenceIds: [UUID]
+    
+    // Computed property for concatenated text
+    private var concatenatedText: String {
+        sentences.map { $0.text }.joined(separator: " ")
+    }
+    
+    // Check if we can extend further
+    private var canExtend: Bool {
+        guard let lastSentence = sentences.last,
+              let currentIndex = allSentences.firstIndex(where: { $0.id == lastSentence.id }) else {
+            return false
+        }
+        return currentIndex < allSentences.count - 1
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
-            // Chinese text
-            Text(sentence.text)
+            // Chinese text (concatenated if extended)
+            Text(concatenatedText)
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(T.C.ink)
             
@@ -76,6 +92,20 @@ struct VideoSelectedSentencePopup: View {
                 }
                 .buttonStyle(PopupButtonStyle())
                 
+                // Spacing
+                Spacer().frame(width: T.S.sm)
+                
+                // Extend button
+                if canExtend {
+                    Button {
+                        extendWithNextSentence()
+                    } label: {
+                        Label("Extend", systemImage: "plus.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(PopupButtonStyle())
+                }
+                
                 // Push remaining space
                 Spacer(minLength: 0)
             }
@@ -87,6 +117,17 @@ struct VideoSelectedSentencePopup: View {
                 .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
         )
         .frame(maxWidth: 340)
+    }
+    
+    private func extendWithNextSentence() {
+        guard let lastSentence = sentences.last,
+              let currentIndex = allSentences.firstIndex(where: { $0.id == lastSentence.id }),
+              currentIndex < allSentences.count - 1 else {
+            return
+        }
+        
+        let nextSentence = allSentences[currentIndex + 1]
+        extendedSentenceIds.append(nextSentence.id)
     }
 }
 
@@ -100,6 +141,7 @@ struct VideoDocumentView: View {
     @State private var tapLocation: CGPoint = .zero
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
+    @State private var extendedSentenceIds: [UUID] = []
     @State private var showingRenameAlert = false
     @State private var newDocumentName = ""
     @State private var showingTranscript = false
@@ -144,18 +186,27 @@ struct VideoDocumentView: View {
                         .onTapGesture {
                             withAnimation {
                                 showingPopup = false
+                                extendedSentenceIds = []  // Reset extended sentences
                                 // Keep video paused - user needs to tap again to resume
                             }
                         }
                     
+                    // Build the array of sentences including any extended ones
+                    let displaySentences = [sentence] + extendedSentenceIds.compactMap { extendedId in
+                        vm.document.sentences.first(where: { $0.id == extendedId })
+                    }
+                    
                     VideoSelectedSentencePopup(
-                        sentence: sentence,
+                        sentences: displaySentences,
+                        allSentences: vm.document.sentences,
                         vm: vm.createSentenceViewModel(for: sentence),
                         isShowing: $showingPopup,
                         position: tapLocation,
                         showingChatGPTInput: $showingChatGPTInput,
-                        chatGPTContext: $chatGPTContext
+                        chatGPTContext: $chatGPTContext,
+                        extendedSentenceIds: $extendedSentenceIds
                     )
+                    .id(displaySentences.count) // Force re-render when sentences change
                     .position(x: geometry.size.width / 2,
                              y: min(tapLocation.y + 150, geometry.size.height - 200))
                     .transition(.scale.combined(with: .opacity))
@@ -167,6 +218,11 @@ struct VideoDocumentView: View {
                    let sentenceId = selectedSentenceId,
                    let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
                     
+                    // Build concatenated text including extended sentences
+                    let concatenatedText = ([sentence] + extendedSentenceIds.compactMap { extendedId in
+                        vm.document.sentences.first(where: { $0.id == extendedId })
+                    }).map { $0.text }.joined(separator: " ")
+                    
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
                         .onTapGesture {
@@ -177,7 +233,7 @@ struct VideoDocumentView: View {
                         .zIndex(200)
                     
                     ChatGPTContextInputPopup(
-                        chineseText: sentence.text,
+                        chineseText: concatenatedText,
                         context: $chatGPTContext,
                         isPresented: $showingChatGPTInput
                     )
@@ -407,6 +463,7 @@ struct VideoDocumentView: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedSentenceId = sentence.id
             tapLocation = location
+            extendedSentenceIds = []  // Reset extended sentences when opening new popup
             showingPopup = true
         }
         
