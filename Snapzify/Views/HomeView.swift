@@ -124,61 +124,91 @@ struct HomeView: View {
             guard !newValues.isEmpty else { return }
             
             Task {
-                // Create all tasks first
-                var taskIds: [(PhotosPickerItem, UUID)] = []
+                // Queue all selected photos for batch processing
+                var queuedImages: [UIImage] = []
+                var queuedVideos: [URL] = []
                 
+                // Load all media items
                 for (index, item) in newValues.enumerated() {
-                    let taskId = UUID()
-                    taskIds.append((item, taskId))
+                    print("Loading item \(index + 1) of \(newValues.count)")
                     
-                    await MainActor.run {
-                        let task = HomeViewModel.ProcessingTask(
-                            id: taskId,
-                            name: "Media \(index + 1)/\(newValues.count)",
-                            progress: "Preparing",
-                            progressValue: 0.0,
-                            totalFrames: 0,
-                            processedFrames: 0,
-                            type: .video,
-                            thumbnail: nil
-                        )
-                        vm.activeProcessingTasks.append(task)
-                        vm.isProcessing = true
+                    // Check if it's a video
+                    if let movie = try? await item.loadTransferable(type: Movie.self) {
+                        print("Video \(index + 1) loaded successfully")
+                        queuedVideos.append(movie.url)
+                    }
+                    // Otherwise try as image
+                    else if let data = try? await item.loadTransferable(type: Data.self),
+                            let image = UIImage(data: data) {
+                        print("Image \(index + 1) loaded successfully")
+                        queuedImages.append(image)
+                    } else {
+                        print("Failed to load media data for item \(index + 1)")
                     }
                 }
                 
-                // Process all items concurrently
-                await withTaskGroup(of: Void.self) { group in
-                    for (index, (item, taskId)) in taskIds.enumerated() {
-                        group.addTask {
-                            print("Processing item \(index + 1) of \(newValues.count)")
+                // If we have any media to process
+                if !queuedImages.isEmpty || !queuedVideos.isEmpty {
+                    // Set up queue processing state
+                    await MainActor.run {
+                        appState.totalQueueItems = queuedImages.count + queuedVideos.count
+                        appState.currentQueueItemIndex = 1
+                        appState.queueProcessingProgress = 0
+                        appState.isProcessingQueue = true
+                    }
+                    
+                    // Process all items and collect documents
+                    var processedDocuments: [Document] = []
+                    
+                    // Process images
+                    for (index, image) in queuedImages.enumerated() {
+                        logger.info("Processing image \(index + 1) of \(queuedImages.count)")
+                        
+                        await MainActor.run {
+                            appState.currentQueueItemIndex = index + 1
+                            appState.queueProcessingProgress = 0
+                        }
+                        
+                        do {
+                            let document = try await vm.processImageForQueue(image)
+                            processedDocuments.append(document)
+                        } catch {
+                            logger.error("Failed to process image \(index + 1): \(error)")
+                        }
+                    }
+                    
+                    // Process videos (if implemented)
+                    for (index, videoURL) in queuedVideos.enumerated() {
+                        logger.info("Processing video \(index + 1) of \(queuedVideos.count)")
+                        
+                        await MainActor.run {
+                            appState.currentQueueItemIndex = queuedImages.count + index + 1
+                            appState.queueProcessingProgress = 0
+                        }
+                        
+                        // TODO: Implement video processing for queue
+                        logger.info("Video queue processing not yet implemented")
+                    }
+                    
+                    // Show queue view with all processed documents
+                    await MainActor.run {
+                        if !processedDocuments.isEmpty {
+                            logger.info("Multi-select complete - Setting \(processedDocuments.count) documents in queue")
+                            appState.queueDocuments = processedDocuments
+                            appState.currentQueueIndex = 0
+                            appState.currentQueueDocument = processedDocuments[0]
+                            appState.isProcessingQueue = false
                             
-                            // Check if it's a video
-                            if let movie = try? await item.loadTransferable(type: Movie.self) {
-                                print("Video \(index + 1) loaded successfully, processing...")
-                                // Always check isVisible at completion time inside processPickedVideoWithTask
-                                await self.vm.processPickedVideoWithTask(movie.url, taskId: taskId, checkVisibility: { self.isVisible })
-                            }
-                            // Otherwise try as image
-                            else if let data = try? await item.loadTransferable(type: Data.self),
-                                    let image = UIImage(data: data) {
-                                print("Image \(index + 1) loaded successfully, snapzifying...")
-                                // Always check isVisible at completion time inside processPickedImageWithTask
-                                await self.vm.processPickedImageWithTask(image, taskId: taskId, checkVisibility: { self.isVisible })
-                            } else {
-                                print("Failed to load media data for item \(index + 1)")
-                                await MainActor.run {
-                                    self.vm.activeProcessingTasks.removeAll { $0.id == taskId }
-                                    if self.vm.activeProcessingTasks.isEmpty {
-                                        self.vm.isProcessing = false
-                                    }
-                                }
-                            }
+                            // Trigger navigation to queue view
+                            NotificationCenter.default.post(name: .openQueueDocument, object: processedDocuments[0])
+                        } else {
+                            logger.info("No documents processed from multi-select")
+                            appState.isProcessingQueue = false
                         }
                     }
                 }
                 
-                // Clear selection after all tasks are started
+                // Clear selection
                 selectedPhotos = []
             }
         }

@@ -106,35 +106,13 @@ struct QueueDocumentView: View {
     }
 }
 
-// Simplified document content view for queue
+// Document content view using shared interaction components
 struct DocumentContentView: View {
     let document: Document
     let isActive: Bool
-    @StateObject private var vm: DocumentViewModel
-    
-    init(document: Document, isActive: Bool) {
-        self.document = document
-        self.isActive = isActive
-        self._vm = StateObject(wrappedValue: ServiceContainer.shared.makeDocumentViewModel(document: document))
-    }
     
     var body: some View {
-        ZStack {
-            // Document image
-            if let mediaURL = document.mediaURL,
-               let imageData = try? Data(contentsOf: mediaURL),
-               let uiImage = UIImage(data: imageData) {
-                
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            
-            // Only load interactive elements if this is the active document
-            if isActive {
-                // Add sentence overlays, popups etc here if needed
-            }
-        }
+        // Use the shared document interaction view from Components
+        DocumentInteractionView(document: document, isActive: isActive)
     }
 }

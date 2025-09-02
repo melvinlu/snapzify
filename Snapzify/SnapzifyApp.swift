@@ -1,15 +1,6 @@
 import SwiftUI
 import os.log
 
-// Queue item structure (matches what ActionExtension writes)
-struct QueueItem: Codable {
-    let id: String
-    let fileName: String
-    let isVideo: Bool
-    let queuedAt: Date
-    let source: String
-}
-
 extension Notification.Name {
     static let openQueueDocument = Notification.Name("openQueueDocument")
 }

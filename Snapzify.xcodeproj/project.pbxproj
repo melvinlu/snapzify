@@ -29,6 +29,9 @@
 		3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123456 /* SettingsView.swift */; };
 		3D9B1A1F1234567890123458 /* QueueProcessingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123457 /* QueueProcessingView.swift */; };
 		3D9B1A1F1234567890123459 /* QueueDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123460 /* QueueDocumentView.swift */; };
+		3D9B1A1F1234567890123462 /* DocumentInteractionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123461 /* DocumentInteractionView.swift */; };
+		3D9B1A1F1234567890123464 /* QueueRecentScreenshotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123463 /* QueueRecentScreenshotIntent.swift */; };
+		3D9B1A1F1234567890123466 /* QueueItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123465 /* QueueItem.swift */; };
 		3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A211234567890123456 /* HomeViewModel.swift */; };
 		3D9B1A211234567890123458 /* PinyinServiceOpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */; };
 		3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A231234567890123456 /* DocumentViewModel.swift */; };
@@ -131,6 +134,9 @@
 		3D9B1A1F1234567890123456 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3D9B1A1F1234567890123457 /* QueueProcessingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueProcessingView.swift; sourceTree = "<group>"; };
 		3D9B1A1F1234567890123460 /* QueueDocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueDocumentView.swift; sourceTree = "<group>"; };
+		3D9B1A1F1234567890123461 /* DocumentInteractionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components/DocumentInteractionView.swift; sourceTree = "<group>"; };
+		3D9B1A1F1234567890123463 /* QueueRecentScreenshotIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = QueueRecentScreenshotIntent.swift; path = ../Intents/QueueRecentScreenshotIntent.swift; sourceTree = "<group>"; };
+		3D9B1A1F1234567890123465 /* QueueItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueItem.swift; sourceTree = "<group>"; };
 		3D9B1A201234567890123457 /* PinyinServiceOpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinyinServiceOpenAI.swift; sourceTree = "<group>"; };
 		3D9B1A211234567890123456 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		3D9B1A231234567890123456 /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
@@ -230,6 +236,7 @@
 			isa = PBXGroup;
 			children = (
 				3D9B1A051234567890123456 /* DataModels.swift */,
+				3D9B1A1F1234567890123465 /* QueueItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -273,6 +280,7 @@
 				3D9B1A39123456789012346A /* SentenceDetailView.swift */,
 				0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */,
 				0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */,
+				3D9B1A1F1234567890123461 /* DocumentInteractionView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -294,6 +302,7 @@
 				3D9B1A031234567890123456 /* Theme.swift */,
 				A2AFE04A7E04C198BC4420E5 /* UIImageWrapper.swift */,
 				875ABEB622C89CF71AF70FD1 /* ChineseDetector.swift */,
+				3D9B1A1F1234567890123463 /* QueueRecentScreenshotIntent.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -522,6 +531,9 @@
 				3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */,
 				3D9B1A1F1234567890123458 /* QueueProcessingView.swift in Sources */,
 				3D9B1A1F1234567890123459 /* QueueDocumentView.swift in Sources */,
+				3D9B1A1F1234567890123462 /* DocumentInteractionView.swift in Sources */,
+				3D9B1A1F1234567890123464 /* QueueRecentScreenshotIntent.swift in Sources */,
+				3D9B1A1F1234567890123466 /* QueueItem.swift in Sources */,
 				3D9B1A201234567890123456 /* HomeViewModel.swift in Sources */,
 				3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */,
 				3D9B1A241234567890123456 /* SentenceViewModel.swift in Sources */,
