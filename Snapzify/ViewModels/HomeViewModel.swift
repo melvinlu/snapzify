@@ -915,6 +915,9 @@ class HomeViewModel: ObservableObject {
                 if appState?.queueDocuments.count == 1 {
                     appState?.currentQueueIndex = 0
                     appState?.currentQueueDocument = document
+                    // Dismiss the processing screen
+                    appState?.isProcessingQueue = false
+                    // Navigate to the document
                     onOpenDocument(document)
                 }
             }

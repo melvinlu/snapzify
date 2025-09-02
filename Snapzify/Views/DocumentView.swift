@@ -712,15 +712,49 @@ struct DocumentView: View {
                 )
             }
             
+            // Queue navigation indicator
+            if !appState.queueDocuments.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 4) {
+                            if let currentIndex = appState.queueDocuments.firstIndex(where: { $0.id == vm.document.id }) {
+                                if currentIndex > 0 {
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                                Text("\(currentIndex + 1)/\(appState.queueDocuments.count)")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.6))
+                                if currentIndex < appState.queueDocuments.count - 1 {
+                                    Image(systemName: "chevron.up")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                            }
+                        }
+                        .padding(8)
+                        .background(Color.black.opacity(0.5))
+                        .cornerRadius(8)
+                        .padding()
+                    }
+                }
+            }
+            
         }
         .navigationBarHidden(true)
-        .offset(x: dragOffset)
+        .offset(y: dragOffset)
         .gesture(
-            DragGesture()
+            DragGesture(minimumDistance: 30)
                 .onChanged { value in
-                    // Only allow horizontal swipes if we have queue documents
+                    // Only allow vertical swipes if we have queue documents and not already navigating
                     if !appState.queueDocuments.isEmpty && !isNavigatingQueue {
-                        dragOffset = value.translation.width
+                        // Only respond to vertical swipes (ignore if horizontal swipe is stronger)
+                        if abs(value.translation.height) > abs(value.translation.width) * 1.5 {
+                            dragOffset = value.translation.height
+                        }
                     }
                 }
                 .onEnded { value in
@@ -731,17 +765,25 @@ struct DocumentView: View {
                         return
                     }
                     
-                    let threshold: CGFloat = 100
-                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    // Lower threshold for easier swiping
+                    let threshold: CGFloat = 50
+                    let velocity = value.predictedEndTranslation.height - value.translation.height
                     
-                    withAnimation(.spring()) {
-                        if value.translation.width > threshold || velocity > 200 {
-                            // Swipe right - previous in queue
-                            navigateToPreviousInQueue()
-                        } else if value.translation.width < -threshold || velocity < -200 {
-                            // Swipe left - next in queue
-                            navigateToNextInQueue()
-                        } else {
+                    // Only process if it's primarily a vertical swipe
+                    if abs(value.translation.height) > abs(value.translation.width) {
+                        withAnimation(.spring()) {
+                            if value.translation.height > threshold || velocity > 100 {
+                                // Swipe down - previous in queue
+                                navigateToPreviousInQueue()
+                            } else if value.translation.height < -threshold || velocity < -100 {
+                                // Swipe up - next in queue
+                                navigateToNextInQueue()
+                            } else {
+                                dragOffset = 0
+                            }
+                        }
+                    } else {
+                        withAnimation(.spring()) {
                             dragOffset = 0
                         }
                     }
@@ -823,18 +865,26 @@ struct DocumentView: View {
     }
     
     private func navigateToNextInQueue() {
+        print("📱 NavigateToNext - Queue docs count: \(appState.queueDocuments.count)")
+        print("📱 Current document ID: \(vm.document.id)")
+        
         guard let currentIndex = appState.queueDocuments.firstIndex(where: { $0.id == vm.document.id }),
               currentIndex < appState.queueDocuments.count - 1 else {
+            print("📱 Cannot navigate next - at end or not found in queue")
             dragOffset = 0
             return
         }
         
+        print("📱 Current index: \(currentIndex), navigating to: \(currentIndex + 1)")
         isNavigatingQueue = true
         let nextDocument = appState.queueDocuments[currentIndex + 1]
         appState.currentQueueIndex = currentIndex + 1
         appState.currentQueueDocument = nextDocument
         
-        // Reset offset and update document
+        // Update the view model with the new document
+        vm.updateDocument(nextDocument)
+        
+        // Reset offset
         dragOffset = 0
         isNavigatingQueue = false
     }
@@ -851,7 +901,10 @@ struct DocumentView: View {
         appState.currentQueueIndex = currentIndex - 1
         appState.currentQueueDocument = previousDocument
         
-        // Reset offset and update document
+        // Update the view model with the new document
+        vm.updateDocument(previousDocument)
+        
+        // Reset offset
         dragOffset = 0
         isNavigatingQueue = false
     }

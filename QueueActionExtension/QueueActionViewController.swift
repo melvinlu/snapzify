@@ -137,8 +137,8 @@ class QueueActionViewController: UIViewController {
             DispatchQueue.main.async {
                 self.statusLabel?.text = "Added to Queue ✓"
                 
-                // Dismiss after short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                // Dismiss after very short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     self.done()
                 }
             }

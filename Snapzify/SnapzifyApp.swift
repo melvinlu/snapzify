@@ -110,6 +110,11 @@ struct SnapzifyApp: App {
         
         logger.info("Found \(queueItems.count) queued items")
         
+        // Set total queue items for progress display
+        appState.totalQueueItems = queueItems.count
+        appState.currentQueueItemIndex = 1
+        appState.queueProcessingProgress = 0
+        
         // Process the oldest item
         let sortedItems = queueItems.sorted { $0.queuedAt < $1.queuedAt }
         if let oldestItem = sortedItems.first {
@@ -140,6 +145,7 @@ struct SnapzifyApp: App {
                             appState.pendingSharedImage = image
                             appState.shouldProcessSharedImage = true
                             appState.shouldProcessQueue = true  // Mark that this is from queue
+                            appState.isProcessingQueue = true  // Show processing screen
                         } else {
                             logger.error("Failed to create UIImage from data")
                         }
@@ -213,6 +219,7 @@ struct ContentView: View {
     @State private var navigationPath = NavigationPath()
     @State private var actionExtensionImage: IdentifiableImage?
     @State private var actionExtensionVideo: IdentifiableVideoURL?
+    @State private var showQueueProcessing = false
     @StateObject private var homeVM: HomeViewModel
     
     private let logger = Logger(subsystem: "com.snapzify.app", category: "ContentView")
@@ -299,6 +306,10 @@ struct ContentView: View {
         .tint(.white)
         .sheet(isPresented: $showSettings) {
             SettingsView(vm: serviceContainer.makeSettingsViewModel())
+        }
+        .fullScreenCover(isPresented: $appState.isProcessingQueue) {
+            QueueProcessingView()
+                .environmentObject(appState)
         }
         .onAppear {
             // Set up callbacks after view is created
@@ -425,4 +436,8 @@ class AppState: ObservableObject {
     @Published var currentQueueDocument: Document?
     @Published var queueDocuments: [Document] = []
     @Published var currentQueueIndex: Int = 0
+    @Published var isProcessingQueue = false
+    @Published var queueProcessingProgress: Int = 0
+    @Published var currentQueueItemIndex: Int = 1
+    @Published var totalQueueItems: Int = 0
 }

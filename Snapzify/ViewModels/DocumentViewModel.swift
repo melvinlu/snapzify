@@ -46,6 +46,12 @@ class DocumentViewModel: ObservableObject {
         }
     }
     
+    func updateDocument(_ newDocument: Document) {
+        self.document = newDocument
+        self.selectedSentenceId = nil
+        self.sentenceViewModels.removeAll()
+    }
+    
     func translateAllPending() async {
         guard autoTranslate && translationService.isConfigured() else { return }
         
