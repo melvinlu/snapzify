@@ -10,6 +10,7 @@ struct QueueDocumentView: View {
     @State private var showingTranscript = false // Track transcript state
     @State private var transcriptDragOffset: CGFloat = 0
     @State private var isDraggingTranscript = false
+    @State private var isPopupShowing = false // Track popup state
     @Environment(\.dismiss) private var dismiss
     
     init(documents: [Document], initialIndex: Int = 0) {
@@ -30,6 +31,9 @@ struct QueueDocumentView: View {
                             isActive: index == currentIndex,
                             onTranscriptRequest: {
                                 showingTranscript = true
+                            },
+                            onPopupStateChanged: { isShowing in
+                                isPopupShowing = isShowing
                             }
                         )
                         .frame(width: geometry.size.width, height: geometry.size.height)
@@ -41,9 +45,9 @@ struct QueueDocumentView: View {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 30)
                         .onChanged { value in
-                            // Don't handle vertical drags if transcript is showing
-                            guard !showingTranscript else { 
-                                print("📍 Ignoring vertical drag - transcript is showing")
+                            // Don't handle vertical drags if transcript or popup is showing
+                            guard !showingTranscript && !isPopupShowing else { 
+                                print("📍 Ignoring vertical drag - transcript (\(showingTranscript)) or popup (\(isPopupShowing)) is showing")
                                 return 
                             }
                             
@@ -61,8 +65,8 @@ struct QueueDocumentView: View {
                             }
                         }
                         .onEnded { value in
-                            // Don't handle if transcript is showing
-                            guard !showingTranscript else { 
+                            // Don't handle if transcript or popup is showing
+                            guard !showingTranscript && !isPopupShowing else { 
                                 isDragging = false
                                 dragOffset = 0
                                 return 
@@ -207,6 +211,7 @@ struct DocumentContentView: View {
     let document: Document
     let isActive: Bool
     let onTranscriptRequest: () -> Void
+    let onPopupStateChanged: (Bool) -> Void
     
     var body: some View {
         // Use the shared document interaction view from Components (without transcript)
@@ -214,7 +219,8 @@ struct DocumentContentView: View {
             document: document, 
             isActive: isActive,
             showTranscript: false, // Never show transcript in child view
-            onTranscriptRequest: onTranscriptRequest
+            onTranscriptRequest: onTranscriptRequest,
+            onPopupStateChanged: onPopupStateChanged
         )
     }
 }

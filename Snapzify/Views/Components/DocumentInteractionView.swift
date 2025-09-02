@@ -203,6 +203,7 @@ struct DocumentInteractionView: View {
     let isActive: Bool
     let showTranscript: Bool // Whether to show transcript in this view
     let onTranscriptRequest: (() -> Void)? // Callback to request transcript from parent
+    let onPopupStateChanged: ((Bool) -> Void)? // Callback to notify popup state changes
     @StateObject private var vm: DocumentViewModel
     @State private var selectedSentenceId: UUID?
     @State private var showingPopup = false
@@ -214,11 +215,12 @@ struct DocumentInteractionView: View {
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
     
-    init(document: Document, isActive: Bool = true, showTranscript: Bool = true, onTranscriptRequest: (() -> Void)? = nil) {
+    init(document: Document, isActive: Bool = true, showTranscript: Bool = true, onTranscriptRequest: (() -> Void)? = nil, onPopupStateChanged: ((Bool) -> Void)? = nil) {
         self.document = document
         self.isActive = isActive
         self.showTranscript = showTranscript
         self.onTranscriptRequest = onTranscriptRequest
+        self.onPopupStateChanged = onPopupStateChanged
         self._vm = StateObject(wrappedValue: ServiceContainer.shared.makeDocumentViewModel(document: document))
     }
     
@@ -237,6 +239,7 @@ struct DocumentInteractionView: View {
                         geometry: geometry,
                         isActive: isActive,
                         showingTranscript: showingTranscript,
+                        showingPopup: showingPopup,
                         transcriptDragOffset: $transcriptDragOffset,
                         isDraggingTranscript: $isDraggingTranscript,
                         onTap: handleTap,
@@ -359,6 +362,9 @@ struct DocumentInteractionView: View {
                 }
             }
         }
+        .onChange(of: showingPopup) { newValue in
+            onPopupStateChanged?(newValue)
+        }
     }
     
     private func handleTap(at location: CGPoint, in displaySize: CGSize, imageSize: CGSize, scale: CGFloat) {
@@ -391,6 +397,7 @@ private struct DocumentImageView: View {
     let geometry: GeometryProxy
     let isActive: Bool
     let showingTranscript: Bool
+    let showingPopup: Bool
     @Binding var transcriptDragOffset: CGFloat
     @Binding var isDraggingTranscript: Bool
     let onTap: (CGPoint, CGSize, CGSize, CGFloat) -> Void
@@ -424,6 +431,12 @@ private struct DocumentImageView: View {
                 isActive && !showingTranscript ?
                 DragGesture(minimumDistance: 20)
                     .onChanged { value in
+                        // Block all gestures if popup is showing
+                        guard !showingPopup else {
+                            print("🚫 Blocking gesture - popup is showing")
+                            return
+                        }
+                        
                         // Handle horizontal swipe for transcript - prioritize horizontal over vertical
                         let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
                         
@@ -437,6 +450,11 @@ private struct DocumentImageView: View {
                         }
                     }
                     .onEnded { value in
+                        // Block all gestures if popup is showing
+                        guard !showingPopup else {
+                            return
+                        }
+                        
                         let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
                         
                         if isHorizontal {
