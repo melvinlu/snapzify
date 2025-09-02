@@ -164,7 +164,7 @@ class ShareViewController: UIViewController, ObservableObject {
     
     private func saveToAppGroup(_ document: Document) {
         guard let containerURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.snapzify"
+            forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
         ) else { return }
         
         let documentsURL = containerURL.appendingPathComponent("Documents")

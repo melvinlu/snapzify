@@ -3,6 +3,14 @@ import Foundation
 class DocumentStoreImpl: DocumentStore {
     private let fileManager = FileManager.default
     private var documentsDirectory: URL? {
+        // Use the app's Documents directory for persistent storage
+        // This survives app reinstalls if user has iCloud backup enabled
+        let urls = fileManager.urls(for: .documentDirectory, in: .userDomainMask)
+        return urls.first?.appendingPathComponent("SnapzifyDocuments")
+    }
+    
+    private var sharedDocumentsDirectory: URL? {
+        // Keep shared container for extension access
         guard let containerURL = fileManager.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.snapzify.app"
         ) else { return nil }
@@ -15,10 +23,17 @@ class DocumentStoreImpl: DocumentStore {
     }
     
     private func createDirectoryIfNeeded() {
-        guard let dir = documentsDirectory else { return }
+        // Create both directories
+        if let dir = documentsDirectory {
+            if !fileManager.fileExists(atPath: dir.path) {
+                try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+            }
+        }
         
-        if !fileManager.fileExists(atPath: dir.path) {
-            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        if let sharedDir = sharedDocumentsDirectory {
+            if !fileManager.fileExists(atPath: sharedDir.path) {
+                try? fileManager.createDirectory(at: sharedDir, withIntermediateDirectories: true)
+            }
         }
     }
     
@@ -27,15 +42,28 @@ class DocumentStoreImpl: DocumentStore {
             throw StoreError.noDirectory
         }
         
-        let fileURL = dir.appendingPathComponent("\(document.id.uuidString).json")
         let data = try JSONEncoder().encode(document)
+        let metadata = DocumentMetadata(from: document)
+        let metaData = try? JSONEncoder().encode(metadata)
+        
+        // Save to app's Documents directory (persists across reinstalls)
+        let fileURL = dir.appendingPathComponent("\(document.id.uuidString).json")
         try data.write(to: fileURL)
         
-        // Also save metadata cache
         let metadataURL = dir.appendingPathComponent("\(document.id.uuidString).meta")
-        let metadata = DocumentMetadata(from: document)
-        if let metaData = try? JSONEncoder().encode(metadata) {
+        if let metaData = metaData {
             try? metaData.write(to: metadataURL)
+        }
+        
+        // Also save to shared container for extension access
+        if let sharedDir = sharedDocumentsDirectory {
+            let sharedFileURL = sharedDir.appendingPathComponent("\(document.id.uuidString).json")
+            try? data.write(to: sharedFileURL)
+            
+            let sharedMetadataURL = sharedDir.appendingPathComponent("\(document.id.uuidString).meta")
+            if let metaData = metaData {
+                try? metaData.write(to: sharedMetadataURL)
+            }
         }
     }
     
