@@ -201,6 +201,7 @@ struct SelectedSentencePopup: View {
 struct DocumentInteractionView: View {
     let document: Document
     let isActive: Bool
+    let onTranscriptStateChange: ((Bool) -> Void)?
     @StateObject private var vm: DocumentViewModel
     @State private var selectedSentenceId: UUID?
     @State private var showingPopup = false
@@ -212,9 +213,10 @@ struct DocumentInteractionView: View {
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
     
-    init(document: Document, isActive: Bool = true) {
+    init(document: Document, isActive: Bool = true, onTranscriptStateChange: ((Bool) -> Void)? = nil) {
         self.document = document
         self.isActive = isActive
+        self.onTranscriptStateChange = onTranscriptStateChange
         self._vm = StateObject(wrappedValue: ServiceContainer.shared.makeDocumentViewModel(document: document))
     }
     
@@ -236,17 +238,32 @@ struct DocumentInteractionView: View {
                         transcriptDragOffset: $transcriptDragOffset,
                         isDraggingTranscript: $isDraggingTranscript,
                         onTap: handleTap,
-                        onTranscriptSwipe: { showingTranscript = true }
+                        onTranscriptSwipe: { 
+                            showingTranscript = true
+                            onTranscriptStateChange?(true)
+                        }
                     )
                 }
                 
-                // Popup overlay
+                // Popup overlay with tap-to-dismiss background
                 if isActive && showingPopup {
+                    // Invisible background to detect taps outside popup
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            print("🔴 Dismissing popup via background tap")
+                            showingPopup = false
+                            extendedSentenceIds = []
+                        }
+                        .zIndex(49)
+                    
                     if let sentenceId = selectedSentenceId,
                        let sentence = vm.document.sentences.first(where: { $0.id == sentenceId }) {
                         
-                        let displaySentences = extendedSentenceIds.isEmpty ? [sentence] : 
-                            vm.document.sentences.filter { extendedSentenceIds.contains($0.id) }
+                        // Build display sentences: original sentence + extended sentences (like DocumentView)
+                        let displaySentences = [sentence] + extendedSentenceIds.compactMap { extendedId in
+                            vm.document.sentences.first(where: { $0.id == extendedId })
+                        }
                         
                         SelectedSentencePopup(
                             sentences: displaySentences,
@@ -258,7 +275,7 @@ struct DocumentInteractionView: View {
                             chatGPTContext: $chatGPTContext,
                             extendedSentenceIds: $extendedSentenceIds
                         )
-                        .id(displaySentences.count) // Force re-render when sentences change
+                        .id(displaySentences.map { $0.id }) // Force re-render when sentences change
                         .position(x: geometry.size.width / 2,
                                  y: min(tapLocation.y + 150, geometry.size.height - 200))
                         .transition(.scale.combined(with: .opacity))
@@ -266,21 +283,19 @@ struct DocumentInteractionView: View {
                     }
                 }
                 
-                // Transcript overlay
+                // Transcript overlay - fullscreen
                 if isActive && (showingTranscript || transcriptDragOffset < 0) {
-                    HStack(spacing: 0) {
-                        Spacer()
-                        TranscriptView(
-                            document: vm.document,
-                            documentVM: vm
-                        )
-                        .frame(width: geometry.size.width * 0.8)
-                        .frame(maxHeight: geometry.size.height)
-                        .background(Color(UIColor.systemBackground))
-                    }
+                    // Full-width transcript
+                    TranscriptView(
+                        document: vm.document,
+                        documentVM: vm
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(UIColor.systemBackground))
                     .offset(x: showingTranscript ? 0 : geometry.size.width + transcriptDragOffset)
                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: transcriptDragOffset)
                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: showingTranscript)
+                    .zIndex(75) // Ensure transcript appears above popups
                     .overlay(
                         // Close button for transcript
                         HStack {
@@ -290,6 +305,7 @@ struct DocumentInteractionView: View {
                                     showingTranscript = false
                                     isDraggingTranscript = false
                                     transcriptDragOffset = 0
+                                    onTranscriptStateChange?(false)
                                 }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
@@ -316,6 +332,7 @@ struct DocumentInteractionView: View {
                                         showingTranscript = false
                                         isDraggingTranscript = false
                                         transcriptDragOffset = 0
+                                        onTranscriptStateChange?(false)
                                     } else {
                                         transcriptDragOffset = 0
                                     }
@@ -398,30 +415,44 @@ private struct DocumentImageView: View {
                         }
                 }
             )
-            .gesture(
+            .simultaneousGesture(
                 isActive && !showingTranscript ?
-                DragGesture(minimumDistance: 30)
+                DragGesture(minimumDistance: 20)
                     .onChanged { value in
-                        // Handle horizontal swipe for transcript
-                        if abs(value.translation.width) > abs(value.translation.height) && value.translation.width < 0 {
+                        // Handle horizontal swipe for transcript - prioritize horizontal over vertical
+                        let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
+                        
+                        if isHorizontal && value.translation.width < 0 {
+                            // Swipe left - show transcript
                             if !isDraggingTranscript {
                                 isDraggingTranscript = true
+                                print("🎯 Starting horizontal drag for transcript")
                             }
                             transcriptDragOffset = value.translation.width
                         }
                     }
                     .onEnded { value in
-                        let threshold = geometry.size.width * 0.25
-                        let velocity = value.predictedEndTranslation.width - value.translation.width
+                        let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
                         
-                        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
-                            if -value.translation.width > threshold || velocity < -200 {
-                                onTranscriptSwipe()
-                                transcriptDragOffset = 0
-                            } else {
-                                isDraggingTranscript = false
-                                transcriptDragOffset = 0
+                        if isHorizontal {
+                            let threshold = geometry.size.width * 0.25
+                            let velocity = value.predictedEndTranslation.width - value.translation.width
+                            
+                            withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                if -value.translation.width > threshold || velocity < -200 {
+                                    print("🎯 Opening transcript via swipe")
+                                    onTranscriptSwipe()
+                                    transcriptDragOffset = 0
+                                } else {
+                                    print("🎯 Cancelling transcript swipe")
+                                    isDraggingTranscript = false
+                                    transcriptDragOffset = 0
+                                }
                             }
+                        } else {
+                            // Reset if it wasn't a horizontal swipe
+                            isDraggingTranscript = false
+                            transcriptDragOffset = 0
                         }
                     }
                 : nil
