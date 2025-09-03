@@ -8,7 +8,7 @@ extension Notification.Name {
 @main
 struct SnapzifyApp: App {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "Main")
-    @StateObject private var appState = AppState()
+    @StateObject private var appState = AppState.shared
     
     var body: some Scene {
         WindowGroup {
@@ -254,6 +254,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var selectedDocument: Document?
     @State private var navigationPath = NavigationPath()
+    @State private var documentNavigationId = UUID()
     @State private var actionExtensionImage: IdentifiableImage?
     @State private var actionExtensionVideo: IdentifiableVideoURL?
     @State private var showQueueProcessing = false
@@ -275,6 +276,29 @@ struct ContentView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             HomeView(vm: homeVM)
+                .onChange(of: appState.directNavigationDocument) { document in
+                    // Direct navigation from screenshot processing
+                    if let document = document {
+                        logger.info("Direct navigation to document: \(document.id)")
+                        selectedDocument = document
+                        appState.directNavigationDocument = nil
+                        appState.pendingDocument = nil
+                        appState.shouldNavigateToDocument = false
+                    }
+                }
+                .onChange(of: appState.shouldNavigateToDocument) { shouldNavigate in
+                    // Only handle navigation if NOT processing a screenshot
+                    // Screenshot navigation is handled via directNavigationDocument
+                    if shouldNavigate && !appState.isProcessingScreenshot {
+                        logger.info("onChange shouldNavigateToDocument triggered (non-screenshot flow)")
+                        if let document = appState.pendingDocument {
+                            navigationPath = NavigationPath()
+                            selectedDocument = document
+                            appState.pendingDocument = nil
+                            appState.shouldNavigateToDocument = false
+                        }
+                    }
+                }
                 .onAppear {
                     // Set up the callbacks after view appears
                     homeVM.onOpenSettings = {
@@ -302,8 +326,10 @@ struct ContentView: View {
                     // Single document view (when not in queue mode)
                     if document.isVideo {
                         VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                            .id(document.id) // Force view refresh when document changes
                     } else {
                         DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                            .id(document.id) // Force view refresh when document changes
                     }
                 }
                 .navigationDestination(for: Document.self) { document in
@@ -371,6 +397,10 @@ struct ContentView: View {
                 .environmentObject(appState)
             }
         }
+        .fullScreenCover(isPresented: $appState.isProcessingScreenshot) {
+            ScreenshotProcessingView()
+                .environmentObject(appState)
+        }
         .onAppear {
             // Set up callbacks after view is created
             homeVM.onOpenSettings = {
@@ -392,6 +422,14 @@ struct ContentView: View {
             }
             // Set appState reference
             homeVM.appState = appState
+            
+            // Check if there's a pending document to navigate to
+            if appState.shouldNavigateToDocument, let document = appState.pendingDocument {
+                logger.info("Found pending document on appear - navigating")
+                selectedDocument = document
+                appState.pendingDocument = nil
+                appState.shouldNavigateToDocument = false
+            }
         }
         .onChange(of: appState.shouldProcessSharedImage) { shouldProcess in
             logger.info("onChange shouldProcessSharedImage triggered: \(shouldProcess)")
@@ -484,6 +522,8 @@ struct ContentView: View {
 }
 
 class AppState: ObservableObject {
+    static let shared = AppState()
+    
     private let logger = Logger(subsystem: "com.snapzify.app", category: "AppState")
     @Published var shouldRefreshDocuments = false
     @Published var shouldProcessActionImage = false
@@ -500,4 +540,10 @@ class AppState: ObservableObject {
     @Published var queueProcessingProgress: Int = 0
     @Published var currentQueueItemIndex: Int = 1
     @Published var totalQueueItems: Int = 0
+    
+    // New properties for direct document navigation
+    @Published var pendingDocument: Document?
+    @Published var shouldNavigateToDocument = false
+    @Published var isProcessingScreenshot = false
+    @Published var directNavigationDocument: Document? // For direct replacement without dismissal
 }

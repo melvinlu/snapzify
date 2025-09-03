@@ -185,7 +185,7 @@ enum IntentError: Swift.Error, CustomLocalizedStringResourceConvertible {
 
 // App Shortcuts provider
 struct SnapzifyShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
+    static var appShortcuts: [AppShortcut] = [
         AppShortcut(
             intent: QueueRecentScreenshotIntent(),
             phrases: [
@@ -195,6 +195,16 @@ struct SnapzifyShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Queue Screenshot",
             systemImageName: "photo.badge.plus"
+        ),
+        AppShortcut(
+            intent: OpenRecentScreenshotIntent(),
+            phrases: [
+                "Open screenshot in \(.applicationName)",
+                "Show screenshot in \(.applicationName)",
+                "Open recent screenshot in \(.applicationName)"
+            ],
+            shortTitle: "Open Screenshot",
+            systemImageName: "photo"
         )
-    }
+    ]
 }
