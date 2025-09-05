@@ -39,7 +39,9 @@ struct VideoSelectedSentencePopup: View {
             HStack(alignment: .center, spacing: 0) {
                 // Pleco button
                 Button {
-                    vm.openInPleco()
+                    // Pass all sentences except the first (which is vm.sentence) as additional
+                    let additionalSentences = sentences.count > 1 ? Array(sentences.dropFirst()) : []
+                    vm.openInPleco(additionalSentences: additionalSentences)
                 } label: {
                     Label("Pleco", systemImage: "book")
                         .font(.caption)
@@ -209,7 +211,7 @@ struct VideoDocumentView: View {
                         chatGPTContext: $chatGPTContext,
                         extendedSentenceIds: $extendedSentenceIds
                     )
-                    .id(displaySentences.count) // Force re-render when sentences change
+                    .id("\(sentence.id)-\(displaySentences.count)") // Force re-render when sentence or count changes
                     .position(x: geometry.size.width / 2,
                              y: min(tapLocation.y + 150, geometry.size.height - 200))
                     .transition(.scale.combined(with: .opacity))

@@ -1,5 +1,47 @@
 import SwiftUI
 
+// MARK: - Tappable Characters View
+struct TappableCharactersView: View {
+    let text: String
+    @Binding var selectedWords: [String]
+    let onCharacterTap: (String, Int) -> Void
+    
+    var body: some View {
+        // Simple approach: let the text wrap naturally
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { index, char in
+                let charStr = String(char)
+                let isHighlighted = selectedWords.contains(where: { $0.contains(charStr) })
+                
+                Text(charStr)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(isHighlighted ? T.C.accent : T.C.ink)
+                    .onTapGesture {
+                        // Check if it's a Chinese character (CJK Unified Ideographs range)
+                        if let scalar = charStr.unicodeScalars.first {
+                            let value = scalar.value
+                            // CJK Unified Ideographs ranges
+                            let isChinese = (0x4E00...0x9FFF).contains(value) || // CJK Unified Ideographs
+                                          (0x3400...0x4DBF).contains(value) || // CJK Extension A  
+                                          (0x20000...0x2A6DF).contains(value) || // CJK Extension B
+                                          (0x2A700...0x2B73F).contains(value) || // CJK Extension C
+                                          (0x2B740...0x2B81F).contains(value) || // CJK Extension D
+                                          (0x2B820...0x2CEAF).contains(value) || // CJK Extension E
+                                          (0xF900...0xFAFF).contains(value) || // CJK Compatibility Ideographs
+                                          (0x2F800...0x2FA1F).contains(value) // CJK Compatibility Supplement
+                            
+                            if isChinese {
+                                onCharacterTap(charStr, index)
+                            }
+                        }
+                    }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true) // Allow horizontal wrapping but keep vertical size
+    }
+}
+
 // MARK: - Selected Sentence Popup with Extend functionality
 struct SelectedSentencePopup: View {
     let sentences: [Sentence]  // Changed to array to support extended sentences
@@ -13,6 +55,10 @@ struct SelectedSentencePopup: View {
     @State private var chatGPTBreakdown = ""
     @State private var isLoadingBreakdown = false
     @State private var breakdownTask: Task<Void, Never>?
+    @State private var selectedWords: [String] = []
+    @State private var characterAnalyses: [String: String] = [:]
+    @State private var isLoadingCharacter = false
+    @State private var characterTask: Task<Void, Never>?
     
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     
@@ -33,41 +79,108 @@ struct SelectedSentencePopup: View {
     var body: some View {
         
         VStack(alignment: .leading, spacing: T.S.sm) {
-            // Chinese text (concatenated if extended)
-            Text(concatenatedText)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(T.C.ink)
+            // Chinese text (concatenated if extended) - tappable characters
+            TappableCharactersView(
+                text: concatenatedText,
+                selectedWords: $selectedWords,
+                onCharacterTap: { char, position in
+                    loadCharacterAnalysis(for: char, at: position)
+                }
+            )
             
-            // ChatGPT breakdown - scrollable and streaming
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Loading breakdown...")
-                                .font(.system(size: 14))
-                                .foregroundStyle(T.C.ink2)
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                    } else if !chatGPTBreakdown.isEmpty {
-                        Text(chatGPTBreakdown)
-                            .font(.system(size: 14))
-                            .foregroundStyle(T.C.ink2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            // Show both sentence translation and character analysis
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: T.S.sm) {
+                        // Always show sentence translation first
+                        if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Translating...")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(T.C.ink2)
+                            }
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
+                        } else if !chatGPTBreakdown.isEmpty {
+                            Text(chatGPTBreakdown)
+                                .font(.system(size: 14))
+                                .foregroundStyle(T.C.ink2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                        }
+                        
+                        // Show character/word analyses below if any characters are selected
+                        if !selectedWords.isEmpty || isLoadingCharacter {
+                            Divider()
+                                .padding(.vertical, 4)
+                            
+                            // Show all selected word analyses
+                            VStack(alignment: .leading, spacing: T.S.sm) {
+                                ForEach(selectedWords, id: \.self) { word in
+                                    if let analysis = characterAnalyses[word] {
+                                        // Format: "word: pinyin, definition" all on one line
+                                        let lines = analysis.split(separator: "\n")
+                                        let formattedText = if lines.count >= 2 {
+                                            "\(word): \(lines.joined(separator: ", "))"
+                                        } else {
+                                            "\(word): \(analysis)"
+                                        }
+                                        
+                                        Text(formattedText)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(T.C.ink2)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 2)
+                                            .id(word) // Add ID for scrolling
+                                    }
+                                }
+                                
+                                // Show loading indicator if analyzing
+                                if isLoadingCharacter {
+                                    HStack {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Analyzing...")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(T.C.ink2)
+                                    }
+                                    .padding(.horizontal, 4)
+                                    .id("loading") // Add ID for scrolling to loading indicator
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 250)
+                .onChange(of: selectedWords) { newWords in
+                    // Scroll to the latest added word
+                    if let lastWord = newWords.last {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            scrollProxy.scrollTo(lastWord, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: isLoadingCharacter) { loading in
+                    // Scroll to loading indicator when starting to load
+                    if loading {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            scrollProxy.scrollTo("loading", anchor: .bottom)
+                        }
                     }
                 }
             }
-            .frame(maxHeight: 250)
             
             // Action buttons
             HStack(alignment: .center, spacing: 0) {
                 // Pleco button
                 Button {
-                    vm.openInPleco()
+                    // Pass all sentences except the first (which is vm.sentence) as additional
+                    let additionalSentences = sentences.count > 1 ? Array(sentences.dropFirst()) : []
+                    vm.openInPleco(additionalSentences: additionalSentences)
                 } label: {
                     Label("Pleco", systemImage: "book")
                         .font(.caption)
@@ -134,16 +247,104 @@ struct SelectedSentencePopup: View {
         )
         .frame(maxWidth: 340)
         .onAppear {
+            // Clear all state when popup appears
+            selectedWords.removeAll()
+            characterAnalyses.removeAll()
+            chatGPTBreakdown = ""
+            isLoadingCharacter = false
+            characterTask?.cancel()
+            breakdownTask?.cancel()
+            
+            // Load the sentence translation
             loadChatGPTBreakdown()
         }
         .onChange(of: concatenatedText) { _ in
             // Reload breakdown when text changes (i.e., when extended)
+            selectedWords.removeAll()
+            characterAnalyses.removeAll()
+            isLoadingCharacter = false
+            characterTask?.cancel()
             breakdownTask?.cancel()
             chatGPTBreakdown = ""
             loadChatGPTBreakdown()
         }
         .onDisappear {
+            // Clean up when popup disappears
             breakdownTask?.cancel()
+            characterTask?.cancel()
+            selectedWords.removeAll()
+            characterAnalyses.removeAll()
+            chatGPTBreakdown = ""
+            isLoadingCharacter = false
+            isLoadingBreakdown = false
+        }
+    }
+    
+    private func loadCharacterAnalysis(for character: String, at position: Int) {
+        guard chatGPTService.isConfigured() else { return }
+        
+        isLoadingCharacter = true
+        
+        characterTask = Task {
+            var isFirstLine = true
+            var fullAnalysis = ""
+            var currentWord = character // Start with the single character
+            
+            do {
+                for try await chunk in chatGPTService.streamCharacterAnalysis(character: character, context: concatenatedText, position: position) {
+                    if !Task.isCancelled {
+                        fullAnalysis += chunk
+                        
+                        // Check if we've received the first line (the word)
+                        if isFirstLine && fullAnalysis.contains("\n") {
+                            let lines = fullAnalysis.split(separator: "\n", maxSplits: 1)
+                            if let firstLine = lines.first {
+                                currentWord = String(firstLine).trimmingCharacters(in: .whitespacesAndNewlines)
+                                
+                                // Add to selected words if not already there
+                                await MainActor.run {
+                                    if !selectedWords.contains(currentWord) {
+                                        selectedWords.append(currentWord)
+                                    }
+                                }
+                                isFirstLine = false
+                            }
+                        }
+                        
+                        // Update the analysis for this word
+                        await MainActor.run {
+                            let lines = fullAnalysis.split(separator: "\n")
+                            if lines.count > 1 {
+                                // Skip first line (word), show rest
+                                let analysis = lines.dropFirst().joined(separator: "\n")
+                                characterAnalyses[currentWord] = analysis
+                            }
+                        }
+                    }
+                }
+                
+                // Final update after stream completes
+                await MainActor.run {
+                    let lines = fullAnalysis.split(separator: "\n")
+                    if lines.count > 1 {
+                        let analysis = lines.dropFirst().joined(separator: "\n")
+                        if !analysis.isEmpty {
+                            characterAnalyses[currentWord] = analysis
+                        }
+                    } else if !fullAnalysis.isEmpty && !fullAnalysis.contains("\n") {
+                        // If we only got one line back (the word), still show it
+                        characterAnalyses[currentWord] = "No additional analysis available"
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    characterAnalyses[currentWord] = "Error analyzing"
+                }
+            }
+            
+            await MainActor.run {
+                isLoadingCharacter = false
+            }
         }
     }
     

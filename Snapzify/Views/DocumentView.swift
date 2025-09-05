@@ -399,7 +399,7 @@ struct DocumentView: View {
                         chatGPTContext: $chatGPTContext,
                         extendedSentenceIds: $extendedSentenceIds
                     )
-                    .id(displaySentences.count) // Force re-render when sentences change
+                    .id("\(sentence.id)-\(displaySentences.count)") // Force re-render when sentence or count changes
                     .position(x: geometry.size.width / 2,
                              y: min(tapLocation.y + 150, geometry.size.height - 200))
                     .transition(.scale.combined(with: .opacity))

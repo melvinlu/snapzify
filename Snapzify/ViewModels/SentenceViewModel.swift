@@ -107,8 +107,18 @@ class SentenceViewModel: ObservableObject {
         }
     }
     
-    func openInPleco() {
-        if let url = URL(string: "plecoapi://x-callback-url/s?q=\(sentence.text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
+    func openInPleco(additionalSentences: [Sentence] = []) {
+        // Concatenate the main sentence with any additional sentences (for extended selection)
+        let allSentences = [sentence] + additionalSentences
+        let textToOpen = allSentences.map { $0.text }.joined(separator: " ")
+        
+        print("🔍 Pleco Debug:")
+        print("  - Number of sentences: \(allSentences.count)")
+        print("  - Concatenated text being sent: '\(textToOpen)'")
+        print("  - Text length: \(textToOpen.count) characters")
+        
+        if let url = URL(string: "plecoapi://x-callback-url/s?q=\(textToOpen.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
+            print("  - Pleco URL: \(url.absoluteString)")
             UIApplication.shared.open(url)
         }
     }

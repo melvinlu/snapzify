@@ -3,6 +3,7 @@ import Foundation
 protocol ChatGPTService {
     func streamBreakdown(chineseText: String) -> AsyncThrowingStream<String, Error>
     func streamCustomPrompt(chineseText: String, userPrompt: String) -> AsyncThrowingStream<String, Error>
+    func streamCharacterAnalysis(character: String, context: String, position: Int) -> AsyncThrowingStream<String, Error>
     func isConfigured() -> Bool
 }
 
@@ -23,13 +24,28 @@ class ChatGPTServiceImpl: ChatGPTService {
     }
     
     func streamBreakdown(chineseText: String) -> AsyncThrowingStream<String, Error> {
-        let prompt = "Analyze this Chinese sentence: \(chineseText)\n\nFirst, provide the pinyin for each character in the sentence.\n\nThen give the overall meaning/translation of the complete sentence by itself. Do not preface with \"The overall meaning is:\" or \"The sentence means:\" - just give the translation directly.\n\nThen provide the breakdown of each character/word and how it contributes to the meaning. Do not include pinyin in this breakdown section.\n\nDo not number sections, no introductions, no repetition of the Chinese sentence, no markdown formatting. Just the pinyin, then translation, then breakdown."
+        let prompt = "Translate this Chinese sentence to English: \(chineseText)\n\nProvide only the English translation. Be concise and natural. Do not include pinyin, character breakdowns, or any other analysis. Just the English meaning."
         return streamChatGPT(prompt: prompt)
     }
     
     func streamCustomPrompt(chineseText: String, userPrompt: String) -> AsyncThrowingStream<String, Error> {
         let combinedPrompt = "\(chineseText) \(userPrompt)\n\nDon't use markdown."
         return streamChatGPT(prompt: combinedPrompt)
+    }
+    
+    func streamCharacterAnalysis(character: String, context: String, position: Int) -> AsyncThrowingStream<String, Error> {
+        let prompt = """
+        In the sentence: \(context)
+        
+        The character '\(character)' appears at position \(position). Check if this character is part of a multi-character word.
+        
+        First line: If it's part of a word, return the complete word. Otherwise return the single character.
+        Second line: pinyin
+        Third line: english meaning
+        
+        No labels, no formatting, just the three lines.
+        """
+        return streamChatGPT(prompt: prompt)
     }
     
     private func streamChatGPT(prompt: String) -> AsyncThrowingStream<String, Error> {
