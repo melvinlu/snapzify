@@ -40,10 +40,13 @@ class ChatGPTServiceImpl: ChatGPTService {
         The character '\(character)' appears at position \(position). Check if this character is part of a multi-character word.
         
         First line: If it's part of a word, return the complete word. Otherwise return the single character.
-        Second line: pinyin
-        Third line: english meaning
+        Second line: pinyin of the word/character
+        Third line: english meaning of the word/character
         
-        No labels, no formatting, just the three lines.
+        If it's a multi-character word, then for EACH individual character that makes up the word, add a line with:
+        [character]: [pinyin], [meaning]
+        
+        No labels, no extra formatting, just the lines as specified.
         """
         return streamChatGPT(prompt: prompt)
     }

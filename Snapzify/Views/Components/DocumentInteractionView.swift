@@ -7,8 +7,8 @@ struct TappableCharactersView: View {
     let onCharacterTap: (String, Int) -> Void
     
     var body: some View {
-        // Simple approach: let the text wrap naturally
-        HStack(alignment: .top, spacing: 0) {
+        // Use a custom layout that wraps but keeps individual tap targets
+        WrappingHStack(alignment: .leading, spacing: 0) {
             ForEach(Array(text.enumerated()), id: \.offset) { index, char in
                 let charStr = String(char)
                 let isHighlighted = selectedWords.contains(where: { $0.contains(charStr) })
@@ -17,18 +17,17 @@ struct TappableCharactersView: View {
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(isHighlighted ? T.C.accent : T.C.ink)
                     .onTapGesture {
-                        // Check if it's a Chinese character (CJK Unified Ideographs range)
+                        // Check if it's a Chinese character
                         if let scalar = charStr.unicodeScalars.first {
                             let value = scalar.value
-                            // CJK Unified Ideographs ranges
-                            let isChinese = (0x4E00...0x9FFF).contains(value) || // CJK Unified Ideographs
-                                          (0x3400...0x4DBF).contains(value) || // CJK Extension A  
-                                          (0x20000...0x2A6DF).contains(value) || // CJK Extension B
-                                          (0x2A700...0x2B73F).contains(value) || // CJK Extension C
-                                          (0x2B740...0x2B81F).contains(value) || // CJK Extension D
-                                          (0x2B820...0x2CEAF).contains(value) || // CJK Extension E
-                                          (0xF900...0xFAFF).contains(value) || // CJK Compatibility Ideographs
-                                          (0x2F800...0x2FA1F).contains(value) // CJK Compatibility Supplement
+                            let isChinese = (0x4E00...0x9FFF).contains(value) || 
+                                          (0x3400...0x4DBF).contains(value) ||
+                                          (0x20000...0x2A6DF).contains(value) ||
+                                          (0x2A700...0x2B73F).contains(value) ||
+                                          (0x2B740...0x2B81F).contains(value) ||
+                                          (0x2B820...0x2CEAF).contains(value) ||
+                                          (0xF900...0xFAFF).contains(value) ||
+                                          (0x2F800...0x2FA1F).contains(value)
                             
                             if isChinese {
                                 onCharacterTap(charStr, index)
@@ -38,7 +37,95 @@ struct TappableCharactersView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true) // Allow horizontal wrapping but keep vertical size
+    }
+}
+
+// A wrapping HStack implementation using Layout protocol (iOS 16+)
+struct WrappingHStack: Layout {
+    var alignment: Alignment = .center
+    var spacing: CGFloat = 10
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlowResult(
+            in: proposal.replacingUnspecifiedDimensions().width,
+            subviews: subviews,
+            alignment: alignment,
+            spacing: spacing
+        )
+        return result.size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(
+            in: bounds.width,
+            subviews: subviews,
+            alignment: alignment,
+            spacing: spacing
+        )
+        
+        for row in result.rows {
+            for element in row.elements {
+                let x = element.x + bounds.minX
+                let y = element.y + bounds.minY
+                element.subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            }
+        }
+    }
+    
+    struct FlowResult {
+        var size: CGSize = .zero
+        var rows: [Row] = []
+        
+        struct Row {
+            var elements: [Element] = []
+            var height: CGFloat = 0
+        }
+        
+        struct Element {
+            var subview: LayoutSubview
+            var x: CGFloat
+            var y: CGFloat
+        }
+        
+        init(in maxWidth: CGFloat, subviews: Subviews, alignment: Alignment, spacing: CGFloat) {
+            var currentX: CGFloat = 0
+            var currentY: CGFloat = 0
+            var currentRow = Row()
+            var width: CGFloat = 0
+            
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                
+                if currentX + size.width > maxWidth && !currentRow.elements.isEmpty {
+                    // Move to next row
+                    rows.append(currentRow)
+                    currentY += currentRow.height + spacing
+                    currentRow = Row()
+                    currentX = 0
+                }
+                
+                currentRow.elements.append(Element(
+                    subview: subview,
+                    x: currentX,
+                    y: currentY
+                ))
+                
+                currentRow.height = max(currentRow.height, size.height)
+                currentX += size.width + spacing
+                width = max(width, currentX)
+            }
+            
+            if !currentRow.elements.isEmpty {
+                rows.append(currentRow)
+            }
+            
+            if let lastRow = rows.last {
+                size = CGSize(
+                    width: width - spacing,
+                    height: currentY + lastRow.height
+                )
+            }
+        }
     }
 }
 
@@ -121,21 +208,41 @@ struct SelectedSentencePopup: View {
                             VStack(alignment: .leading, spacing: T.S.sm) {
                                 ForEach(selectedWords, id: \.self) { word in
                                     if let analysis = characterAnalyses[word] {
-                                        // Format: "word: pinyin, definition" all on one line
-                                        let lines = analysis.split(separator: "\n")
-                                        let formattedText = if lines.count >= 2 {
-                                            "\(word): \(lines.joined(separator: ", "))"
-                                        } else {
-                                            "\(word): \(analysis)"
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            // Parse the analysis
+                                            let lines = analysis.split(separator: "\n")
+                                                .map { $0.trimmingCharacters(in: .whitespaces) }
+                                                .filter { !$0.isEmpty }
+                                            
+                                            // Format main word/character breakdown
+                                            if lines.count >= 2 {
+                                                // Main word: pinyin, definition
+                                                let mainText = "\(word): \(lines[0]), \(lines[1])"
+                                                Text(mainText)
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundStyle(T.C.ink)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                
+                                                // Only show individual character breakdowns for multi-character words
+                                                if word.count > 1 && lines.count > 2 {
+                                                    ForEach(Array(lines.dropFirst(2)), id: \.self) { charLine in
+                                                        Text("  " + charLine) // Indent character breakdowns
+                                                            .font(.system(size: 12))
+                                                            .foregroundStyle(T.C.ink2.opacity(0.8))
+                                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                                    }
+                                                }
+                                            } else {
+                                                // Fallback for single line or unexpected format
+                                                Text("\(word): \(analysis)")
+                                                    .font(.system(size: 13))
+                                                    .foregroundStyle(T.C.ink2)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                            }
                                         }
-                                        
-                                        Text(formattedText)
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(T.C.ink2)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(.horizontal, 4)
-                                            .padding(.vertical, 2)
-                                            .id(word) // Add ID for scrolling
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .id(word) // Add ID for scrolling
                                     }
                                 }
                                 
