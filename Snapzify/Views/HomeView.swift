@@ -204,6 +204,11 @@ struct HomeView: View {
                             appState.currentQueueDocument = processedDocuments[0]
                             appState.isProcessingQueue = false
                             
+                            // Refresh documents list to show newly imported items
+                            Task {
+                                await vm.refreshDocuments()
+                            }
+                            
                             // Trigger navigation to queue view
                             NotificationCenter.default.post(name: .openQueueDocument, object: processedDocuments[0])
                         } else {

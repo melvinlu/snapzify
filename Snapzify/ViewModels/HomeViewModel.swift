@@ -664,7 +664,7 @@ class HomeViewModel: ObservableObject {
             try await store.save(document)
             let savedDocument = document
             
-            // Navigate to the document after everything is processed
+            // Update UI and navigate to the document after everything is processed
             await MainActor.run {
                 self.documents.insert(DocumentMetadata(from: savedDocument), at: 0)
                 self.isProcessing = false
