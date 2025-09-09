@@ -768,6 +768,165 @@ class HomeViewModel: ObservableObject {
         return document
     }
     
+    func processVideoForQueue(_ videoURL: URL, source: DocumentSource = .imported) async throws -> Document {
+        // Process video without navigation, similar to processPickedVideo but returning a Document
+        let script = ChineseScript(rawValue: selectedScript) ?? .simplified
+        
+        // Extract frames from video
+        let frames = try await extractFramesFromVideo(videoURL, frameInterval: 0.2)
+        
+        guard !frames.isEmpty else {
+            throw ProcessingError.noFramesExtracted
+        }
+        
+        // Process all frames for OCR
+        var textAppearances: [String: [FrameAppearance]] = [:]
+        let frameInterval = 0.2
+        
+        let maxConcurrentRequests = 25
+        var processedCount = 0
+        
+        if frames.count <= maxConcurrentRequests {
+            let results = try await withThrowingTaskGroup(of: (Int, [OCRLine]).self) { group in
+                for (index, frame) in frames.enumerated() {
+                    group.addTask {
+                        let ocrLines = try await self.ocrService.recognizeText(in: frame)
+                        return (index, ocrLines)
+                    }
+                }
+                
+                var allResults: [(Int, [OCRLine])] = []
+                for try await result in group {
+                    allResults.append(result)
+                    processedCount += 1
+                    
+                    // Report progress
+                    let progress = Double(processedCount) / Double(frames.count)
+                    onProcessingProgress?(progress * 0.5) // OCR is 50% of the work
+                }
+                
+                return allResults.sorted { $0.0 < $1.0 }
+            }
+            
+            // Process OCR results
+            for (index, ocrLines) in results {
+                let frameTime = Double(index) * frameInterval
+                for line in ocrLines {
+                    let text = line.text
+                    if !text.isEmpty {
+                        let appearance = FrameAppearance(
+                            timestamp: frameTime,
+                            bbox: line.bbox
+                        )
+                        if textAppearances[text] != nil {
+                            textAppearances[text]?.append(appearance)
+                        } else {
+                            textAppearances[text] = [appearance]
+                        }
+                    }
+                }
+            }
+        } else {
+            // Process in batches for larger videos
+            for batchStart in stride(from: 0, to: frames.count, by: maxConcurrentRequests) {
+                let batchEnd = min(batchStart + maxConcurrentRequests, frames.count)
+                let batch = Array(frames[batchStart..<batchEnd])
+                
+                let results = try await withThrowingTaskGroup(of: (Int, [OCRLine]).self) { group in
+                    for (localIndex, frame) in batch.enumerated() {
+                        let globalIndex = batchStart + localIndex
+                        group.addTask {
+                            let ocrLines = try await self.ocrService.recognizeText(in: frame)
+                            return (globalIndex, ocrLines)
+                        }
+                    }
+                    
+                    var batchResults: [(Int, [OCRLine])] = []
+                    for try await result in group {
+                        batchResults.append(result)
+                        processedCount += 1
+                        
+                        // Report progress
+                        let progress = Double(processedCount) / Double(frames.count)
+                        onProcessingProgress?(progress * 0.5)
+                    }
+                    
+                    return batchResults.sorted { $0.0 < $1.0 }
+                }
+                
+                // Process OCR results for this batch
+                for (index, ocrLines) in results {
+                    let frameTime = Double(index) * frameInterval
+                    for line in ocrLines {
+                        let text = line.text
+                        if !text.isEmpty {
+                            let appearance = FrameAppearance(
+                                timestamp: frameTime,
+                                bbox: line.bbox
+                            )
+                            if textAppearances[text] != nil {
+                                textAppearances[text]?.append(appearance)
+                            } else {
+                                textAppearances[text] = [appearance]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Convert to sentences
+        var allSentences: [Sentence] = []
+        for (text, appearances) in textAppearances {
+            allSentences.append(Sentence(
+                text: text,
+                frameAppearances: appearances
+            ))
+        }
+        
+        guard !allSentences.isEmpty else {
+            throw ProcessingError.noChineseDetected
+        }
+        
+        // Report 75% progress after processing
+        onProcessingProgress?(0.75)
+        
+        // Create document
+        let representativeImage = frames.first!
+        let videoData = try Data(contentsOf: videoURL)
+        let documentId = UUID()
+        
+        let savedVideoURL = try await MainActor.run {
+            try MediaStorageService.shared.saveMedia(videoData, id: documentId, isVideo: true)
+        }
+        
+        let thumbnailURL: URL? = try? await MainActor.run {
+            let thumbnailSize = CGSize(width: 120, height: 120)
+            let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+            let thumbnail = renderer.image { context in
+                representativeImage.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+            }
+            return try MediaStorageService.shared.saveThumbnail(thumbnail, id: documentId)
+        }
+        
+        let document = Document(
+            id: documentId,
+            source: source,
+            script: script,
+            sentences: allSentences,
+            mediaURL: savedVideoURL,
+            thumbnailURL: thumbnailURL,
+            isVideo: true
+        )
+        
+        try await store.save(document)
+        
+        // Report completion
+        onProcessingProgress?(1.0)
+        
+        return document
+    }
+    
     func processSharedImage(_ image: UIImage) async {
         // Process shared image with high priority
         await Task(priority: .high) {

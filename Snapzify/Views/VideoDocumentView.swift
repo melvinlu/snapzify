@@ -1,137 +1,7 @@
 import SwiftUI
 import AVKit
 
-// Video-specific popup with ChatGPT context input
-struct VideoSelectedSentencePopup: View {
-    let sentences: [Sentence]  // Changed to array to support extended sentences
-    let allSentences: [Sentence]  // All sentences in document for finding next
-    @ObservedObject var vm: SentenceViewModel
-    @Binding var isShowing: Bool
-    let position: CGPoint
-    @Binding var showingChatGPTInput: Bool
-    @Binding var chatGPTContext: String
-    @Binding var extendedSentenceIds: [UUID]
-    
-    // Computed property for concatenated text
-    private var concatenatedText: String {
-        sentences.map { $0.text }.joined(separator: " ")
-    }
-    
-    // Check if we can extend further
-    private var canExtend: Bool {
-        guard let lastSentence = sentences.last,
-              let currentIndex = allSentences.firstIndex(where: { $0.id == lastSentence.id }) else {
-            return false
-        }
-        return currentIndex < allSentences.count - 1
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: T.S.sm) {
-            // Chinese text (concatenated if extended)
-            Text(concatenatedText)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(T.C.ink)
-            
-            
-            
-            // Action buttons
-            HStack(alignment: .center, spacing: 0) {
-                // Pleco button
-                Button {
-                    // Pass all sentences except the first (which is vm.sentence) as additional
-                    let additionalSentences = sentences.count > 1 ? Array(sentences.dropFirst()) : []
-                    vm.openInPleco(additionalSentences: additionalSentences)
-                } label: {
-                    Label("Pleco", systemImage: "book")
-                        .font(.caption)
-                }
-                .buttonStyle(PopupButtonStyle())
-                
-                // Spacing after Pleco
-                Spacer().frame(width: T.S.sm)
-                
-                // Audio button
-                if vm.isGeneratingAudio || vm.isPreparingAudio {
-                    HStack(spacing: 4) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
-                            .scaleEffect(0.6)
-                        Text("Load")
-                            .font(.caption)
-                            .foregroundStyle(T.C.ink2)
-                            .fixedSize()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(T.C.ink.opacity(0.1))
-                    )
-                    .fixedSize()
-                } else {
-                    Button {
-                        vm.playOrPauseAudio()
-                    } label: {
-                        Label(
-                            vm.isPlaying ? "Pause" : "Play",
-                            systemImage: vm.isPlaying ? "pause.fill" : "play.fill"
-                        )
-                        .font(.caption)
-                    }
-                    .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
-                }
-                
-                // Spacing after Audio
-                Spacer().frame(width: T.S.sm)
-                
-                // ChatGPT button
-                Button {
-                    showingChatGPTInput = true
-                } label: {
-                    Label("ChatGPT", systemImage: "message.circle")
-                        .font(.caption)
-                }
-                .buttonStyle(PopupButtonStyle())
-                
-                // Spacing
-                Spacer().frame(width: T.S.sm)
-                
-                // Extend button
-                if canExtend {
-                    Button {
-                        extendWithNextSentence()
-                    } label: {
-                        Label("Extend", systemImage: "plus.circle")
-                            .font(.caption)
-                    }
-                    .buttonStyle(PopupButtonStyle())
-                }
-                
-                // Push remaining space
-                Spacer(minLength: 0)
-            }
-        }
-        .padding(T.S.lg)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(T.C.card)
-                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-        )
-        .frame(maxWidth: 340)
-    }
-    
-    private func extendWithNextSentence() {
-        guard let lastSentence = sentences.last,
-              let currentIndex = allSentences.firstIndex(where: { $0.id == lastSentence.id }),
-              currentIndex < allSentences.count - 1 else {
-            return
-        }
-        
-        let nextSentence = allSentences[currentIndex + 1]
-        extendedSentenceIds.append(nextSentence.id)
-    }
-}
+// Removed VideoSelectedSentencePopup - now using SelectedSentencePopup from DocumentInteractionView
 
 struct VideoDocumentView: View {
     @StateObject var vm: DocumentViewModel
@@ -201,7 +71,7 @@ struct VideoDocumentView: View {
                         vm.document.sentences.first(where: { $0.id == extendedId })
                     }
                     
-                    VideoSelectedSentencePopup(
+                    SelectedSentencePopup(
                         sentences: displaySentences,
                         allSentences: vm.document.sentences,
                         vm: vm.createSentenceViewModel(for: sentence),

@@ -177,7 +177,7 @@ struct HomeView: View {
                         }
                     }
                     
-                    // Process videos (if implemented)
+                    // Process videos
                     for (index, videoURL) in queuedVideos.enumerated() {
                         logger.info("Processing video \(index + 1) of \(queuedVideos.count)")
                         
@@ -186,8 +186,13 @@ struct HomeView: View {
                             appState.queueProcessingProgress = 0
                         }
                         
-                        // TODO: Implement video processing for queue
-                        logger.info("Video queue processing not yet implemented")
+                        do {
+                            let document = try await vm.processVideoForQueue(videoURL)
+                            processedDocuments.append(document)
+                            logger.info("Successfully processed video \(index + 1)")
+                        } catch {
+                            logger.error("Failed to process video \(index + 1): \(error)")
+                        }
                     }
                     
                     // Show queue view with all processed documents
