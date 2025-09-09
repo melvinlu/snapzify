@@ -588,11 +588,46 @@ struct SelectedSentencePopup: View {
             return
         }
         
-        let nextSentence = allSentences[currentIndex + 1]
+        // For video documents, try to find the next sentence in the same frame first
+        let nextSentence: Sentence
+        if let lastTimestamp = lastSentence.timestamp ?? lastSentence.frameAppearances?.first?.timestamp {
+            // Look for sentences in the same frame (within 0.2 seconds)
+            var candidateIndex = currentIndex + 1
+            var foundSentence: Sentence? = nil
+            
+            while candidateIndex < allSentences.count {
+                let candidate = allSentences[candidateIndex]
+                let candidateTimestamp = candidate.timestamp ?? candidate.frameAppearances?.first?.timestamp ?? 0
+                
+                // Check if this sentence is in the same frame
+                if abs(candidateTimestamp - lastTimestamp) < 0.2 {
+                    // Found a sentence in the same frame
+                    foundSentence = candidate
+                    break
+                } else if candidateTimestamp > lastTimestamp {
+                    // We've moved to a later frame, use this sentence
+                    foundSentence = candidate
+                    break
+                }
+                candidateIndex += 1
+            }
+            
+            // Use found sentence or fallback to the immediate next
+            nextSentence = foundSentence ?? allSentences[currentIndex + 1]
+        } else {
+            // For non-video documents, just use the next sentence
+            nextSentence = allSentences[currentIndex + 1]
+        }
+        
         print("📝 Extending with next sentence: '\(nextSentence.text)'")
         print("📝 Current sentences count: \(sentences.count)")
         print("📝 Extended IDs before: \(extendedSentenceIds)")
-        extendedSentenceIds.append(nextSentence.id)
+        
+        // Don't add duplicates
+        if !extendedSentenceIds.contains(nextSentence.id) {
+            extendedSentenceIds.append(nextSentence.id)
+        }
+        
         print("📝 Extended IDs after: \(extendedSentenceIds)")
         // The onChange modifier will detect the change and reload the breakdown
     }

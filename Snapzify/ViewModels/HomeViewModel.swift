@@ -620,6 +620,22 @@ class HomeViewModel: ObservableObject {
                 ))
             }
             
+            // Sort sentences by their first appearance timestamp to maintain chronological order
+            // and by vertical position for sentences in the same frame
+            allSentences.sort { sentence1, sentence2 in
+                let time1 = sentence1.timestamp ?? 0
+                let time2 = sentence2.timestamp ?? 0
+                
+                // If they appear in the same frame (within 0.1 seconds), sort by vertical position
+                if abs(time1 - time2) < 0.1 {
+                    let y1 = sentence1.rangeInImage?.minY ?? 0
+                    let y2 = sentence2.rangeInImage?.minY ?? 0
+                    return y1 < y2  // Top to bottom
+                }
+                
+                return time1 < time2
+            }
+            
             guard !allSentences.isEmpty else {
                 throw ProcessingError.noChineseDetected
             }
@@ -813,7 +829,8 @@ class HomeViewModel: ObservableObject {
                 let frameTime = Double(index) * frameInterval
                 for line in ocrLines {
                     let text = line.text
-                    if !text.isEmpty {
+                    // Only include text that contains Chinese characters
+                    if !text.isEmpty && containsChinese(text) {
                         let appearance = FrameAppearance(
                             timestamp: frameTime,
                             bbox: line.bbox
@@ -859,7 +876,8 @@ class HomeViewModel: ObservableObject {
                     let frameTime = Double(index) * frameInterval
                     for line in ocrLines {
                         let text = line.text
-                        if !text.isEmpty {
+                        // Only include text that contains Chinese characters
+                        if !text.isEmpty && containsChinese(text) {
                             let appearance = FrameAppearance(
                                 timestamp: frameTime,
                                 bbox: line.bbox
@@ -875,13 +893,28 @@ class HomeViewModel: ObservableObject {
             }
         }
         
-        // Convert to sentences
+        // Convert to sentences and sort by first appearance timestamp AND vertical position
         var allSentences: [Sentence] = []
         for (text, appearances) in textAppearances {
             allSentences.append(Sentence(
                 text: text,
                 frameAppearances: appearances
             ))
+        }
+        
+        // Sort sentences by their first appearance timestamp, then by vertical position (top to bottom)
+        allSentences.sort { sentence1, sentence2 in
+            let time1 = sentence1.frameAppearances?.first?.timestamp ?? 0
+            let time2 = sentence2.frameAppearances?.first?.timestamp ?? 0
+            
+            // If they appear in the same frame (within 0.1 seconds), sort by vertical position
+            if abs(time1 - time2) < 0.1 {
+                let y1 = sentence1.frameAppearances?.first?.bbox.minY ?? 0
+                let y2 = sentence2.frameAppearances?.first?.bbox.minY ?? 0
+                return y1 < y2  // Top to bottom
+            }
+            
+            return time1 < time2
         }
         
         guard !allSentences.isEmpty else {
