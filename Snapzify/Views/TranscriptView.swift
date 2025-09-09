@@ -3,19 +3,20 @@ import SwiftUI
 struct TranscriptView: View {
     let document: Document
     @ObservedObject var documentVM: DocumentViewModel
+    var currentFrameTime: Double? = nil  // For video documents, the current frame timestamp
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(getUniqueSentences(), id: \.id) { sentence in
+                ForEach(getVisibleSentences(), id: \.id) { sentence in
                     ExpandedSentenceView(
                         sentence: sentence,
                         sentenceVM: documentVM.createSentenceViewModel(for: sentence)
                     )
                     
                     // Divider between sentences
-                    if sentence.id != getUniqueSentences().last?.id {
+                    if sentence.id != getVisibleSentences().last?.id {
                         Divider()
                             .background(T.C.divider.opacity(0.3))
                             .padding(.horizontal, T.S.md)
@@ -35,9 +36,25 @@ struct TranscriptView: View {
         .preferredColorScheme(.dark)
     }
     
-    private func getUniqueSentences() -> [Sentence] {
-        // For videos, deduplicate sentences that appear in multiple frames
-        if document.isVideo {
+    private func getVisibleSentences() -> [Sentence] {
+        // For videos with current frame time, show only sentences visible in that frame
+        if document.isVideo, let frameTime = currentFrameTime {
+            return document.sentences.filter { sentence in
+                // Check if this sentence appears in the current frame
+                if let appearances = sentence.frameAppearances {
+                    // Check if any appearance is within 0.15 seconds of current frame
+                    return appearances.contains { appearance in
+                        abs(appearance.timestamp - frameTime) <= 0.15
+                    }
+                }
+                // Fallback for sentences with single timestamp
+                if let timestamp = sentence.timestamp {
+                    return abs(timestamp - frameTime) <= 0.15
+                }
+                return false
+            }
+        } else if document.isVideo {
+            // For videos without current frame (shouldn't happen), deduplicate
             var seenTexts = Set<String>()
             var uniqueSentences: [Sentence] = []
             
@@ -50,7 +67,7 @@ struct TranscriptView: View {
             
             return uniqueSentences
         } else {
-            // For images, return all sentences as-is
+            // For non-video documents, return all sentences
             return document.sentences
         }
     }

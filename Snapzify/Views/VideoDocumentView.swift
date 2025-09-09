@@ -21,6 +21,8 @@ struct VideoDocumentView: View {
     @State private var isDraggingTranscript = false
     @State private var dragOffset: CGFloat = 0
     @State private var isNavigatingQueue = false
+    @State private var isSelectingForExtension = false
+    @State private var baseSentenceId: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
     
@@ -49,6 +51,41 @@ struct VideoDocumentView: View {
                     )
                 }
                 
+                // Selection mode overlay
+                if isSelectingForExtension {
+                    VStack {
+                        Spacer()
+                            .frame(height: 80) // Space for header icons
+                        
+                        HStack {
+                            Text("Tap a sentence to extend with")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.orange.opacity(0.9))
+                                )
+                            
+                            Button {
+                                // Cancel selection mode
+                                isSelectingForExtension = false
+                                baseSentenceId = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        Spacer()
+                    }
+                    .zIndex(90) // Below popup but above video
+                }
+                
                 // Popup overlay (behind slider)
                 if showingPopup,
                    let sentenceId = selectedSentenceId,
@@ -71,9 +108,30 @@ struct VideoDocumentView: View {
                         vm.document.sentences.first(where: { $0.id == extendedId })
                     }
                     
-                    let sliderHeight: CGFloat = 60 // 36pt buttons + 24pt padding
-                    let popupEstimatedHeight: CGFloat = 250 // Estimated max popup height
-                    let safeBottomY = geometry.size.height - sliderHeight - popupEstimatedHeight/2 - 20 // 20pt buffer
+                    let sliderHeight: CGFloat = 80 // Increased to account for full slider with buttons
+                    let topSafeArea: CGFloat = 100 // Space for top controls
+                    let bottomBuffer: CGFloat = 20 // Buffer between popup and slider
+                    let sliderTop = geometry.size.height - sliderHeight
+                    
+                    // Calculate available space and desired position
+                    let desiredY = tapLocation.y - 50 // Position above tap point
+                    let maxAvailableHeight = sliderTop - topSafeArea - bottomBuffer
+                    
+                    // Calculate actual popup position
+                    let (popupY, popupMaxHeight): (CGFloat, CGFloat) = {
+                        if desiredY < topSafeArea + 150 {
+                            // Too close to top, position below tap
+                            let y = min(tapLocation.y + 100, sliderTop - 150 - bottomBuffer)
+                            return (y, sliderTop - y - bottomBuffer)
+                        } else if desiredY > sliderTop - 150 - bottomBuffer {
+                            // Too close to slider, position higher
+                            let y = sliderTop - 150 - bottomBuffer
+                            return (y, min(300, maxAvailableHeight))
+                        } else {
+                            // Normal position
+                            return (desiredY, min(300, sliderTop - desiredY - bottomBuffer))
+                        }
+                    }()
                     
                     SelectedSentencePopup(
                         sentences: displaySentences,
@@ -83,15 +141,19 @@ struct VideoDocumentView: View {
                         position: tapLocation,
                         showingChatGPTInput: $showingChatGPTInput,
                         chatGPTContext: $chatGPTContext,
-                        extendedSentenceIds: $extendedSentenceIds
+                        extendedSentenceIds: $extendedSentenceIds,
+                        maxHeight: popupMaxHeight,
+                        onManualSelect: {
+                            // Enter selection mode
+                            isSelectingForExtension = true
+                            baseSentenceId = sentence.id
+                            showingPopup = false
+                        }
                     )
                     .id("\(sentence.id)-\(displaySentences.count)") // Force re-render when sentence or count changes
                     .position(
                         x: geometry.size.width / 2,
-                        y: min(
-                            max(tapLocation.y + 100, popupEstimatedHeight/2 + 50), // Ensure not too high
-                            safeBottomY // Ensure not overlapping slider
-                        )
+                        y: popupY
                     )
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(100)
@@ -320,7 +382,8 @@ struct VideoDocumentView: View {
             if isDraggingTranscript || showingTranscript {
                 TranscriptView(
                     document: vm.document, 
-                    documentVM: vm
+                    documentVM: vm,
+                    currentFrameTime: Double(currentFrameIndex) * frameInterval
                 )
                 .frame(width: geometry.size.width)
                 .background(Color.black)
@@ -421,12 +484,27 @@ struct VideoDocumentView: View {
         print("🎯   - ID: \(sentence.id)")
         print("🎯   - Status: \(sentence.status)")
         
-        // Always show popup immediately
-        withAnimation(.easeInOut(duration: 0.2)) {
-            selectedSentenceId = sentence.id
-            tapLocation = location
-            extendedSentenceIds = []  // Reset extended sentences when opening new popup
-            showingPopup = true
+        if isSelectingForExtension {
+            // In selection mode - extend the base sentence with this one
+            if let baseSentenceId = baseSentenceId {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedSentenceId = baseSentenceId
+                    tapLocation = location
+                    extendedSentenceIds = [sentence.id]
+                    showingPopup = true
+                    // Exit selection mode
+                    isSelectingForExtension = false
+                    self.baseSentenceId = nil
+                }
+            }
+        } else {
+            // Normal mode - show popup for tapped sentence
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedSentenceId = sentence.id
+                tapLocation = location
+                extendedSentenceIds = []  // Reset extended sentences when opening new popup
+                showingPopup = true
+            }
         }
         
         // Check if sentence needs translation

@@ -41,11 +41,20 @@ class ChatGPTServiceImpl: ChatGPTService {
         
         First line: If it's part of a word, return the complete word. Otherwise return the single character.
         Second line: pinyin of the word/character
-        Third line: english meaning of the word/character
+        Third line: english meaning, how it specifically contributes to this sentence's meaning
         
         If it's a multi-character word, then for EACH individual character that makes up the word, add a line with:
         [character]: [pinyin], [meaning]
         
+        Format the third line as: [general meaning] → [specific contribution to this sentence]
+        
+        Examples:
+        - For 吃 in "我吃苹果": eat → the action being performed on the apple
+        - For 苹果 in "我吃苹果": apple → what is being eaten
+        - For 很 in "她很漂亮": very → intensifies how beautiful she is
+        - For 了 in "我吃了": (particle) → indicates the eating already happened
+        
+        Be specific about THIS sentence's meaning, not generic grammar roles.
         No labels, no extra formatting, just the lines as specified.
         """
         return streamChatGPT(prompt: prompt)

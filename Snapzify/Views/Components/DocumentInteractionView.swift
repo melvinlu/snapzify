@@ -1,5 +1,33 @@
 import SwiftUI
 
+// MARK: - Helper Views
+struct CharacterBreakdownLineView: View {
+    let charLine: String
+    
+    var cleanedLine: String {
+        // For individual characters in a word, remove the semantic role part (after the second comma)
+        // Format is: "character: pinyin, meaning, role"
+        // We want: "character: pinyin, meaning"
+        
+        let components = charLine.split(separator: ",", maxSplits: 2).map { $0.trimmingCharacters(in: .whitespaces) }
+        
+        if components.count >= 3 {
+            // Has role part - join first two components (character: pinyin, meaning)
+            return components[0] + ", " + components[1]
+        } else {
+            // No role part or unexpected format - return as is
+            return charLine
+        }
+    }
+    
+    var body: some View {
+        Text("  " + cleanedLine) // Indent character breakdowns
+            .font(.system(size: 12))
+            .foregroundStyle(T.C.ink2.opacity(0.8))
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 // MARK: - Tappable Characters View
 struct TappableCharactersView: View {
     let text: String
@@ -139,6 +167,8 @@ struct SelectedSentencePopup: View {
     @Binding var showingChatGPTInput: Bool
     @Binding var chatGPTContext: String
     @Binding var extendedSentenceIds: [UUID]
+    var maxHeight: CGFloat? = nil
+    var onManualSelect: (() -> Void)? = nil
     @State private var chatGPTBreakdown = ""
     @State private var isLoadingBreakdown = false
     @State private var breakdownTask: Task<Void, Never>?
@@ -165,8 +195,8 @@ struct SelectedSentencePopup: View {
         return currentIndex < allSentences.count - 1
     }
     
-    var body: some View {
-        
+    @ViewBuilder
+    private var popupContent: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
             // Chinese text (concatenated if extended) - tappable characters
             TappableCharactersView(
@@ -218,7 +248,7 @@ struct SelectedSentencePopup: View {
                                             
                                             // Format main word/character breakdown
                                             if lines.count >= 2 {
-                                                // Main word: pinyin, definition
+                                                // Main word: pinyin, definition with role
                                                 let mainText = "\(word): \(lines[0]), \(lines[1])"
                                                 Text(mainText)
                                                     .font(.system(size: 13, weight: .semibold))
@@ -228,10 +258,7 @@ struct SelectedSentencePopup: View {
                                                 // Only show individual character breakdowns for multi-character words
                                                 if word.count > 1 && lines.count > 2 {
                                                     ForEach(Array(lines.dropFirst(2)), id: \.self) { charLine in
-                                                        Text("  " + charLine) // Indent character breakdowns
-                                                            .font(.system(size: 12))
-                                                            .foregroundStyle(T.C.ink2.opacity(0.8))
-                                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                                        CharacterBreakdownLineView(charLine: charLine)
                                                     }
                                                 }
                                             } else {
@@ -262,7 +289,7 @@ struct SelectedSentencePopup: View {
                                 }
                             }
                         }
-                        .frame(maxHeight: 200)
+                        .frame(maxHeight: maxHeight != nil ? min(200, maxHeight! * 0.4) : 200)
                         .onChange(of: selectedWords) { newWords in
                             // Scroll to the latest added word
                             if let lastWord = newWords.last {
@@ -363,6 +390,21 @@ struct SelectedSentencePopup: View {
                     Spacer().frame(width: T.S.sm)
                 }
                 
+                // Manual selection button
+                Button {
+                    // Dismiss popup and enter selection mode
+                    isShowing = false
+                    // Call the callback if provided
+                    onManualSelect?()
+                } label: {
+                    Image(systemName: "hand.tap")
+                        .font(.system(size: 16))
+                }
+                .buttonStyle(PopupButtonStyle())
+                
+                // Spacing
+                Spacer().frame(width: T.S.sm)
+                
                 // Extend button
                 if canExtend {
                     // Add spacing if All button is not shown
@@ -383,13 +425,33 @@ struct SelectedSentencePopup: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(T.S.lg)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(T.C.card)
-                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-        )
-        .frame(maxWidth: 340)
+    }
+    
+    var body: some View {
+        Group {
+            // Wrap in ScrollView if height is constrained
+            if let maxHeight = maxHeight, maxHeight < 400 {
+                ScrollView {
+                    popupContent
+                        .padding(T.S.lg)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(T.C.card)
+                        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+                )
+                .frame(maxWidth: 340, maxHeight: maxHeight)
+            } else {
+                popupContent
+                    .padding(T.S.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(T.C.card)
+                            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+                    )
+                    .frame(maxWidth: 340, maxHeight: maxHeight)
+            }
+        }
         .onAppear {
             // Clear all state when popup appears
             selectedWords.removeAll()
@@ -683,6 +745,8 @@ struct DocumentInteractionView: View {
     @State private var extendedSentenceIds: [UUID] = []
     @State private var showingChatGPTInput = false
     @State private var chatGPTContext = ""
+    @State private var isSelectingForExtension = false
+    @State private var baseSentenceId: UUID? = nil
     
     init(document: Document, isActive: Bool = true, showTranscript: Bool = true, onTranscriptRequest: (() -> Void)? = nil, onPopupStateChanged: ((Bool) -> Void)? = nil) {
         self.document = document
@@ -722,6 +786,41 @@ struct DocumentInteractionView: View {
                             }
                         }
                     )
+                    
+                    // Selection mode overlay
+                    if isSelectingForExtension {
+                        VStack {
+                            Spacer()
+                                .frame(height: 80) // Space for header icons
+                            
+                            HStack {
+                                Text("Tap a sentence to extend with")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.orange.opacity(0.9))
+                                    )
+                                
+                                Button {
+                                    // Cancel selection mode
+                                    isSelectingForExtension = false
+                                    baseSentenceId = nil
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                        .background(Circle().fill(Color.black.opacity(0.5)))
+                                }
+                            }
+                            .padding(.horizontal)
+                            
+                            Spacer()
+                        }
+                        .zIndex(45) // Below popup but above image
+                    }
                 }
                 
                 // Popup overlay with tap-to-dismiss background
@@ -752,7 +851,13 @@ struct DocumentInteractionView: View {
                             position: tapLocation,
                             showingChatGPTInput: $showingChatGPTInput,
                             chatGPTContext: $chatGPTContext,
-                            extendedSentenceIds: $extendedSentenceIds
+                            extendedSentenceIds: $extendedSentenceIds,
+                            onManualSelect: {
+                                // Enter selection mode
+                                isSelectingForExtension = true
+                                baseSentenceId = sentence.id
+                                showingPopup = false
+                            }
                         )
                         .id(displaySentences.map { $0.id }) // Force re-render when sentences change
                         .position(x: geometry.size.width / 2,
@@ -849,10 +954,26 @@ struct DocumentInteractionView: View {
                 
                 if normalizedX >= bboxLeft && normalizedX <= bboxRight &&
                    normalizedY >= bboxTop && normalizedY <= bboxBottom {
-                    selectedSentenceId = sentence.id
-                    tapLocation = location
-                    showingPopup = true
-                    extendedSentenceIds = []
+                    
+                    if isSelectingForExtension {
+                        // In selection mode - extend the base sentence with this one
+                        if let baseSentenceId = baseSentenceId {
+                            // Show popup with both sentences
+                            selectedSentenceId = baseSentenceId
+                            tapLocation = location
+                            extendedSentenceIds = [sentence.id]
+                            showingPopup = true
+                            // Exit selection mode
+                            isSelectingForExtension = false
+                            self.baseSentenceId = nil
+                        }
+                    } else {
+                        // Normal mode - show popup for tapped sentence
+                        selectedSentenceId = sentence.id
+                        tapLocation = location
+                        showingPopup = true
+                        extendedSentenceIds = []
+                    }
                     return
                 }
             }
