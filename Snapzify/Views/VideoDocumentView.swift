@@ -108,31 +108,6 @@ struct VideoDocumentView: View {
                         vm.document.sentences.first(where: { $0.id == extendedId })
                     }
                     
-                    let sliderHeight: CGFloat = 80 // Increased to account for full slider with buttons
-                    let topSafeArea: CGFloat = 100 // Space for top controls
-                    let bottomBuffer: CGFloat = 20 // Buffer between popup and slider
-                    let sliderTop = geometry.size.height - sliderHeight
-                    
-                    // Calculate available space and desired position
-                    let desiredY = tapLocation.y - 50 // Position above tap point
-                    let maxAvailableHeight = sliderTop - topSafeArea - bottomBuffer
-                    
-                    // Calculate actual popup position
-                    let (popupY, popupMaxHeight): (CGFloat, CGFloat) = {
-                        if desiredY < topSafeArea + 150 {
-                            // Too close to top, position below tap
-                            let y = min(tapLocation.y + 100, sliderTop - 150 - bottomBuffer)
-                            return (y, sliderTop - y - bottomBuffer)
-                        } else if desiredY > sliderTop - 150 - bottomBuffer {
-                            // Too close to slider, position higher
-                            let y = sliderTop - 150 - bottomBuffer
-                            return (y, min(300, maxAvailableHeight))
-                        } else {
-                            // Normal position
-                            return (desiredY, min(300, sliderTop - desiredY - bottomBuffer))
-                        }
-                    }()
-                    
                     SelectedSentencePopup(
                         sentences: displaySentences,
                         allSentences: vm.document.sentences,
@@ -142,7 +117,6 @@ struct VideoDocumentView: View {
                         showingChatGPTInput: $showingChatGPTInput,
                         chatGPTContext: $chatGPTContext,
                         extendedSentenceIds: $extendedSentenceIds,
-                        maxHeight: popupMaxHeight,
                         onManualSelect: {
                             // Enter selection mode
                             isSelectingForExtension = true
@@ -153,7 +127,7 @@ struct VideoDocumentView: View {
                     .id("\(sentence.id)-\(displaySentences.count)") // Force re-render when sentence or count changes
                     .position(
                         x: geometry.size.width / 2,
-                        y: popupY
+                        y: geometry.size.height / 2
                     )
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(100)

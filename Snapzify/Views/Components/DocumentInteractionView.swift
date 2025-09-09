@@ -234,10 +234,8 @@ struct SelectedSentencePopup: View {
                     Divider()
                         .padding(.vertical, 4)
                     
-                    // Only use ScrollView when there are multiple analyses
-                    ScrollViewReader { scrollProxy in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: T.S.sm) {
+                    // Character analyses in a scrollable area if needed
+                    VStack(alignment: .leading, spacing: T.S.sm) {
                                 ForEach(selectedWords, id: \.self) { word in
                                     if let analysis = characterAnalyses[word] {
                                         VStack(alignment: .leading, spacing: 2) {
@@ -286,25 +284,6 @@ struct SelectedSentencePopup: View {
                                     }
                                     .padding(.horizontal, 4)
                                     .id("loading") // Add ID for scrolling to loading indicator
-                                }
-                            }
-                        }
-                        .frame(maxHeight: maxHeight != nil ? min(200, maxHeight! * 0.4) : 200)
-                        .onChange(of: selectedWords) { newWords in
-                            // Scroll to the latest added word
-                            if let lastWord = newWords.last {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    scrollProxy.scrollTo(lastWord, anchor: .bottom)
-                                }
-                            }
-                        }
-                        .onChange(of: isLoadingCharacter) { loading in
-                            // Scroll to loading indicator when starting to load
-                            if loading {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    scrollProxy.scrollTo("loading", anchor: .bottom)
-                                }
-                            }
                         }
                     }
                 }
@@ -427,29 +406,53 @@ struct SelectedSentencePopup: View {
         }
     }
     
+    @State private var contentHeight: CGFloat = 0
+    @State private var scrollViewHeight: CGFloat = 0
+    
     var body: some View {
-        Group {
-            // Wrap in ScrollView if height is constrained
-            if let maxHeight = maxHeight, maxHeight < 400 {
-                ScrollView {
-                    popupContent
-                        .padding(T.S.lg)
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(T.C.card)
-                        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-                )
-                .frame(maxWidth: 340, maxHeight: maxHeight)
-            } else {
+        ZStack(alignment: .trailing) {
+            ScrollView(.vertical, showsIndicators: true) {
                 popupContent
                     .padding(T.S.lg)
+                    .frame(minHeight: 60)
                     .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(T.C.card)
-                            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+                        GeometryReader { geometry in
+                            Color.clear
+                                .onAppear {
+                                    contentHeight = geometry.size.height
+                                }
+                                .onChange(of: geometry.size.height) { newHeight in
+                                    contentHeight = newHeight
+                                }
+                        }
                     )
-                    .frame(maxWidth: 340, maxHeight: maxHeight)
+            }
+            .scrollIndicators(.visible, axes: .vertical)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(T.C.card)
+                    .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+            )
+            .frame(maxWidth: 340, maxHeight: 300)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear
+                        .onAppear {
+                            scrollViewHeight = geometry.size.height
+                        }
+                        .onChange(of: geometry.size.height) { newHeight in
+                            scrollViewHeight = newHeight
+                        }
+                }
+            )
+            
+            // Custom scroll indicator when content is scrollable
+            if contentHeight > scrollViewHeight {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.gray.opacity(0.5))
+                    .frame(width: 4, height: 50)
+                    .padding(.trailing, 4)
+                    .padding(.vertical, 4)
             }
         }
         .onAppear {
