@@ -90,7 +90,9 @@ class PaginatedDocumentLoader: ObservableObject {
         Task {
             for id in visibleIds {
                 if cacheManager.getCachedDocument(id) == nil {
-                    if let document = try? await store.fetch(id: id) {
+                    if var document = try? await store.fetch(id: id) {
+                        // TODO: Migrate media paths if needed
+                        // document = MediaPathMigration.shared.migrateDocument(document)
                         cacheManager.cacheDocument(document)
                         
                         // Preload thumbnail

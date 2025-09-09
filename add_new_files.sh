@@ -34,6 +34,7 @@ add_file_to_xcode "Snapzify/Utils/LRUCache.swift" "Utils"
 add_file_to_xcode "Snapzify/Utils/ErrorHandling.swift" "Utils"
 add_file_to_xcode "Snapzify/Utils/PaginatedDocumentLoader.swift" "Utils"
 add_file_to_xcode "Snapzify/Utils/ConcurrentProcessing.swift" "Utils"
+add_file_to_xcode "Snapzify/Utils/MediaPathMigration.swift" "Utils"
 
 # Constants
 echo -e "\nConstants Group:"

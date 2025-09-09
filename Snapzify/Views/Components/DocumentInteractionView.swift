@@ -146,6 +146,8 @@ struct SelectedSentencePopup: View {
     @State private var characterAnalyses: [String: String] = [:]
     @State private var isLoadingCharacter = false
     @State private var characterTask: Task<Void, Never>?
+    @State private var showAllBreakdowns = false
+    @State private var isLoadingAllBreakdowns = false
     
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     
@@ -175,36 +177,36 @@ struct SelectedSentencePopup: View {
                 }
             )
             
-            // Show both sentence translation and character analysis
-            ScrollViewReader { scrollProxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: T.S.sm) {
-                        // Always show sentence translation first
-                        if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Translating...")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(T.C.ink2)
-                            }
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                        } else if !chatGPTBreakdown.isEmpty {
-                            Text(chatGPTBreakdown)
-                                .font(.system(size: 14))
-                                .foregroundStyle(T.C.ink2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                        }
-                        
-                        // Show character/word analyses below if any characters are selected
-                        if !selectedWords.isEmpty || isLoadingCharacter {
-                            Divider()
-                                .padding(.vertical, 4)
-                            
-                            // Show all selected word analyses
+            // Show sentence translation
+            VStack(alignment: .leading, spacing: T.S.sm) {
+                // Always show sentence translation first
+                if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Translating...")
+                            .font(.system(size: 14))
+                            .foregroundStyle(T.C.ink2)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                } else if !chatGPTBreakdown.isEmpty {
+                    Text(chatGPTBreakdown)
+                        .font(.system(size: 14))
+                        .foregroundStyle(T.C.ink2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                }
+                
+                // Show character/word analyses below if any characters are selected
+                if !selectedWords.isEmpty || isLoadingCharacter {
+                    Divider()
+                        .padding(.vertical, 4)
+                    
+                    // Only use ScrollView when there are multiple analyses
+                    ScrollViewReader { scrollProxy in
+                        ScrollView {
                             VStack(alignment: .leading, spacing: T.S.sm) {
                                 ForEach(selectedWords, id: \.self) { word in
                                     if let analysis = characterAnalyses[word] {
@@ -260,22 +262,22 @@ struct SelectedSentencePopup: View {
                                 }
                             }
                         }
-                    }
-                }
-                .frame(maxHeight: 250)
-                .onChange(of: selectedWords) { newWords in
-                    // Scroll to the latest added word
-                    if let lastWord = newWords.last {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            scrollProxy.scrollTo(lastWord, anchor: .bottom)
+                        .frame(maxHeight: 200)
+                        .onChange(of: selectedWords) { newWords in
+                            // Scroll to the latest added word
+                            if let lastWord = newWords.last {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    scrollProxy.scrollTo(lastWord, anchor: .bottom)
+                                }
+                            }
                         }
-                    }
-                }
-                .onChange(of: isLoadingCharacter) { loading in
-                    // Scroll to loading indicator when starting to load
-                    if loading {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            scrollProxy.scrollTo("loading", anchor: .bottom)
+                        .onChange(of: isLoadingCharacter) { loading in
+                            // Scroll to loading indicator when starting to load
+                            if loading {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    scrollProxy.scrollTo("loading", anchor: .bottom)
+                                }
+                            }
                         }
                     }
                 }
@@ -289,8 +291,8 @@ struct SelectedSentencePopup: View {
                     let additionalSentences = sentences.count > 1 ? Array(sentences.dropFirst()) : []
                     vm.openInPleco(additionalSentences: additionalSentences)
                 } label: {
-                    Label("Pleco", systemImage: "book")
-                        .font(.caption)
+                    Image(systemName: "book")
+                        .font(.system(size: 16))
                 }
                 .buttonStyle(PopupButtonStyle())
                 
@@ -319,25 +321,60 @@ struct SelectedSentencePopup: View {
                     Button {
                         vm.playOrPauseAudio()
                     } label: {
-                        Label(
-                            vm.isPlaying ? "Pause" : "Play",
-                            systemImage: vm.isPlaying ? "pause.fill" : "play.fill"
-                        )
-                        .font(.caption)
+                        Image(systemName: vm.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 16))
                     }
                     .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
                 }
                 
-                // Spacing
-                Spacer().frame(width: T.S.sm)
+                // All Characters button (only show if ChatGPT is configured)
+                if chatGPTService.isConfigured() {
+                    // Spacing before All button
+                    Spacer().frame(width: T.S.sm)
+                    
+                    if isLoadingAllBreakdowns {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
+                                .scaleEffect(0.6)
+                            Text("Loading")
+                                .font(.caption)
+                                .foregroundStyle(T.C.ink2)
+                                .fixedSize()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(T.C.ink.opacity(0.1))
+                        )
+                        .fixedSize()
+                    } else {
+                        Button {
+                            loadAllCharacterBreakdowns()
+                        } label: {
+                            Image(systemName: "text.badge.checkmark")
+                                .font(.system(size: 16))
+                        }
+                        .buttonStyle(PopupButtonStyle(isActive: showAllBreakdowns))
+                    }
+                    
+                    // Spacing after All button
+                    Spacer().frame(width: T.S.sm)
+                }
                 
                 // Extend button
                 if canExtend {
+                    // Add spacing if All button is not shown
+                    if !chatGPTService.isConfigured() {
+                        Spacer().frame(width: T.S.sm)
+                    }
+                    
                     Button {
                         extendWithNextSentence()
                     } label: {
-                        Label("Extend", systemImage: "plus.circle")
-                            .font(.caption)
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 16))
                     }
                     .buttonStyle(PopupButtonStyle())
                 }
@@ -359,6 +396,8 @@ struct SelectedSentencePopup: View {
             characterAnalyses.removeAll()
             chatGPTBreakdown = ""
             isLoadingCharacter = false
+            showAllBreakdowns = false
+            isLoadingAllBreakdowns = false
             characterTask?.cancel()
             breakdownTask?.cancel()
             
@@ -370,6 +409,8 @@ struct SelectedSentencePopup: View {
             selectedWords.removeAll()
             characterAnalyses.removeAll()
             isLoadingCharacter = false
+            showAllBreakdowns = false
+            isLoadingAllBreakdowns = false
             characterTask?.cancel()
             breakdownTask?.cancel()
             chatGPTBreakdown = ""
@@ -384,6 +425,91 @@ struct SelectedSentencePopup: View {
             chatGPTBreakdown = ""
             isLoadingCharacter = false
             isLoadingBreakdown = false
+            showAllBreakdowns = false
+            isLoadingAllBreakdowns = false
+        }
+    }
+    
+    private func loadAllCharacterBreakdowns() {
+        guard chatGPTService.isConfigured() else { return }
+        
+        isLoadingAllBreakdowns = true
+        showAllBreakdowns = true
+        
+        // Extract all unique Chinese characters from the text
+        let chineseCharacters = concatenatedText.compactMap { char -> String? in
+            let charStr = String(char)
+            if let scalar = charStr.unicodeScalars.first {
+                let value = scalar.value
+                let isChinese = (0x4E00...0x9FFF).contains(value) || 
+                              (0x3400...0x4DBF).contains(value) ||
+                              (0x20000...0x2A6DF).contains(value) ||
+                              (0x2A700...0x2B73F).contains(value) ||
+                              (0x2B740...0x2B81F).contains(value) ||
+                              (0x2B820...0x2CEAF).contains(value) ||
+                              (0xF900...0xFAFF).contains(value) ||
+                              (0x2F800...0x2FA1F).contains(value)
+                
+                return isChinese ? charStr : nil
+            }
+            return nil
+        }
+        
+        // Load analysis for each character
+        Task {
+            for (index, char) in chineseCharacters.enumerated() {
+                if !selectedWords.contains(where: { $0.contains(char) }) {
+                    // Only load if not already analyzed
+                    await loadCharacterAnalysisForAll(character: char, at: index)
+                }
+            }
+            
+            await MainActor.run {
+                isLoadingAllBreakdowns = false
+            }
+        }
+    }
+    
+    private func loadCharacterAnalysisForAll(character: String, at position: Int) async {
+        var fullAnalysis = ""
+        var currentWord = character
+        var isFirstLine = true
+        
+        do {
+            for try await chunk in chatGPTService.streamCharacterAnalysis(character: character, context: concatenatedText, position: position) {
+                if !Task.isCancelled {
+                    fullAnalysis += chunk
+                    
+                    // Check if we've received the first line (the word)
+                    if isFirstLine && fullAnalysis.contains("\n") {
+                        let lines = fullAnalysis.split(separator: "\n", maxSplits: 1)
+                        if let firstLine = lines.first {
+                            currentWord = String(firstLine).trimmingCharacters(in: .whitespacesAndNewlines)
+                            
+                            // Add to selected words if not already there
+                            await MainActor.run {
+                                if !selectedWords.contains(currentWord) {
+                                    selectedWords.append(currentWord)
+                                }
+                            }
+                            isFirstLine = false
+                        }
+                    }
+                }
+            }
+            
+            // Final update after stream completes
+            await MainActor.run {
+                let lines = fullAnalysis.split(separator: "\n")
+                if lines.count > 1 {
+                    let analysis = lines.dropFirst().joined(separator: "\n")
+                    if !analysis.isEmpty {
+                        characterAnalyses[currentWord] = analysis
+                    }
+                }
+            }
+        } catch {
+            // Silently skip errors for batch loading
         }
     }
     

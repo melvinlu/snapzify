@@ -78,7 +78,9 @@ class DocumentStoreImpl: DocumentStore {
         
         for file in files where file.pathExtension == "json" {
             if let data = try? Data(contentsOf: file),
-               let document = try? JSONDecoder().decode(Document.self, from: data) {
+               var document = try? JSONDecoder().decode(Document.self, from: data) {
+                // TODO: Migrate media paths if needed
+                // document = MediaPathMigration.shared.migrateDocument(document)
                 documents.append(document)
             }
         }
@@ -98,7 +100,12 @@ class DocumentStoreImpl: DocumentStore {
         }
         
         let data = try Data(contentsOf: fileURL)
-        return try JSONDecoder().decode(Document.self, from: data)
+        var document = try JSONDecoder().decode(Document.self, from: data)
+        
+        // TODO: Migrate media paths if needed
+        // document = MediaPathMigration.shared.migrateDocument(document)
+        
+        return document
     }
     
     func delete(id: UUID) async throws {

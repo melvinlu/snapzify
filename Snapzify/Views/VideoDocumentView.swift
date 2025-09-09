@@ -71,6 +71,10 @@ struct VideoDocumentView: View {
                         vm.document.sentences.first(where: { $0.id == extendedId })
                     }
                     
+                    let sliderHeight: CGFloat = 60 // 36pt buttons + 24pt padding
+                    let popupEstimatedHeight: CGFloat = 250 // Estimated max popup height
+                    let safeBottomY = geometry.size.height - sliderHeight - popupEstimatedHeight/2 - 20 // 20pt buffer
+                    
                     SelectedSentencePopup(
                         sentences: displaySentences,
                         allSentences: vm.document.sentences,
@@ -82,8 +86,13 @@ struct VideoDocumentView: View {
                         extendedSentenceIds: $extendedSentenceIds
                     )
                     .id("\(sentence.id)-\(displaySentences.count)") // Force re-render when sentence or count changes
-                    .position(x: geometry.size.width / 2,
-                             y: min(tapLocation.y + 150, geometry.size.height - 200))
+                    .position(
+                        x: geometry.size.width / 2,
+                        y: min(
+                            max(tapLocation.y + 100, popupEstimatedHeight/2 + 50), // Ensure not too high
+                            safeBottomY // Ensure not overlapping slider
+                        )
+                    )
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(100)
                 }
@@ -203,28 +212,73 @@ struct VideoDocumentView: View {
                 }
                 .zIndex(500) // Ensure navigation bar is always on top
                 
-                // Frame navigation slider - always on top
+                // Frame navigation slider with arrow buttons - always on top
                 if vm.document.mediaURL != nil && !showingTranscript && !isDraggingTranscript {
                     VStack {
                         Spacer()
                         
-                        Slider(
-                            value: Binding(
-                                get: { Double(currentFrameIndex) },
-                                set: { newValue in
-                                    currentFrameIndex = Int(newValue)
-                                    // Dismiss popup when slider is used
+                        HStack(spacing: 12) {
+                            // Previous frame button
+                            Button {
+                                if currentFrameIndex > 0 {
+                                    currentFrameIndex -= 1
+                                    // Dismiss popup when navigating frames
                                     if showingPopup {
                                         withAnimation {
                                             showingPopup = false
                                         }
                                     }
                                 }
-                            ),
-                            in: 0...Double(max(totalFrames - 1, 1)),
-                            step: 1
-                        )
-                        .tint(.white)
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Circle().fill(Color.white.opacity(0.2)))
+                            }
+                            .disabled(currentFrameIndex <= 0)
+                            .opacity(currentFrameIndex <= 0 ? 0.3 : 1.0)
+                            
+                            // Slider
+                            Slider(
+                                value: Binding(
+                                    get: { Double(currentFrameIndex) },
+                                    set: { newValue in
+                                        currentFrameIndex = Int(newValue)
+                                        // Dismiss popup when slider is used
+                                        if showingPopup {
+                                            withAnimation {
+                                                showingPopup = false
+                                            }
+                                        }
+                                    }
+                                ),
+                                in: 0...Double(max(totalFrames - 1, 1)),
+                                step: 1
+                            )
+                            .tint(.white)
+                            
+                            // Next frame button
+                            Button {
+                                if currentFrameIndex < totalFrames - 1 {
+                                    currentFrameIndex += 1
+                                    // Dismiss popup when navigating frames
+                                    if showingPopup {
+                                        withAnimation {
+                                            showingPopup = false
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Circle().fill(Color.white.opacity(0.2)))
+                            }
+                            .disabled(currentFrameIndex >= totalFrames - 1)
+                            .opacity(currentFrameIndex >= totalFrames - 1 ? 0.3 : 1.0)
+                        }
                         .padding(.horizontal)
                         .padding(.vertical, 12)
                         .background(Color.black.opacity(0.8))
