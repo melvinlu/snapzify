@@ -244,6 +244,14 @@ struct HomeView: View {
                 Task {
                     await vm.performReverseSnapzify()
                 }
+            },
+            breakdownText: $vm.breakdownText,
+            breakdownResult: $vm.breakdownResult,
+            isBreakingDown: vm.isBreakingDown,
+            onBreakdown: {
+                Task {
+                    await vm.performBreakdown()
+                }
             }
         )
     }

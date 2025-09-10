@@ -21,6 +21,11 @@ class HomeViewModel: ObservableObject {
     @Published var reverseSnapzifyText: String = ""
     @Published var isTranslating: Bool = false
     @Published var translationResult: String = ""
+    
+    // Chinese breakdown properties
+    @Published var breakdownText: String = ""
+    @Published var isBreakingDown: Bool = false
+    @Published var breakdownResult: String = ""
     weak var appState: AppState?
     
     struct ProcessingTask: Identifiable {
@@ -1246,6 +1251,54 @@ class HomeViewModel: ObservableObject {
     }
     
     // MARK: - Reverse Snapzify
+    
+    func performBreakdown() async {
+        guard !breakdownText.isEmpty else {
+            print("DEBUG: Cannot perform breakdown - no text")
+            return
+        }
+        guard englishToChineseService.isConfigured() else {
+            print("DEBUG: Service not configured")
+            await MainActor.run {
+                errorMessage = "OpenAI API key not configured. Please add it in Settings."
+            }
+            return
+        }
+        
+        // Save the query to show as header
+        let queryText = breakdownText
+        UserDefaults.standard.set(queryText, forKey: "currentBreakdownQuery")
+        
+        print("DEBUG: Starting breakdown for: \(queryText)")
+        await MainActor.run {
+            // Dismiss keyboard
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            
+            isBreakingDown = true
+            breakdownResult = ""
+            // Clear the text field after submit
+            breakdownText = ""
+        }
+        
+        do {
+            let stream = englishToChineseService.streamBreakdown(queryText)
+            
+            for try await chunk in stream {
+                await MainActor.run {
+                    self.breakdownResult += chunk
+                }
+            }
+            
+            await MainActor.run {
+                self.isBreakingDown = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Breakdown failed: \(error.localizedDescription)"
+                self.isBreakingDown = false
+            }
+        }
+    }
     
     func performReverseSnapzify() async {
         guard !reverseSnapzifyText.isEmpty else { 

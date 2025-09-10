@@ -38,6 +38,7 @@ class TranslationResult: NSObject, Codable {
 protocol EnglishToChineseTranslationService {
     func translate(_ englishText: String) async throws -> TranslationResult
     func streamTranslate(_ englishText: String) -> AsyncThrowingStream<String, Error>
+    func streamBreakdown(_ chineseText: String) -> AsyncThrowingStream<String, Error>
     func isConfigured() -> Bool
     func clearCache()
 }
@@ -72,6 +73,92 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
             return false
         }
         return true
+    }
+    
+    func streamBreakdown(_ chineseText: String) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    guard isConfigured() else {
+                        throw EnglishChineseTranslationError.notConfigured
+                    }
+                    
+                    let trimmedText = chineseText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmedText.isEmpty else {
+                        throw EnglishChineseTranslationError.invalidInput("Empty input text")
+                    }
+                    
+                    guard let key = configService.openAIKey,
+                          let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+                        throw EnglishChineseTranslationError.invalidConfiguration
+                    }
+                    
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    
+                    let systemPrompt = """
+                    You are a Chinese language expert. Provide a detailed breakdown of the given Chinese text.
+                    
+                    First, provide the overall meaning of the complete text.
+                    
+                    Then break down each character individually with:
+                    - The character
+                    - Pinyin
+                    - Meaning(s)
+                    - Any relevant notes about usage
+                    
+                    Be concise and direct. No headers, labels, or unnecessary formatting. Just provide the breakdown information.
+                    
+                    Format:
+                    Overall: [complete translation/meaning]
+                    
+                    [character] • [pinyin] • [meaning/explanation]
+                    [character] • [pinyin] • [meaning/explanation]
+                    [continue for each character]
+                    """
+                    
+                    let userPrompt = "Break down this Chinese text: \"\(trimmedText)\""
+                    
+                    let payload: [String: Any] = [
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            ["role": "system", "content": systemPrompt],
+                            ["role": "user", "content": userPrompt]
+                        ],
+                        "stream": true,
+                        "temperature": 0.3
+                    ]
+                    
+                    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                    
+                    let (bytes, _) = try await URLSession.shared.bytes(for: request)
+                    
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("data: ") {
+                            let jsonString = String(line.dropFirst(6))
+                            if jsonString == "[DONE]" {
+                                break
+                            }
+                            
+                            if let data = jsonString.data(using: .utf8),
+                               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let choices = json["choices"] as? [[String: Any]],
+                               let first = choices.first,
+                               let delta = first["delta"] as? [String: Any],
+                               let content = delta["content"] as? String {
+                                continuation.yield(content)
+                            }
+                        }
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
     
     func streamTranslate(_ englishText: String) -> AsyncThrowingStream<String, Error> {
