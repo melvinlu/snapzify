@@ -66,8 +66,10 @@ struct ReverseSnapzifyView: View {
                     .submitLabel(.go)
                     .focused($isTextFieldFocused)
                     .onSubmit {
-                        onTranslate()
-                        isTextFieldFocused = false
+                        if !text.isEmpty {
+                            onTranslate()
+                            isTextFieldFocused = false
+                        }
                     }
                 
                 // Translate button
@@ -125,11 +127,13 @@ struct ReverseSnapzifyView: View {
                                                 .font(.body)
                                                 .foregroundStyle(T.C.ink)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                                .underline(color: T.C.ink.opacity(0.3))
                                         } else {
                                             Text(line)
                                                 .font(.body)
                                                 .foregroundStyle(T.C.ink)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                                .underline(color: T.C.ink.opacity(0.3))
                                         }
                                     }
                                     .buttonStyle(.plain)
@@ -144,6 +148,7 @@ struct ReverseSnapzifyView: View {
                                             .font(.body)
                                             .foregroundStyle(T.C.ink)
                                             .frame(maxWidth: .infinity, alignment: .leading)
+                                            .underline(color: T.C.ink.opacity(0.3))
                                     }
                                     .buttonStyle(.plain)
                                 } else {
@@ -197,8 +202,10 @@ struct ReverseSnapzifyView: View {
                     .submitLabel(.go)
                     .focused($isBreakdownFieldFocused)
                     .onSubmit {
-                        onBreakdown()
-                        isBreakdownFieldFocused = false
+                        if !breakdownText.isEmpty {
+                            onBreakdown()
+                            isBreakdownFieldFocused = false
+                        }
                     }
                 
                 // Breakdown button
@@ -222,9 +229,15 @@ struct ReverseSnapzifyView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     // Show the text being broken down as header
                     if let currentBreakdown = UserDefaults.standard.string(forKey: "currentBreakdownQuery"), !currentBreakdown.isEmpty {
-                        Text(currentBreakdown)
-                            .font(.headline)
-                            .foregroundStyle(T.C.ink)
+                        Button {
+                            openInPleco(text: currentBreakdown)
+                        } label: {
+                            Text(currentBreakdown)
+                                .font(.headline)
+                                .foregroundStyle(T.C.ink)
+                                .underline(color: T.C.ink.opacity(0.3))
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     if isBreakingDown && breakdownResult.isEmpty {
@@ -238,29 +251,61 @@ struct ReverseSnapzifyView: View {
                             let line = lines[index]
                             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
                             if !trimmedLine.isEmpty {
-                                // Check if line contains Chinese characters to make them tappable
+                                // Parse line to make Chinese characters individually tappable
                                 if containsChineseCharacters(trimmedLine) {
-                                    Button {
-                                        // Extract just Chinese characters for Pleco
-                                        let chineseOnly = trimmedLine.filter { char in
-                                            let scalar = String(char).unicodeScalars.first
-                                            if let value = scalar?.value {
-                                                return (0x4E00...0x9FFF).contains(value) ||
-                                                       (0x3400...0x4DBF).contains(value)
+                                    // For lines with bullet points (character breakdowns)
+                                    if trimmedLine.contains("•") {
+                                        let components = trimmedLine.components(separatedBy: "•")
+                                        HStack(spacing: 4) {
+                                            ForEach(components.indices, id: \.self) { compIndex in
+                                                let component = components[compIndex].trimmingCharacters(in: .whitespaces)
+                                                if compIndex == 0 && containsChineseCharacters(component) {
+                                                    // First component is the Chinese character - make it tappable
+                                                    Button {
+                                                        openInPleco(text: component)
+                                                    } label: {
+                                                        Text(component)
+                                                            .font(.body)
+                                                            .foregroundStyle(T.C.ink)
+                                                            .underline(color: T.C.ink.opacity(0.3))
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                    
+                                                    if compIndex < components.count - 1 {
+                                                        Text(" • ")
+                                                            .font(.body)
+                                                            .foregroundStyle(T.C.ink2)
+                                                    }
+                                                } else {
+                                                    // Other components (pinyin, meaning)
+                                                    Text(component)
+                                                        .font(.body)
+                                                        .foregroundStyle(T.C.ink)
+                                                    
+                                                    if compIndex < components.count - 1 {
+                                                        Text(" • ")
+                                                            .font(.body)
+                                                            .foregroundStyle(T.C.ink2)
+                                                    }
+                                                }
                                             }
-                                            return false
+                                            Spacer()
                                         }
-                                        if !chineseOnly.isEmpty {
-                                            openInPleco(text: chineseOnly)
+                                    } else {
+                                        // For lines that are just Chinese text (like overall meaning)
+                                        Button {
+                                            openInPleco(text: trimmedLine)
+                                        } label: {
+                                            Text(line)
+                                                .font(.body)
+                                                .foregroundStyle(T.C.ink)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .underline(color: T.C.ink.opacity(0.3))
                                         }
-                                    } label: {
-                                        Text(line)
-                                            .font(.body)
-                                            .foregroundStyle(T.C.ink)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 } else {
+                                    // Non-Chinese text (labels, etc.)
                                     Text(line)
                                         .font(.body)
                                         .foregroundStyle(T.C.ink)

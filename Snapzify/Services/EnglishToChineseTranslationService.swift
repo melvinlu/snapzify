@@ -112,7 +112,7 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     Be concise and direct. No headers, labels, or unnecessary formatting. Just provide the breakdown information.
                     
                     Format:
-                    Overall: [complete translation/meaning]
+                    [complete translation/meaning]
                     
                     [character] • [pinyin] • [meaning/explanation]
                     [character] • [pinyin] • [meaning/explanation]

@@ -1271,9 +1271,6 @@ class HomeViewModel: ObservableObject {
         
         print("DEBUG: Starting breakdown for: \(queryText)")
         await MainActor.run {
-            // Dismiss keyboard
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            
             isBreakingDown = true
             breakdownResult = ""
             // Clear the text field after submit
@@ -1319,9 +1316,6 @@ class HomeViewModel: ObservableObject {
         
         print("DEBUG: Starting translation for: \(queryText)")
         await MainActor.run {
-            // Dismiss keyboard
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            
             isTranslating = true
             translationResult = ""
             // Clear the text field after submit
