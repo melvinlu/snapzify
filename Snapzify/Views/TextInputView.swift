@@ -108,11 +108,17 @@ struct TextInputView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(
-                        LinearGradient(
-                            colors: viewModel.hasInput && !viewModel.isStreaming ? [T.C.brandStart, T.C.brandEnd] : [T.C.divider, T.C.divider],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                        Group {
+                            if viewModel.hasInput && !viewModel.isStreaming {
+                                LinearGradient(
+                                    colors: [T.C.brandStart, T.C.brandEnd],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            } else {
+                                T.C.divider
+                            }
+                        }
                     )
                     .cornerRadius(12)
                 }
@@ -147,7 +153,8 @@ struct TextInputView: View {
         .scrollIndicators(.hidden)
         .onAppear {
             // Auto-focus the text field when view appears
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Task {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second delay
                 isTextFieldFocused = true
             }
         }
@@ -160,10 +167,6 @@ struct TextInputView: View {
                         onDismiss: {
                             showTranslationPopup = false
                             viewModel.clear()
-                        },
-                        onSave: {
-                            await viewModel.processAndSaveTranslation()
-                            showTranslationPopup = false
                         }
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))

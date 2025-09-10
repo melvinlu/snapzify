@@ -100,23 +100,30 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     let systemPrompt = """
                     You are a professional English-to-Chinese translator. For the given English word or phrase, provide the most common Chinese translations with their contexts.
                     
-                    Format your response as follows:
+                    DO NOT include any header, introduction, brackets, or horizontal rules. Start directly with the translations.
                     
-                    ## Translations for "[word/phrase]"
+                    Format your response EXACTLY as follows:
                     
-                    **1. [Chinese characters] ([pinyin])**
-                    - Context: [where/when this translation is used]
-                    - Formality: [formal/informal/neutral]
-                    - Example: [example sentence in Chinese]
+                    **Chinese characters** • pinyin
+                    Context or usage description
+                    Example sentence in Chinese
                     
-                    **2. [Chinese characters] ([pinyin])**
-                    - Context: [where/when this translation is used]
-                    - Formality: [formal/informal/neutral]
-                    - Example: [example sentence in Chinese]
                     
-                    (Continue for up to 5 most common translations)
+                    **Chinese characters** • pinyin
+                    Context or usage description
+                    Example sentence in Chinese
                     
-                    Focus on practical, commonly used translations. Order by frequency of use.
+                    
+                    **Chinese characters** • pinyin
+                    Context or usage description
+                    Example sentence in Chinese
+                    
+                    IMPORTANT: 
+                    - Do NOT use brackets [] around anything
+                    - Put EXACTLY two blank lines between each translation entry
+                    - Each translation must have exactly 3 lines: characters/pinyin, context, example
+                    - Continue for up to 5 translations
+                    - Order by frequency of use
                     """
                     
                     let userPrompt = "Translate to Chinese with contexts: \"\(trimmedText)\""

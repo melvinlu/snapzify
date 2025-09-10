@@ -3,11 +3,16 @@ import SwiftUI
 
 @MainActor
 class TextInputViewModel: ObservableObject {
-    @Published var inputText: String = ""
+    @Published var inputText: String = "" {
+        didSet {
+            updateHasInput()
+        }
+    }
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var streamingResult: String = ""
     @Published var isStreaming: Bool = false
+    @Published private(set) var hasInput: Bool = false
     
     private let translationService: EnglishToChineseTranslationService
     private let documentService: DocumentService
@@ -23,8 +28,8 @@ class TextInputViewModel: ObservableObject {
         self.appState = appState
     }
     
-    var hasInput: Bool {
-        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private func updateHasInput() {
+        hasInput = !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
     var isServiceConfigured: Bool {
