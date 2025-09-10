@@ -47,7 +47,7 @@ struct ReverseSnapzifyView: View {
         VStack(alignment: .leading, spacing: T.S.sm) {
             HStack(spacing: T.S.sm) {
                 // Text field
-                TextField("Colloquially translate to Chinese...", text: $text)
+                TextField("Translate to colloquial Chinese...", text: $text)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .foregroundStyle(T.C.ink)
