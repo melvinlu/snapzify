@@ -209,43 +209,106 @@ struct SelectedSentencePopup: View {
             }
             .buttonStyle(PopupButtonStyle())
             
-            // Spacing after Pleco
-            Spacer().frame(width: T.S.sm)
-            
-            // Audio button
-            if vm.isGeneratingAudio || vm.isPreparingAudio {
-                HStack(spacing: 4) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
-                        .scaleEffect(0.6)
-                    Text("Load")
-                        .font(.caption)
+            // Show sentence translation
+            VStack(alignment: .leading, spacing: T.S.sm) {
+                // Always show sentence translation first
+                if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Translating...")
+                            .font(.system(size: 14))
+                            .foregroundStyle(T.C.ink2)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                } else if !chatGPTBreakdown.isEmpty {
+                    Text(chatGPTBreakdown)
+                        .font(.system(size: 14))
                         .foregroundStyle(T.C.ink2)
-                        .fixedSize()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(T.C.ink.opacity(0.1))
-                )
-                .fixedSize()
-            } else {
-                Button {
-                    vm.playOrPauseAudio()
-                } label: {
-                    Image(systemName: vm.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 16))
+                
+                // Show character/word analyses below if any characters are selected
+                if !selectedWords.isEmpty || isLoadingCharacter {
+                    Divider()
+                        .padding(.vertical, 4)
+                    
+                    // Character analyses in a scrollable area if needed
+                    VStack(alignment: .leading, spacing: T.S.sm) {
+                                ForEach(selectedWords, id: \.self) { word in
+                                    if let analysis = characterAnalyses[word] {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            // Parse the analysis
+                                            let lines = analysis.split(separator: "\n")
+                                                .map { $0.trimmingCharacters(in: .whitespaces) }
+                                                .filter { !$0.isEmpty }
+                                            
+                                            // Format main word/character breakdown
+                                            if lines.count >= 2 {
+                                                // Main word: pinyin, definition with role
+                                                let mainText = "\(word): \(lines[0]), \(lines[1])"
+                                                Text(mainText)
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundStyle(T.C.ink)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                
+                                                // Only show individual character breakdowns for multi-character words
+                                                if word.count > 1 && lines.count > 2 {
+                                                    ForEach(Array(lines.dropFirst(2)), id: \.self) { charLine in
+                                                        CharacterBreakdownLineView(charLine: charLine)
+                                                    }
+                                                }
+                                            } else {
+                                                // Fallback for single line or unexpected format
+                                                Text("\(word): \(analysis)")
+                                                    .font(.system(size: 13))
+                                                    .foregroundStyle(T.C.ink2)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                            }
+                                        }
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .id(word) // Add ID for scrolling
+                                    }
+                                }
+                                
+                                // Show loading indicator if analyzing
+                                if isLoadingCharacter {
+                                    HStack {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Analyzing...")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(T.C.ink2)
+                                    }
+                                    .padding(.horizontal, 4)
+                                    .id("loading") // Add ID for scrolling to loading indicator
+                        }
+                    }
                 }
-                .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
             }
             
-            // All Characters button (only show if ChatGPT is configured)
-            if chatGPTService.isConfigured() {
-                // Spacing before All button
+            // Action buttons
+            HStack(alignment: .center, spacing: 0) {
+                // Pleco button
+                Button {
+                    // Pass all sentences except the first (which is vm.sentence) as additional
+                    let additionalSentences = sentences.count > 1 ? Array(sentences.dropFirst()) : []
+                    vm.openInPleco(additionalSentences: additionalSentences)
+                } label: {
+                    Image(systemName: "book")
+                        .font(.system(size: 16))
+                }
+                .buttonStyle(PopupButtonStyle())
+                
+                // Spacing after Pleco
                 Spacer().frame(width: T.S.sm)
                 
-                if isLoadingAllBreakdowns {
+                // Audio button
+                if vm.isGeneratingAudio || vm.isPreparingAudio {
                     HStack(spacing: 4) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
@@ -264,53 +327,89 @@ struct SelectedSentencePopup: View {
                     .fixedSize()
                 } else {
                     Button {
-                        loadAllCharacterBreakdowns()
+                        vm.playOrPauseAudio()
                     } label: {
-                        Image(systemName: "text.badge.checkmark")
+                        Image(systemName: vm.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 16))
                     }
-                    .buttonStyle(PopupButtonStyle(isActive: showAllBreakdowns))
+                    .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
                 }
                 
-                // Spacing after All button
-                Spacer().frame(width: T.S.sm)
-            }
-            
-            // Manual selection button
-            Button {
-                // Dismiss popup and enter selection mode
-                isShowing = false
-                // Call the callback if provided
-                onManualSelect?()
-            } label: {
-                Image(systemName: "hand.tap")
-                    .font(.system(size: 16))
-            }
-            .buttonStyle(PopupButtonStyle())
-            
-            // Spacing
-            Spacer().frame(width: T.S.sm)
-            
-            // Extend button
-            if canExtend {
-                // Add spacing if All button is not shown
-                if !chatGPTService.isConfigured() {
+                // All Characters button (only show if ChatGPT is configured)
+                if chatGPTService.isConfigured() {
+                    // Spacing before All button
+                    Spacer().frame(width: T.S.sm)
+                    
+                    if isLoadingAllBreakdowns {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
+                                .scaleEffect(0.6)
+                            Text("Load")
+                                .font(.caption)
+                                .foregroundStyle(T.C.ink2)
+                                .fixedSize()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(T.C.ink.opacity(0.1))
+                        )
+                        .fixedSize()
+                    } else {
+                        Button {
+                            loadAllCharacterBreakdowns()
+                        } label: {
+                            Image(systemName: "text.badge.checkmark")
+                                .font(.system(size: 16))
+                        }
+                        .buttonStyle(PopupButtonStyle(isActive: showAllBreakdowns))
+                    }
+                    
+                    // Spacing after All button
                     Spacer().frame(width: T.S.sm)
                 }
                 
+                // Manual selection button
                 Button {
-                    extendWithNextSentence()
+                    // Dismiss popup and enter selection mode
+                    isShowing = false
+                    // Call the callback if provided
+                    onManualSelect?()
                 } label: {
-                    Image(systemName: "plus.circle")
+                    Image(systemName: "hand.tap")
                         .font(.system(size: 16))
                 }
                 .buttonStyle(PopupButtonStyle())
+                
+                // Spacing
+                Spacer().frame(width: T.S.sm)
+                
+                // Extend button
+                if canExtend {
+                    // Add spacing if All button is not shown
+                    if !chatGPTService.isConfigured() {
+                        Spacer().frame(width: T.S.sm)
+                    }
+                    
+                    Button {
+                        extendWithNextSentence()
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 16))
+                    }
+                    .buttonStyle(PopupButtonStyle())
+                }
+                
+                // Push remaining space
+                Spacer(minLength: 0)
             }
-            
-            // Push remaining space
-            Spacer(minLength: 0)
         }
     }
+    
+    @State private var contentHeight: CGFloat = 0
+    @State private var scrollViewHeight: CGFloat = 0
     
     var body: some View {
         VStack(spacing: 0) {

@@ -10,6 +10,7 @@
 		057AF194E418CBC6A609E857 /* MediaStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3CAB4D9569509E4445624C /* MediaStorageService.swift */; };
 		14FF5D5227ED405755C43183 /* ActionIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 15627FBFFEB1AFE5A161B98D /* ActionIcon.png */; };
 		2400A106E61C6BD7F823EE8D /* ServiceContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E937F459F270D304710898D8 /* ServiceContainer.swift */; };
+		37FBF99D9437805308AE82B2 /* TranslationResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D69B78D1F52C635C09E33F /* TranslationResultsView.swift */; };
 		3A8B6CC2165AB2A2EDC1A366 /* UIImageWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2AFE04A7E04C198BC4420E5 /* UIImageWrapper.swift */; };
 		3D9B1A001234567890123456 /* SnapzifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A011234567890123456 /* SnapzifyApp.swift */; };
 		3D9B1A021234567890123456 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A031234567890123456 /* Theme.swift */; };
@@ -50,9 +51,14 @@
 		48B5B75E4312202E118FFB46 /* ActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		49CE9FCE422D47AC86FAD815 /* QueueActionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A43B5F73814169853A2F02 /* QueueActionViewController.swift */; };
 		5E7351685F648D10E0213F08 /* ActionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0646378E12D0819C51E3B5FA /* ActionViewController.swift */; };
+		67C87C45186B6930F15DC8CE /* DocumentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0366A9F7901316551893D518 /* DocumentService.swift */; };
 		6C10D521A75AB7C28AB8B387 /* DocumentStoreImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = F681F60E8E6F38EEB03596EB /* DocumentStoreImpl.swift */; };
 		73550BFDF166174BD82CAAAC /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7FBD0CFE852306298E69989D /* MainInterface.storyboard */; };
+		91942C76313DB07000871301 /* StreamingTranslationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACABFE8E66BA35BD21E5B970 /* StreamingTranslationView.swift */; };
+		91EA7BB8CADF24C7773AC2FE /* StreamingTranslationPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5414F0017CB63212D83F373 /* StreamingTranslationPopup.swift */; };
+		A3263C9387D9202112194648 /* TextInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628D7A3BF92046A4B96B822D /* TextInputView.swift */; };
 		A33117F3C323CEBDFDF76102 /* ScreenshotProcessingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 028565A1AA6F498119241E43 /* ScreenshotProcessingView.swift */; };
+		A3C9632FD39ABD40EDFEA52A /* TextInputViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 994DEB4BE3D314E5A2911EA6 /* TextInputViewModel.swift */; };
 		AED20FA1FBEA4A9DAE2F5053 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EBE6093C6A074BEBB56DF36F /* MainInterface.storyboard */; };
 		B48270D521E2273F3FB6A834 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 518E226ED0401075BE5C372C /* Foundation.framework */; };
 		C0047CD5DB0F20CF4724D8B2 /* ActionIcon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = D7C5FB603D1781A9612ED1BD /* ActionIcon@2x.png */; };
@@ -60,6 +66,7 @@
 		C45810DDED58D9C91534ABC7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A530A292416FC5D38CDF259E /* Assets.xcassets */; };
 		C8490D8C4CB39322122165AD /* ActionExtensionLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */; };
 		C8490D8C4CB39322122165AE /* ActionExtensionVideoLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */; };
+		D4F8DF1EC6D9FFE58D20D9E4 /* EnglishToChineseTranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E5A269FB7C4FA73DA52D33 /* EnglishToChineseTranslationService.swift */; };
 		E0231CA15D1740708E0CA1C1 /* QueueActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 53383BBD552B4C18A5ECC156 /* QueueActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E4407D16310FD24BBD223D0A /* ChineseDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875ABEB622C89CF71AF70FD1 /* ChineseDetector.swift */; };
 		E81491167A9087FED37A06F2 /* OpenRecentScreenshotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C36FE5E568891BBA7F89A00 /* OpenRecentScreenshotIntent.swift */; };
@@ -109,6 +116,7 @@
 
 /* Begin PBXFileReference section */
 		028565A1AA6F498119241E43 /* ScreenshotProcessingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenshotProcessingView.swift; sourceTree = "<group>"; };
+		0366A9F7901316551893D518 /* DocumentService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentService.swift; sourceTree = "<group>"; };
 		0646378E12D0819C51E3B5FA /* ActionViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActionViewController.swift; path = ActionExtension/ActionViewController.swift; sourceTree = "<group>"; };
 		0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionExtensionLoadingView.swift; sourceTree = "<group>"; };
 		0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionExtensionVideoLoadingView.swift; sourceTree = "<group>"; };
@@ -160,17 +168,23 @@
 		518E226ED0401075BE5C372C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		53383BBD552B4C18A5ECC156 /* QueueActionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QueueActionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		61A43B5F73814169853A2F02 /* QueueActionViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueActionViewController.swift; sourceTree = "<group>"; };
+		628D7A3BF92046A4B96B822D /* TextInputView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TextInputView.swift; sourceTree = "<group>"; };
 		7C36FE5E568891BBA7F89A00 /* OpenRecentScreenshotIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OpenRecentScreenshotIntent.swift; path = ../Intents/OpenRecentScreenshotIntent.swift; sourceTree = "<group>"; };
 		7FBD0CFE852306298E69989D /* MainInterface.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; name = MainInterface.storyboard; path = ActionExtension/MainInterface.storyboard; sourceTree = "<group>"; };
 		875ABEB622C89CF71AF70FD1 /* ChineseDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChineseDetector.swift; sourceTree = "<group>"; };
+		98D69B78D1F52C635C09E33F /* TranslationResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TranslationResultsView.swift; path = Snapzify/Views/Components/TranslationResultsView.swift; sourceTree = SOURCE_ROOT; };
+		994DEB4BE3D314E5A2911EA6 /* TextInputViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TextInputViewModel.swift; sourceTree = "<group>"; };
 		A2AFE04A7E04C198BC4420E5 /* UIImageWrapper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UIImageWrapper.swift; sourceTree = "<group>"; };
 		A530A292416FC5D38CDF259E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A530A292416FC5D38CDF259F /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = ActionExtension/Assets.xcassets; sourceTree = "<group>"; };
+		A5414F0017CB63212D83F373 /* StreamingTranslationPopup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StreamingTranslationPopup.swift; path = Snapzify/Views/Components/StreamingTranslationPopup.swift; sourceTree = SOURCE_ROOT; };
+		ACABFE8E66BA35BD21E5B970 /* StreamingTranslationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StreamingTranslationView.swift; path = Snapzify/Views/Components/StreamingTranslationView.swift; sourceTree = SOURCE_ROOT; };
 		C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = "ActionIcon@3x.png"; path = "ActionExtension/Resources/ActionIcon@3x.png"; sourceTree = "<group>"; };
 		D7C5FB603D1781A9612ED1BD /* ActionIcon@2x.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = "ActionIcon@2x.png"; path = "ActionExtension/Resources/ActionIcon@2x.png"; sourceTree = "<group>"; };
 		E937F459F270D304710898D8 /* ServiceContainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ServiceContainer.swift; sourceTree = "<group>"; };
 		EBE6093C6A074BEBB56DF36F /* MainInterface.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = Base.lproj/MainInterface.storyboard; sourceTree = "<group>"; };
 		F681F60E8E6F38EEB03596EB /* DocumentStoreImpl.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentStoreImpl.swift; sourceTree = "<group>"; };
+		F9E5A269FB7C4FA73DA52D33 /* EnglishToChineseTranslationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EnglishToChineseTranslationService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -264,6 +278,8 @@
 				F681F60E8E6F38EEB03596EB /* DocumentStoreImpl.swift */,
 				E937F459F270D304710898D8 /* ServiceContainer.swift */,
 				4C3CAB4D9569509E4445624C /* MediaStorageService.swift */,
+				F9E5A269FB7C4FA73DA52D33 /* EnglishToChineseTranslationService.swift */,
+				0366A9F7901316551893D518 /* DocumentService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -286,6 +302,8 @@
 				0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */,
 				3D9B1A1F1234567890123461 /* DocumentInteractionView.swift */,
 				028565A1AA6F498119241E43 /* ScreenshotProcessingView.swift */,
+				628D7A3BF92046A4B96B822D /* TextInputView.swift */,
+				9A0E2630A46CC43AFC12A77E /* Components */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -297,6 +315,7 @@
 				3D9B1A231234567890123456 /* DocumentViewModel.swift */,
 				3D9B1A251234567890123456 /* SentenceViewModel.swift */,
 				3D9B1A271234567890123456 /* SettingsViewModel.swift */,
+				994DEB4BE3D314E5A2911EA6 /* TextInputViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -320,6 +339,16 @@
 				3D9B1A2B1234567890123456 /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		9A0E2630A46CC43AFC12A77E /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				98D69B78D1F52C635C09E33F /* TranslationResultsView.swift */,
+				ACABFE8E66BA35BD21E5B970 /* StreamingTranslationView.swift */,
+				A5414F0017CB63212D83F373 /* StreamingTranslationPopup.swift */,
+			);
+			name = Components;
 			sourceTree = "<group>";
 		};
 		ADE3CCA179E221298D3A14F7 /* Frameworks */ = {
@@ -553,6 +582,13 @@
 				057AF194E418CBC6A609E857 /* MediaStorageService.swift in Sources */,
 				E81491167A9087FED37A06F2 /* OpenRecentScreenshotIntent.swift in Sources */,
 				A33117F3C323CEBDFDF76102 /* ScreenshotProcessingView.swift in Sources */,
+				A3263C9387D9202112194648 /* TextInputView.swift in Sources */,
+				D4F8DF1EC6D9FFE58D20D9E4 /* EnglishToChineseTranslationService.swift in Sources */,
+				67C87C45186B6930F15DC8CE /* DocumentService.swift in Sources */,
+				A3C9632FD39ABD40EDFEA52A /* TextInputViewModel.swift in Sources */,
+				37FBF99D9437805308AE82B2 /* TranslationResultsView.swift in Sources */,
+				91942C76313DB07000871301 /* StreamingTranslationView.swift in Sources */,
+				91EA7BB8CADF24C7773AC2FE /* StreamingTranslationPopup.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

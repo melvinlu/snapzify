@@ -105,11 +105,20 @@ struct HomeView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    vm.openSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .foregroundStyle(T.C.ink)
+                HStack(spacing: 12) {
+                    Button {
+                        vm.showTextInput = true
+                    } label: {
+                        Image(systemName: "text.cursor")
+                            .foregroundStyle(T.C.ink)
+                    }
+                    
+                    Button {
+                        vm.openSettings()
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .foregroundStyle(T.C.ink)
+                    }
                 }
             }
         }
@@ -120,6 +129,9 @@ struct HomeView: View {
             maxSelectionCount: 10,
             matching: .any(of: [.images, .videos])
         )
+        .sheet(isPresented: $vm.showTextInput) {
+            TextInputView(isPresented: $vm.showTextInput)
+        }
         .onChange(of: selectedPhotos) { newValues in
             guard !newValues.isEmpty else { return }
             

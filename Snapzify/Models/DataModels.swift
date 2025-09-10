@@ -11,6 +11,7 @@ enum DocumentSource: String, Codable, Hashable {
     case shareExtension
     case photos
     case imported
+    case textInput
 }
 
 enum SentenceStatus: Codable, Equatable, Hashable {
@@ -98,11 +99,13 @@ struct Document: Identifiable, Codable, Hashable {
     var isSaved: Bool
     var assetIdentifier: String?  // PHAsset localIdentifier for photo library deletion
     var customName: String?  // User-defined name for the document
+    var additionalInfo: String?  // Additional metadata or context information
     
     init(id: UUID = UUID(), createdAt: Date = Date(), source: DocumentSource, 
          script: ChineseScript = .simplified, sentences: [Sentence] = [], 
          mediaURL: URL? = nil, thumbnailURL: URL? = nil, isVideo: Bool = false, 
-         isSaved: Bool = false, assetIdentifier: String? = nil, customName: String? = nil) {
+         isSaved: Bool = false, assetIdentifier: String? = nil, customName: String? = nil,
+         additionalInfo: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.source = source
@@ -114,6 +117,7 @@ struct Document: Identifiable, Codable, Hashable {
         self.isSaved = isSaved
         self.assetIdentifier = assetIdentifier
         self.customName = customName
+        self.additionalInfo = additionalInfo
     }
 }
 

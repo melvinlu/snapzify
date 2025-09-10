@@ -16,6 +16,7 @@ class HomeViewModel: ObservableObject {
     @Published var isProcessingSharedImage = false
     @Published var isLoading = true
     @Published var showPhotoPicker = false
+    @Published var showTextInput = false
     @Published var errorMessage: String?
     @Published var processingProgress: String = ""
     @Published var activeProcessingTasks: [ProcessingTask] = []

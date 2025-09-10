@@ -46,6 +46,10 @@ add_file_to_xcode "Snapzify/Views/Components/SharedPopupComponents.swift" "Views
 add_file_to_xcode "Snapzify/Views/Components/MediaNavigationBar.swift" "Views/Components"
 add_file_to_xcode "Snapzify/Views/Components/BaseMediaDocumentView.swift" "Views/Components"
 
+# Views
+echo -e "\nViews Group:"
+add_file_to_xcode "Snapzify/Views/TextInputView.swift" "Views"
+
 # Protocols
 echo -e "\nProtocols Group:"
 add_file_to_xcode "Snapzify/Protocols/ServiceProtocols.swift" "Protocols"
