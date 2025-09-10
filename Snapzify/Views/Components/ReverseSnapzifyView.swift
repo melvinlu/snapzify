@@ -75,7 +75,7 @@ struct ReverseSnapzifyView: View {
                     isTextFieldFocused = false
                     onTranslate()
                 } label: {
-                    Image(systemName: "arrow.right.circle.fill")
+                    Image(systemName: "text.magnifyingglass")
                         .font(.title2)
                         .foregroundStyle(
                             LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
