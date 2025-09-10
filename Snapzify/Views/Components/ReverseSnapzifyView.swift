@@ -99,11 +99,18 @@ struct ReverseSnapzifyView: View {
                             let line = lines[index]
                             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
                             if !trimmedLine.isEmpty {
-                                // Check if this line contains Chinese characters for Pleco link
-                                if containsChineseCharacters(trimmedLine) && !trimmedLine.hasPrefix("**") {
-                                    // Make Chinese sentences tappable to open in Pleco
+                                // Check if this is the main translation line (starts with ** and contains Chinese)
+                                if trimmedLine.hasPrefix("**") && containsChineseCharacters(trimmedLine) {
+                                    // Extract Chinese characters from the markdown
+                                    let cleanedLine = trimmedLine
+                                        .replacingOccurrences(of: "**", with: "")
+                                        .components(separatedBy: "•")
+                                        .first?
+                                        .trimmingCharacters(in: .whitespaces) ?? trimmedLine
+                                    
+                                    // Make the translation itself clickable
                                     Button {
-                                        openInPleco(text: trimmedLine)
+                                        openInPleco(text: cleanedLine)
                                     } label: {
                                         if let attributedString = try? AttributedString(markdown: line) {
                                             Text(attributedString)
@@ -118,8 +125,21 @@ struct ReverseSnapzifyView: View {
                                         }
                                     }
                                     .buttonStyle(.plain)
+                                }
+                                // Check if this line contains Chinese characters for example sentences
+                                else if containsChineseCharacters(trimmedLine) && !trimmedLine.hasPrefix("**") {
+                                    // Make Chinese example sentences tappable to open in Pleco
+                                    Button {
+                                        openInPleco(text: trimmedLine)
+                                    } label: {
+                                        Text(trimmedLine)
+                                            .font(.body)
+                                            .foregroundStyle(T.C.ink)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .buttonStyle(.plain)
                                 } else {
-                                    // Regular text with markdown
+                                    // Regular text (context, dividers, etc.)
                                     if let attributedString = try? AttributedString(markdown: line) {
                                         Text(attributedString)
                                             .font(.body)

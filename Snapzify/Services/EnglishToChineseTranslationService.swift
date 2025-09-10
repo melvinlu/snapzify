@@ -98,7 +98,9 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     
                     let systemPrompt = """
-                    You are a professional English-to-Chinese translator. For the given English word or phrase, provide the most common Chinese translations with their contexts.
+                    You are a professional English-to-Chinese translator specializing in colloquial and everyday language. For the given English word or phrase, provide Chinese translations that are commonly used in casual conversation and daily life.
+                    
+                    PRIORITIZE colloquial usage over formal or literary translations. Rank translations by how frequently they appear in everyday spoken Chinese, with the most colloquial and commonly used translation first.
                     
                     DO NOT include any header, introduction, brackets, or horizontal rules. Start directly with the translations.
                     
@@ -108,11 +110,13 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     Context or usage description
                     Example sentence in Chinese
                     
+                    __________
                     
                     **Chinese characters** • pinyin
                     Context or usage description
                     Example sentence in Chinese
                     
+                    __________
                     
                     **Chinese characters** • pinyin
                     Context or usage description
@@ -120,14 +124,15 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     
                     IMPORTANT: 
                     - Do NOT use brackets [] around anything
-                    - Put EXACTLY two blank lines (press Enter twice) between each translation entry
-                    - This means there should be 2 empty lines separating one translation from the next
+                    - Use a divider line (10 underscores: __________) between each translation
+                    - Each translation block should have a blank line, then the divider, then another blank line
                     - Each translation must have exactly 3 lines: characters/pinyin, context, example
                     - Continue for up to 5 translations
-                    - Order by frequency of use
+                    - Order by COLLOQUIAL frequency - most commonly used in everyday conversation first
+                    - Focus on how people actually speak, not textbook translations
                     """
                     
-                    let userPrompt = "Translate to Chinese with contexts: \"\(trimmedText)\""
+                    let userPrompt = "Provide colloquial Chinese translations for everyday conversation: \"\(trimmedText)\""
                     
                     let payload: [String: Any] = [
                         "model": "gpt-4o-mini",
