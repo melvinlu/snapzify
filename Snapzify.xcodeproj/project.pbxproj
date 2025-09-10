@@ -48,6 +48,7 @@
 		3D9B1A381234567890123470 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A391234567890123469 /* TranscriptView.swift */; };
 		3D9B1B351234567890123465 /* ChatGPTService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1B341234567890123464 /* ChatGPTService.swift */; };
 		408EE21643E4AE8A216691B0 /* ActionIcon@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = C3CD17B768358FDA426E3BF1 /* ActionIcon@3x.png */; };
+		466B82FEA645E80A8D97AB42 /* ReverseSnapzifyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7DDE895100600C1B382EBE /* ReverseSnapzifyView.swift */; };
 		48B5B75E4312202E118FFB46 /* ActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 189D4B5E0C4AFB6E47452312 /* ActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		49CE9FCE422D47AC86FAD815 /* QueueActionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A43B5F73814169853A2F02 /* QueueActionViewController.swift */; };
 		5E7351685F648D10E0213F08 /* ActionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0646378E12D0819C51E3B5FA /* ActionViewController.swift */; };
@@ -118,6 +119,7 @@
 		028565A1AA6F498119241E43 /* ScreenshotProcessingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenshotProcessingView.swift; sourceTree = "<group>"; };
 		0366A9F7901316551893D518 /* DocumentService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentService.swift; sourceTree = "<group>"; };
 		0646378E12D0819C51E3B5FA /* ActionViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActionViewController.swift; path = ActionExtension/ActionViewController.swift; sourceTree = "<group>"; };
+		0B7DDE895100600C1B382EBE /* ReverseSnapzifyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ReverseSnapzifyView.swift; path = Snapzify/Views/Components/ReverseSnapzifyView.swift; sourceTree = SOURCE_ROOT; };
 		0D093F9485C992710535EFBC /* ActionExtensionLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionExtensionLoadingView.swift; sourceTree = "<group>"; };
 		0D093F9485C992710535EFC1 /* ActionExtensionVideoLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionExtensionVideoLoadingView.swift; sourceTree = "<group>"; };
 		15627FBFFEB1AFE5A161B98D /* ActionIcon.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = ActionIcon.png; path = ActionExtension/Resources/ActionIcon.png; sourceTree = "<group>"; };
@@ -347,6 +349,7 @@
 				98D69B78D1F52C635C09E33F /* TranslationResultsView.swift */,
 				ACABFE8E66BA35BD21E5B970 /* StreamingTranslationView.swift */,
 				A5414F0017CB63212D83F373 /* StreamingTranslationPopup.swift */,
+				0B7DDE895100600C1B382EBE /* ReverseSnapzifyView.swift */,
 			);
 			name = Components;
 			sourceTree = "<group>";
@@ -589,6 +592,7 @@
 				37FBF99D9437805308AE82B2 /* TranslationResultsView.swift in Sources */,
 				91942C76313DB07000871301 /* StreamingTranslationView.swift in Sources */,
 				91EA7BB8CADF24C7773AC2FE /* StreamingTranslationPopup.swift in Sources */,
+				466B82FEA645E80A8D97AB42 /* ReverseSnapzifyView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

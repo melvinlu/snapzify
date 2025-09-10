@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import Photos
 import AVFoundation
 import os.log
@@ -16,10 +17,15 @@ class HomeViewModel: ObservableObject {
     @Published var isProcessingSharedImage = false
     @Published var isLoading = true
     @Published var showPhotoPicker = false
-    @Published var showTextInput = false
     @Published var errorMessage: String?
     @Published var processingProgress: String = ""
     @Published var activeProcessingTasks: [ProcessingTask] = []
+    
+    // Reverse Snapzify properties
+    @Published var reverseSnapzifyText: String = ""
+    @Published var isTranslating: Bool = false
+    @Published var translationResult: String = ""
+    @Published var showTranslationPopup: Bool = false
     weak var appState: AppState?
     
     struct ProcessingTask: Identifiable {
@@ -45,6 +51,9 @@ class HomeViewModel: ObservableObject {
     private let scriptConversionService: ScriptConversionService
     private let chineseProcessingService: ChineseProcessingService = ServiceContainer.shared.chineseProcessingService
     private let streamingChineseProcessingService: StreamingChineseProcessingService = ServiceContainer.shared.streamingChineseProcessingService
+    private lazy var englishToChineseService: EnglishToChineseTranslationService = {
+        EnglishToChineseTranslationServiceImpl(configService: ServiceContainer.shared.configService)
+    }()
     var onOpenSettings: () -> Void
     var onOpenDocument: (Document) -> Void
     var onProcessingProgress: ((Double) -> Void)?
@@ -1429,6 +1438,67 @@ class HomeViewModel: ObservableObject {
         await removeTask()
         
         return savedDocument
+    }
+    
+    // MARK: - Reverse Snapzify
+    
+    var canPerformReverseSnapzify: Bool {
+        !reverseSnapzifyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    func performReverseSnapzify() async {
+        guard canPerformReverseSnapzify else { 
+            print("DEBUG: Cannot perform reverse snapzify - no text")
+            return 
+        }
+        guard englishToChineseService.isConfigured() else {
+            print("DEBUG: Service not configured")
+            await MainActor.run {
+                errorMessage = "OpenAI API key not configured. Please add it in Settings."
+            }
+            return
+        }
+        
+        print("DEBUG: Starting translation for: \(reverseSnapzifyText)")
+        await MainActor.run {
+            // Dismiss keyboard
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            
+            isTranslating = true
+            translationResult = ""
+            showTranslationPopup = true
+        }
+        print("DEBUG: showTranslationPopup set to: \(showTranslationPopup)")
+        
+        do {
+            let stream = englishToChineseService.streamTranslate(reverseSnapzifyText)
+            
+            print("DEBUG: Starting to read stream")
+            for try await chunk in stream {
+                print("DEBUG: Received chunk: \(chunk)")
+                await MainActor.run {
+                    self.translationResult += chunk
+                    print("DEBUG: Total result so far: \(self.translationResult)")
+                }
+            }
+            
+            print("DEBUG: Stream finished")
+            await MainActor.run {
+                self.isTranslating = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Translation failed: \(error.localizedDescription)"
+                self.isTranslating = false
+                self.showTranslationPopup = false
+            }
+        }
+    }
+    
+    func dismissTranslation() {
+        showTranslationPopup = false
+        translationResult = ""
+        reverseSnapzifyText = ""
     }
 }
 

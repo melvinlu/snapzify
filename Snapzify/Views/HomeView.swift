@@ -72,6 +72,8 @@ struct HomeView: View {
                         
                         quickActions
                         
+                        reverseSnapzifySection
+                        
                         savedSection
                         
                         if !vm.documents.isEmpty {
@@ -89,6 +91,22 @@ struct HomeView: View {
                 }
             }
         }
+        .overlay(
+            Group {
+                if vm.showTranslationPopup && (vm.isTranslating || !vm.translationResult.isEmpty) {
+                    StreamingTranslationPopup(
+                        content: vm.translationResult,
+                        isStreaming: vm.isTranslating,
+                        onDismiss: {
+                            vm.dismissTranslation()
+                        }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .zIndex(999)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: vm.showTranslationPopup)
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -105,20 +123,11 @@ struct HomeView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    Button {
-                        vm.showTextInput = true
-                    } label: {
-                        Image(systemName: "text.cursor")
-                            .foregroundStyle(T.C.ink)
-                    }
-                    
-                    Button {
-                        vm.openSettings()
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .foregroundStyle(T.C.ink)
-                    }
+                Button {
+                    vm.openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .foregroundStyle(T.C.ink)
                 }
             }
         }
@@ -129,9 +138,6 @@ struct HomeView: View {
             maxSelectionCount: 10,
             matching: .any(of: [.images, .videos])
         )
-        .sheet(isPresented: $vm.showTextInput) {
-            TextInputView(isPresented: $vm.showTextInput)
-        }
         .onChange(of: selectedPhotos) { newValues in
             guard !newValues.isEmpty else { return }
             
@@ -351,6 +357,20 @@ struct HomeView: View {
             .buttonStyle(SecondaryButtonStyle())
             .disabled(vm.isProcessing || vm.latestInfo == nil)
         }
+    }
+    
+    @ViewBuilder
+    private var reverseSnapzifySection: some View {
+        ReverseSnapzifyView(
+            text: $vm.reverseSnapzifyText,
+            isTranslating: vm.isTranslating,
+            canTranslate: vm.canPerformReverseSnapzify,
+            onTranslate: {
+                Task {
+                    await vm.performReverseSnapzify()
+                }
+            }
+        )
     }
     
     @ViewBuilder

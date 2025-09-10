@@ -1,9 +1,38 @@
 import SwiftUI
+import UIKit
 
 struct StreamingTranslationPopup: View {
     let content: String
     let isStreaming: Bool
     let onDismiss: () -> Void
+    
+    private func containsChineseCharacters(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            // Check for CJK Unified Ideographs range
+            if (0x4E00...0x9FFF).contains(scalar.value) ||
+               (0x3400...0x4DBF).contains(scalar.value) ||
+               (0x20000...0x2A6DF).contains(scalar.value) ||
+               (0x2A700...0x2B73F).contains(scalar.value) ||
+               (0x2B740...0x2B81F).contains(scalar.value) ||
+               (0x2B820...0x2CEAF).contains(scalar.value) ||
+               (0x2CEB0...0x2EBEF).contains(scalar.value) ||
+               (0x30000...0x3134F).contains(scalar.value) {
+                return true
+            }
+        }
+        return false
+    }
+    
+    private func openInPleco(text: String) {
+        guard let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "plecoapi://x-callback-url/s?q=\(encodedText)") else {
+            return
+        }
+        
+        if UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
+    }
     
     private func parseContent(_ text: String) -> [String] {
         // Simple markdown parser for our specific format
@@ -76,14 +105,48 @@ struct StreamingTranslationPopup: View {
                             
                             ForEach(Array(translations.enumerated()), id: \.offset) { index, translation in
                                 if !translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    if let attributedString = try? AttributedString(markdown: translation) {
-                                        Text(attributedString)
-                                            .font(.body)
-                                            .foregroundStyle(T.C.ink)
-                                    } else {
-                                        Text(translation)
-                                            .font(.body)
-                                            .foregroundStyle(T.C.ink)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        // Parse each translation block
+                                        let lines = translation.components(separatedBy: "\n")
+                                        ForEach(Array(lines.enumerated()), id: \.offset) { lineIndex, line in
+                                            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+                                            if !trimmedLine.isEmpty {
+                                                // Check if this line looks like a Chinese example sentence
+                                                // (doesn't start with ** and contains Chinese characters)
+                                                if lineIndex == lines.count - 1 && 
+                                                   !trimmedLine.hasPrefix("**") &&
+                                                   containsChineseCharacters(trimmedLine) {
+                                                    // Make example sentence tappable to open in Pleco
+                                                    Button {
+                                                        openInPleco(text: trimmedLine)
+                                                    } label: {
+                                                        if let attributedString = try? AttributedString(markdown: line) {
+                                                            Text(attributedString)
+                                                                .font(.body)
+                                                                .foregroundStyle(Color.blue)
+                                                                .underline()
+                                                        } else {
+                                                            Text(line)
+                                                                .font(.body)
+                                                                .foregroundStyle(Color.blue)
+                                                                .underline()
+                                                        }
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                } else {
+                                                    // Regular text
+                                                    if let attributedString = try? AttributedString(markdown: line) {
+                                                        Text(attributedString)
+                                                            .font(.body)
+                                                            .foregroundStyle(T.C.ink)
+                                                    } else {
+                                                        Text(line)
+                                                            .font(.body)
+                                                            .foregroundStyle(T.C.ink)
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -92,28 +155,7 @@ struct StreamingTranslationPopup: View {
                         .padding()
                     }
                 }
-                .frame(maxHeight: 400)
-                
-                // Close button
-                if !isStreaming && !content.isEmpty {
-                    Divider()
-                        .background(T.C.divider)
-                    
-                    Button {
-                        onDismiss()
-                    } label: {
-                        Text("Close")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(T.C.ink)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(T.C.cardElevated)
-                            )
-                    }
-                    .padding()
-                }
+                .frame(height: 500)
             }
             .background(
                 RoundedRectangle(cornerRadius: 16)
