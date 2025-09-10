@@ -256,7 +256,7 @@ struct ReverseSnapzifyView: View {
                                     // For lines with bullet points (character breakdowns)
                                     if trimmedLine.contains("•") {
                                         let components = trimmedLine.components(separatedBy: "•")
-                                        HStack(spacing: 4) {
+                                        HStack(spacing: 0) {
                                             ForEach(components.indices, id: \.self) { compIndex in
                                                 let component = components[compIndex].trimmingCharacters(in: .whitespaces)
                                                 if compIndex == 0 && containsChineseCharacters(component) {
@@ -270,23 +270,11 @@ struct ReverseSnapzifyView: View {
                                                             .underline(color: T.C.ink.opacity(0.3))
                                                     }
                                                     .buttonStyle(.plain)
-                                                    
-                                                    if compIndex < components.count - 1 {
-                                                        Text(" • ")
-                                                            .font(.body)
-                                                            .foregroundStyle(T.C.ink2)
-                                                    }
-                                                } else {
-                                                    // Other components (pinyin, meaning)
-                                                    Text(component)
+                                                } else if compIndex > 0 {
+                                                    // Other components (pinyin, meaning) with bullet
+                                                    Text(" • \(component)")
                                                         .font(.body)
                                                         .foregroundStyle(T.C.ink)
-                                                    
-                                                    if compIndex < components.count - 1 {
-                                                        Text(" • ")
-                                                            .font(.body)
-                                                            .foregroundStyle(T.C.ink2)
-                                                    }
                                                 }
                                             }
                                             Spacer()
