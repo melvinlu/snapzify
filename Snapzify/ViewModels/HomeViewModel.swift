@@ -25,7 +25,6 @@ class HomeViewModel: ObservableObject {
     @Published var reverseSnapzifyText: String = ""
     @Published var isTranslating: Bool = false
     @Published var translationResult: String = ""
-    @Published var showTranslationPopup: Bool = false
     weak var appState: AppState?
     
     struct ProcessingTask: Identifiable {
@@ -1442,12 +1441,8 @@ class HomeViewModel: ObservableObject {
     
     // MARK: - Reverse Snapzify
     
-    var canPerformReverseSnapzify: Bool {
-        !reverseSnapzifyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-    
     func performReverseSnapzify() async {
-        guard canPerformReverseSnapzify else { 
+        guard !reverseSnapzifyText.isEmpty else { 
             print("DEBUG: Cannot perform reverse snapzify - no text")
             return 
         }
@@ -1466,9 +1461,7 @@ class HomeViewModel: ObservableObject {
             
             isTranslating = true
             translationResult = ""
-            showTranslationPopup = true
         }
-        print("DEBUG: showTranslationPopup set to: \(showTranslationPopup)")
         
         do {
             let stream = englishToChineseService.streamTranslate(reverseSnapzifyText)
@@ -1490,16 +1483,10 @@ class HomeViewModel: ObservableObject {
             await MainActor.run {
                 self.errorMessage = "Translation failed: \(error.localizedDescription)"
                 self.isTranslating = false
-                self.showTranslationPopup = false
             }
         }
     }
     
-    func dismissTranslation() {
-        showTranslationPopup = false
-        translationResult = ""
-        reverseSnapzifyText = ""
-    }
 }
 
 // MARK: - Timeout Utilities

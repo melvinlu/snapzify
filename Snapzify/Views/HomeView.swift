@@ -74,11 +74,11 @@ struct HomeView: View {
                         
                         reverseSnapzifySection
                         
-                        savedSection
+                        // savedSection
                         
-                        if !vm.documents.isEmpty {
-                            recentDocuments
-                        }
+                        // if !vm.documents.isEmpty {
+                        //     recentDocuments
+                        // }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -91,22 +91,6 @@ struct HomeView: View {
                 }
             }
         }
-        .overlay(
-            Group {
-                if vm.showTranslationPopup && (vm.isTranslating || !vm.translationResult.isEmpty) {
-                    StreamingTranslationPopup(
-                        content: vm.translationResult,
-                        isStreaming: vm.isTranslating,
-                        onDismiss: {
-                            vm.dismissTranslation()
-                        }
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    .zIndex(999)
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: vm.showTranslationPopup)
-        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -363,8 +347,8 @@ struct HomeView: View {
     private var reverseSnapzifySection: some View {
         ReverseSnapzifyView(
             text: $vm.reverseSnapzifyText,
+            translationResult: $vm.translationResult,
             isTranslating: vm.isTranslating,
-            canTranslate: vm.canPerformReverseSnapzify,
             onTranslate: {
                 Task {
                     await vm.performReverseSnapzify()

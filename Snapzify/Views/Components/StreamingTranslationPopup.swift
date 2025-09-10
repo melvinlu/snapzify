@@ -64,11 +64,9 @@ struct StreamingTranslationPopup: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    if !isStreaming {
-                        Text("Translation")
-                            .font(.headline)
-                            .foregroundStyle(T.C.ink)
-                    }
+                    Text("Translation")
+                        .font(.headline)
+                        .foregroundStyle(T.C.ink)
                     
                     Spacer()
                     
@@ -84,10 +82,8 @@ struct StreamingTranslationPopup: View {
                 }
                 .padding()
                 
-                if !isStreaming {
-                    Divider()
-                        .background(T.C.divider)
-                }
+                Divider()
+                    .background(T.C.divider)
                 
                 // Content
                 ScrollView {
@@ -98,51 +94,70 @@ struct StreamingTranslationPopup: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding()
                     } else {
-                        // Display content with markdown formatting, preserving line breaks
-                        VStack(alignment: .leading, spacing: 16) {
-                            // Split content by double newlines to separate translations
-                            let translations = content.components(separatedBy: "\n\n")
-                            
-                            ForEach(Array(translations.enumerated()), id: \.offset) { index, translation in
-                                if !translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        // Parse each translation block
-                                        let lines = translation.components(separatedBy: "\n")
-                                        ForEach(Array(lines.enumerated()), id: \.offset) { lineIndex, line in
-                                            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-                                            if !trimmedLine.isEmpty {
-                                                // Check if this line looks like a Chinese example sentence
-                                                // (doesn't start with ** and contains Chinese characters)
-                                                if lineIndex == lines.count - 1 && 
-                                                   !trimmedLine.hasPrefix("**") &&
-                                                   containsChineseCharacters(trimmedLine) {
-                                                    // Make example sentence tappable to open in Pleco
-                                                    Button {
-                                                        openInPleco(text: trimmedLine)
-                                                    } label: {
+                        // Display content as a single text view during streaming to prevent flashing
+                        if isStreaming {
+                            // Parse markdown during streaming
+                            VStack(alignment: .leading, spacing: 8) {
+                                let lines = content.components(separatedBy: "\n")
+                                ForEach(lines.indices, id: \.self) { index in
+                                    let line = lines[index]
+                                    if !line.trimmingCharacters(in: .whitespaces).isEmpty {
+                                        if let attributedString = try? AttributedString(markdown: line) {
+                                            Text(attributedString)
+                                                .font(.body)
+                                                .foregroundStyle(T.C.ink)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        } else {
+                                            Text(line)
+                                                .font(.body)
+                                                .foregroundStyle(T.C.ink)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding()
+                            .id("streaming")
+                        } else {
+                            // Full formatted display after streaming completes
+                            VStack(alignment: .leading, spacing: 16) {
+                                // Split content by double newlines to separate translations
+                                let translations = content.components(separatedBy: "\n\n")
+                                
+                                ForEach(Array(translations.enumerated()), id: \.offset) { index, translation in
+                                    if !translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            // Parse each translation block
+                                            let lines = translation.components(separatedBy: "\n")
+                                            ForEach(Array(lines.enumerated()), id: \.offset) { lineIndex, line in
+                                                let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+                                                if !trimmedLine.isEmpty {
+                                                    // Check if this line looks like a Chinese example sentence
+                                                    // (doesn't start with ** and contains Chinese characters)
+                                                    if lineIndex == lines.count - 1 && 
+                                                       !trimmedLine.hasPrefix("**") &&
+                                                       containsChineseCharacters(trimmedLine) {
+                                                        // Make example sentence tappable to open in Pleco
+                                                        Button {
+                                                            openInPleco(text: trimmedLine)
+                                                        } label: {
+                                                            Text(trimmedLine)
+                                                                .font(.body)
+                                                                .fontWeight(.bold)
+                                                                .foregroundStyle(T.C.ink)
+                                                        }
+                                                        .buttonStyle(.plain)
+                                                    } else {
+                                                        // Regular text
                                                         if let attributedString = try? AttributedString(markdown: line) {
                                                             Text(attributedString)
                                                                 .font(.body)
-                                                                .foregroundStyle(Color.blue)
-                                                                .underline()
+                                                                .foregroundStyle(T.C.ink)
                                                         } else {
                                                             Text(line)
                                                                 .font(.body)
-                                                                .foregroundStyle(Color.blue)
-                                                                .underline()
+                                                                .foregroundStyle(T.C.ink)
                                                         }
-                                                    }
-                                                    .buttonStyle(.plain)
-                                                } else {
-                                                    // Regular text
-                                                    if let attributedString = try? AttributedString(markdown: line) {
-                                                        Text(attributedString)
-                                                            .font(.body)
-                                                            .foregroundStyle(T.C.ink)
-                                                    } else {
-                                                        Text(line)
-                                                            .font(.body)
-                                                            .foregroundStyle(T.C.ink)
                                                     }
                                                 }
                                             }
@@ -150,11 +165,13 @@ struct StreamingTranslationPopup: View {
                                     }
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .id("formatted")
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
                     }
                 }
+                .animation(.none, value: isStreaming)
                 .frame(height: 500)
             }
             .background(
