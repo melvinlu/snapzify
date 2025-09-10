@@ -39,7 +39,7 @@ struct ReverseSnapzifyView: View {
         VStack(alignment: .leading, spacing: T.S.sm) {
             HStack(spacing: T.S.sm) {
                 // Text field
-                TextField("To translate", text: $text)
+                TextField("To colloquially translate...", text: $text)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .foregroundStyle(T.C.ink)
@@ -80,7 +80,14 @@ struct ReverseSnapzifyView: View {
             
             // Translation results
             if isTranslating || !translationResult.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Show the word/phrase being translated as header
+                    if let currentTranslation = UserDefaults.standard.string(forKey: "currentTranslationQuery"), !currentTranslation.isEmpty {
+                        Text(currentTranslation)
+                            .font(.headline)
+                            .foregroundStyle(T.C.ink)
+                    }
+                    
                     if isTranslating && translationResult.isEmpty {
                         Text("Reverse Snapzifying...")
                             .font(.body)

@@ -9,8 +9,6 @@ import os.log
 class HomeViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "HomeViewModel")
     private var documentCache: [UUID: Document] = [:]  // Cache full documents only when needed
-    @Published var shouldSuggestLatest = false
-    @Published var latestInfo: LatestScreenshotInfo?
     @Published var isProcessing = false
     @Published var isProcessingSharedImage = false
     @Published var isLoading = false
@@ -55,10 +53,6 @@ class HomeViewModel: ObservableObject {
     var onProcessingProgress: ((Double) -> Void)?
     @AppStorage("selectedScript") private var selectedScript: String = ChineseScript.simplified.rawValue
     
-    struct LatestScreenshotInfo {
-        let timestamp: String
-        let asset: PHAsset
-    }
     
     init(
         store: DocumentStore,
@@ -78,118 +72,7 @@ class HomeViewModel: ObservableObject {
     
     
     
-    func checkForLatestScreenshot() async {
-        // Run photo library access on background queue to avoid blocking UI
-        await Task.detached(priority: .background) {
-            let fetchOptions = PHFetchOptions()
-            fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-            fetchOptions.fetchLimit = 1
-            // Remove screenshot filter to get most recent image from gallery
-            // fetchOptions.predicate = NSPredicate(format: "mediaSubtype == %ld", PHAssetMediaSubtype.photoScreenshot.rawValue)
-            
-            let assets = PHAsset.fetchAssets(with: .image, options: fetchOptions)
-            
-            guard let latestAsset = assets.firstObject else {
-                await MainActor.run {
-                    self.shouldSuggestLatest = false
-                    self.latestInfo = nil
-                }
-                return
-            }
-            
-            let formatter = DateFormatter()
-            formatter.dateStyle = .none
-            formatter.timeStyle = .short
-            
-            let info = LatestScreenshotInfo(
-                timestamp: formatter.string(from: latestAsset.creationDate ?? Date()),
-                asset: latestAsset
-            )
-            
-            await MainActor.run {
-                self.latestInfo = info
-                // Always show the suggestion since we don't track processed documents anymore
-                self.shouldSuggestLatest = true
-            }
-        }.value
-    }
     
-    func processLatest() {
-        guard let info = latestInfo else { return }
-        
-        Task {
-            // Create processing task immediately
-            let taskId = UUID()
-            
-            await MainActor.run {
-                let task = ProcessingTask(
-                    id: taskId,
-                    name: "Photo",
-                    progress: "Preparing",
-                    progressValue: 0.0,
-                    totalFrames: 0,
-                    processedFrames: 0,
-                    type: .image,
-                    thumbnail: nil
-                )
-                self.activeProcessingTasks.append(task)
-                isProcessing = true
-            }
-            
-            do {
-                let image = try await loadImage(from: info.asset)
-                
-                // Create and update thumbnail
-                let thumbnailSize = CGSize(width: 60, height: 60)
-                await MainActor.run {
-                    UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
-                    image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
-                    let thumbnailImage = UIGraphicsGetImageFromCurrentImageContext()
-                    UIGraphicsEndImageContext()
-                    
-                    if let index = self.activeProcessingTasks.firstIndex(where: { $0.id == taskId }) {
-                        self.activeProcessingTasks[index].thumbnail = thumbnailImage
-                    }
-                }
-                
-                // Add 60-second timeout to image processing
-                let script = ChineseScript(rawValue: selectedScript) ?? .simplified
-                _ = try await withTimeout(seconds: 60) {
-                    try await self.processImageCore(
-                        image,
-                        source: .photos,
-                        script: script,
-                        assetIdentifier: info.asset.localIdentifier,
-                        shouldNavigate: true,
-                        existingTaskId: taskId
-                    )
-                }
-                
-                // Document is already saved in processImage
-                shouldSuggestLatest = false
-                
-                // Remove task after successful completion
-                await MainActor.run {
-                    self.activeProcessingTasks.removeAll { $0.id == taskId }
-                }
-            } catch {
-                print("Failed to snapzify screenshot: \(error)")
-                await MainActor.run {
-                    self.activeProcessingTasks.removeAll { $0.id == taskId }
-                    isProcessing = false  // Clear on error
-                    if error is TimeoutError {
-                        errorMessage = "Snapzifying timed out. Please try again with a simpler image."
-                    } else if let processingError = error as? ProcessingError {
-                        errorMessage = processingError.errorDescription ?? "Failed to process image"
-                        print("Setting error message: \(errorMessage ?? "")")
-                    } else {
-                        errorMessage = "Failed to snapzify screenshot: \(error.localizedDescription)"
-                    }
-                    logger.debug("Error message set to: \(self.errorMessage ?? "nil")")
-                }
-            }
-        }
-    }
     
     func pasteImage() {
         guard let image = UIPasteboard.general.image else { return }
@@ -1377,17 +1260,23 @@ class HomeViewModel: ObservableObject {
             return
         }
         
-        print("DEBUG: Starting translation for: \(reverseSnapzifyText)")
+        // Save the query to show as header
+        let queryText = reverseSnapzifyText
+        UserDefaults.standard.set(queryText, forKey: "currentTranslationQuery")
+        
+        print("DEBUG: Starting translation for: \(queryText)")
         await MainActor.run {
             // Dismiss keyboard
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             
             isTranslating = true
             translationResult = ""
+            // Clear the text field after submit
+            reverseSnapzifyText = ""
         }
         
         do {
-            let stream = englishToChineseService.streamTranslate(reverseSnapzifyText)
+            let stream = englishToChineseService.streamTranslate(queryText)
             
             print("DEBUG: Starting to read stream")
             for try await chunk in stream {

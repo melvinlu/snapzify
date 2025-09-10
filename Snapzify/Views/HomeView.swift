@@ -77,10 +77,6 @@ struct HomeView: View {
                     .padding(.vertical, 24)
                 }
                 .scrollIndicators(.hidden)
-                .refreshable {
-                    // Manual refresh - check for latest photo immediately
-                    await vm.checkForLatestScreenshot()
-                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -214,11 +210,6 @@ struct HomeView: View {
         .onAppear {
             isVisible = true
             
-            // Check for latest screenshot once on appear
-            Task {
-                await vm.checkForLatestScreenshot()
-            }
-            
             // Shared images and action extension images are checked at app level
         }
         .onDisappear {
@@ -227,39 +218,20 @@ struct HomeView: View {
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 // Shared images and action extension images are checked at app level when app becomes active
-                
-                // Refresh when scene becomes active
-                let now = Date()
-                if now.timeIntervalSince(lastRefreshTime) > 0.5 {
-                    Task {
-                        await vm.checkForLatestScreenshot()
-                    }
-                    lastRefreshTime = now
-                }
+                lastRefreshTime = Date()
             }
         }
     }
     
     @ViewBuilder
     private var quickActions: some View {
-        HStack(spacing: T.S.md) {
-            Button {
-                vm.pickScreenshot()
-            } label: {
-                Label("Import", systemImage: "square.and.arrow.down")
-                    .foregroundStyle(T.C.ink)
-            }
-            .buttonStyle(SecondaryButtonStyle())
-            
-            Button {
-                vm.processLatest()
-            } label: {
-                Label("Most Recent", systemImage: "photo.on.rectangle.angled")
-                    .foregroundStyle(T.C.ink)
-            }
-            .buttonStyle(SecondaryButtonStyle())
-            .disabled(vm.isProcessing || vm.latestInfo == nil)
+        Button {
+            vm.pickScreenshot()
+        } label: {
+            Label("Analyze Chinese text from media", systemImage: "square.and.arrow.down")
+                .foregroundStyle(T.C.ink)
         }
+        .buttonStyle(SecondaryButtonStyle())
     }
     
     @ViewBuilder

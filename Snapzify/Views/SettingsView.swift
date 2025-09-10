@@ -59,13 +59,6 @@ struct SettingsView: View {
                     }
                 }
                 
-                HStack {
-                    Text("Easily extract and study Chinese from images!")
-                        .font(.caption)
-                        .foregroundStyle(T.C.ink2)
-                    Spacer()
-                }
-                
                 Divider()
                     .background(T.C.divider.opacity(0.6))
                 
