@@ -8,14 +8,12 @@ import os.log
 @MainActor
 class HomeViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.snapzify.app", category: "HomeViewModel")
-    @Published var documents: [DocumentMetadata] = []
-    @Published var savedDocuments: [DocumentMetadata] = []
     private var documentCache: [UUID: Document] = [:]  // Cache full documents only when needed
     @Published var shouldSuggestLatest = false
     @Published var latestInfo: LatestScreenshotInfo?
     @Published var isProcessing = false
     @Published var isProcessingSharedImage = false
-    @Published var isLoading = true
+    @Published var isLoading = false
     @Published var showPhotoPicker = false
     @Published var errorMessage: String?
     @Published var processingProgress: String = ""
@@ -44,7 +42,6 @@ class HomeViewModel: ObservableObject {
         }
     }
     
-    @Published private(set) var hasLoadedDocuments = false
     private let store: DocumentStore
     private let ocrService: OCRService
     private let scriptConversionService: ScriptConversionService
@@ -77,117 +74,44 @@ class HomeViewModel: ObservableObject {
         self.onOpenDocument = onOpenDocument
     }
     
-    func loadDocuments() async {
-        // Only load if we haven't loaded yet
-        guard !hasLoadedDocuments else { return }
-        
-        isLoading = true
-        do {
-            // Load lightweight metadata in parallel
-            async let recentMeta = store.fetchRecentMetadata(limit: 10)
-            async let savedMeta = store.fetchSavedMetadata()
-            
-            // Only check for screenshot, don't wait for it
-            Task { await checkForLatestScreenshot() }
-            
-            // Wait for metadata to load
-            documents = try await recentMeta
-            savedDocuments = try await savedMeta
-            
-            hasLoadedDocuments = true
-        } catch {
-            print("Failed to load documents: \(error)")
-        }
-        isLoading = false
-    }
     
-    func refreshDocuments() async {
-        // Force refresh documents WITHOUT showing loading state
-        do {
-            documents = try await store.fetchRecentMetadata(limit: 10)
-            savedDocuments = try await store.fetchSavedMetadata()
-            Task { await checkForLatestScreenshot() }
-        } catch {
-            print("Failed to load documents: \(error)")
-        }
-    }
     
-    func refreshSavedDocuments() async {
-        // Refresh only saved documents metadata (lightweight)
-        do {
-            savedDocuments = try await store.fetchSavedMetadata()
-            // Only update recent if needed
-            if documents.isEmpty {
-                documents = try await store.fetchRecentMetadata(limit: 10)
-            }
-        } catch {
-            print("Failed to refresh saved documents: \(error)")
-        }
-    }
     
-    func updateDocumentSavedStatus(_ updatedDocument: Document) {
-        // Update metadata arrays with new metadata
-        let updatedMetadata = DocumentMetadata(from: updatedDocument)
-        
-        // Update in documents array - remove and re-insert to trigger SwiftUI update
-        if let index = documents.firstIndex(where: { $0.id == updatedDocument.id }) {
-            documents.remove(at: index)
-            documents.insert(updatedMetadata, at: index)
-        }
-        
-        // Update saved documents array
-        if updatedDocument.isSaved {
-            // Add to saved if not already there
-            if !savedDocuments.contains(where: { $0.id == updatedDocument.id }) {
-                savedDocuments.append(updatedMetadata)
-                savedDocuments.sort { $0.createdAt > $1.createdAt }
-            } else {
-                // Update existing - remove and re-insert to trigger SwiftUI update
-                if let index = savedDocuments.firstIndex(where: { $0.id == updatedDocument.id }) {
-                    savedDocuments.remove(at: index)
-                    savedDocuments.insert(updatedMetadata, at: index)
-                }
-            }
-        } else {
-            // Remove from saved
-            savedDocuments.removeAll { $0.id == updatedDocument.id }
-        }
-        
-        // Update cache if present
-        documentCache[updatedDocument.id] = updatedDocument
-    }
     
     func checkForLatestScreenshot() async {
-        let fetchOptions = PHFetchOptions()
-        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        fetchOptions.fetchLimit = 1
-        // Remove screenshot filter to get most recent image from gallery
-        // fetchOptions.predicate = NSPredicate(format: "mediaSubtype == %ld", PHAssetMediaSubtype.photoScreenshot.rawValue)
-        
-        let assets = PHAsset.fetchAssets(with: .image, options: fetchOptions)
-        
-        guard let latestAsset = assets.firstObject else {
-            shouldSuggestLatest = false
-            return
-        }
-        
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        
-        latestInfo = LatestScreenshotInfo(
-            timestamp: formatter.string(from: latestAsset.creationDate ?? Date()),
-            asset: latestAsset
-        )
-        
-        // Only show smart banner if image is newer than last processed
-        if let lastProcessed = documents.first,
-           let assetDate = latestAsset.creationDate,
-           assetDate <= lastProcessed.createdAt {
-            shouldSuggestLatest = false
-        } else {
-            shouldSuggestLatest = true
-        }
+        // Run photo library access on background queue to avoid blocking UI
+        await Task.detached(priority: .background) {
+            let fetchOptions = PHFetchOptions()
+            fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+            fetchOptions.fetchLimit = 1
+            // Remove screenshot filter to get most recent image from gallery
+            // fetchOptions.predicate = NSPredicate(format: "mediaSubtype == %ld", PHAssetMediaSubtype.photoScreenshot.rawValue)
+            
+            let assets = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+            
+            guard let latestAsset = assets.firstObject else {
+                await MainActor.run {
+                    self.shouldSuggestLatest = false
+                    self.latestInfo = nil
+                }
+                return
+            }
+            
+            let formatter = DateFormatter()
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            
+            let info = LatestScreenshotInfo(
+                timestamp: formatter.string(from: latestAsset.creationDate ?? Date()),
+                asset: latestAsset
+            )
+            
+            await MainActor.run {
+                self.latestInfo = info
+                // Always show the suggestion since we don't track processed documents anymore
+                self.shouldSuggestLatest = true
+            }
+        }.value
     }
     
     func processLatest() {
@@ -691,7 +615,7 @@ class HomeViewModel: ObservableObject {
             
             // Update UI and navigate to the document after everything is processed
             await MainActor.run {
-                self.documents.insert(DocumentMetadata(from: savedDocument), at: 0)
+                // No longer maintaining documents list
                 self.isProcessing = false
                 // Remove the processing task
                 self.activeProcessingTasks.removeAll { $0.id == taskId }
@@ -1306,8 +1230,7 @@ class HomeViewModel: ObservableObject {
         
         // Handle navigation and UI updates
         await MainActor.run {
-            // Add the document to the local documents array immediately
-            self.documents.insert(DocumentMetadata(from: savedDocument), at: 0)
+            // No longer maintaining documents list
             
             // Navigation decision - check if we're still on home page at completion time
             if shouldNavigate {

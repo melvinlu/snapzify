@@ -168,8 +168,9 @@ class ActionExtensionVideoLoadingViewModel: ObservableObject {
                 }
             }
             
-            // Find the processed document (should be the most recent)
-            if let documentMetadata = homeVM.documents.first,
+            // Since we don't track documents anymore, we need to fetch the most recent document
+            if let documents = try? await store.fetchRecentMetadata(limit: 1),
+               let documentMetadata = documents.first,
                let document = try? await store.fetch(id: documentMetadata.id) {
                 processingPercentage = "100%"
                 isProcessing = false

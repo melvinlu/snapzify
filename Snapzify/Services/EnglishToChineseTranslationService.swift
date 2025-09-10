@@ -120,7 +120,8 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     
                     IMPORTANT: 
                     - Do NOT use brackets [] around anything
-                    - Put EXACTLY two blank lines between each translation entry
+                    - Put EXACTLY two blank lines (press Enter twice) between each translation entry
+                    - This means there should be 2 empty lines separating one translation from the next
                     - Each translation must have exactly 3 lines: characters/pinyin, context, example
                     - Continue for up to 5 translations
                     - Order by frequency of use

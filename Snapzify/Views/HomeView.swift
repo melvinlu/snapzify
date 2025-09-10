@@ -28,7 +28,6 @@ struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var appState: AppState
     @State private var lastRefreshTime = Date()
-    @State private var photoCheckTimer: Timer?
     @State private var isVisible = true
     private let logger = Logger(subsystem: "com.snapzify.app", category: "HomeView")
     
@@ -73,12 +72,6 @@ struct HomeView: View {
                         quickActions
                         
                         reverseSnapzifySection
-                        
-                        // savedSection
-                        
-                        // if !vm.documents.isEmpty {
-                        //     recentDocuments
-                        // }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -87,7 +80,6 @@ struct HomeView: View {
                 .refreshable {
                     // Manual refresh - check for latest photo immediately
                     await vm.checkForLatestScreenshot()
-                    await vm.refreshSavedDocuments()
                 }
             }
         }
@@ -206,11 +198,6 @@ struct HomeView: View {
                             appState.currentQueueDocument = processedDocuments[0]
                             appState.isProcessingQueue = false
                             
-                            // Refresh documents list to show newly imported items
-                            Task {
-                                await vm.refreshDocuments()
-                            }
-                            
                             // Trigger navigation to queue view
                             NotificationCenter.default.post(name: .openQueueDocument, object: processedDocuments[0])
                         } else {
@@ -227,96 +214,28 @@ struct HomeView: View {
         .onAppear {
             isVisible = true
             
-            // Load documents only once
+            // Check for latest screenshot once on appear
             Task {
-                await vm.loadDocuments()
+                await vm.checkForLatestScreenshot()
             }
-            // Start polling for new photos every 2 seconds
-            startPhotoPolling()
             
             // Shared images and action extension images are checked at app level
-            
-            // Only refresh saved documents if not just launching
-            if vm.hasLoadedDocuments {
-                Task {
-                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                    await vm.refreshSavedDocuments()
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .documentSavedStatusChanged)) { notification in
-            // Update saved documents immediately when pin status changes
-            if let document = notification.object as? Document {
-                vm.updateDocumentSavedStatus(document)
-            }
         }
         .onDisappear {
             isVisible = false
-            // Stop polling when view disappears
-            stopPhotoPolling()
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 // Shared images and action extension images are checked at app level when app becomes active
                 
-                // Resume polling when app becomes active
-                startPhotoPolling()
-                
                 // Refresh when scene becomes active
                 let now = Date()
                 if now.timeIntervalSince(lastRefreshTime) > 0.5 {
                     Task {
-                        await vm.refreshSavedDocuments()
                         await vm.checkForLatestScreenshot()
                     }
                     lastRefreshTime = now
                 }
-            } else if phase == .background {
-                // Stop polling when app goes to background
-                stopPhotoPolling()
-            }
-        }
-    }
-    
-    
-    @ViewBuilder
-    private var savedSection: some View {
-        VStack(alignment: .leading, spacing: T.S.sm) {
-            HStack {
-                Text("Saved")
-                    .font(.title3)
-                    .foregroundStyle(T.C.ink)
-                
-                Spacer()
-            }
-            .padding(.horizontal, T.S.xs)
-            
-            let hasAnyContent = !vm.savedDocuments.isEmpty
-            
-            if !hasAnyContent {
-                HStack {
-                    Text("No saved content yet")
-                        .foregroundStyle(T.C.ink2)
-                        .font(.subheadline)
-                    Spacer()
-                }
-                .padding()
-                .card()
-            } else {
-                VStack(spacing: 0) {
-                    // Images first
-                    ForEach(vm.savedDocuments) { doc in
-                        documentRow(doc, showPinIcon: false)
-                        
-                        let isLast = doc.id == vm.savedDocuments.last?.id
-                        if !isLast {
-                            Divider()
-                                .background(T.C.divider.opacity(0.6))
-                                .padding(.leading, 78)
-                        }
-                    }
-                }
-                .card()
             }
         }
     }
@@ -358,100 +277,6 @@ struct HomeView: View {
     }
     
     @ViewBuilder
-    private var recentDocuments: some View {
-        VStack(alignment: .leading, spacing: T.S.sm) {
-            HStack {
-                Text("Recent")
-                    .font(.title3)
-                    .foregroundStyle(T.C.ink)
-                
-                if vm.isProcessingSharedImage {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                        Text("Snapzifying shared image...")
-                            .font(.caption)
-                            .foregroundStyle(T.C.ink2)
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, T.S.xs)
-            
-            VStack(spacing: 0) {
-                ForEach(Array(vm.documents.prefix(10).enumerated()), id: \.element.id) { index, doc in
-                    documentRow(doc, showPinIcon: false)
-                    
-                    if index < min(9, vm.documents.count - 1) {
-                        Divider()
-                            .background(T.C.divider.opacity(0.6))
-                            .padding(.leading, 78)
-                    }
-                }
-            }
-            .card()
-        }
-    }
-    
-    @ViewBuilder
-    private func documentRow(_ doc: DocumentMetadata, showPinIcon: Bool = true) -> some View {
-        HStack(spacing: T.S.md) {
-            Group {
-                if let thumbnailURL = doc.thumbnailURL,
-                   let thumbnailData = try? Data(contentsOf: thumbnailURL),
-                   let uiImage = UIImage(data: thumbnailData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(T.C.outline.opacity(0.3), lineWidth: 0.5)
-                        )
-                } else {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 60, height: 60)
-                        .overlay(
-                            Image(systemName: "doc.text")
-                                .foregroundStyle(T.C.ink2)
-                                .font(.title2)
-                        )
-                }
-            }
-            
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(documentTitle(for: doc))
-                        .foregroundStyle(T.C.ink)
-                        .font(.subheadline)
-                        .lineLimit(1)
-                    
-                    if doc.isSaved && showPinIcon {
-                        Image(systemName: "pin.fill")
-                            .foregroundStyle(T.C.accent)
-                            .font(.caption2)
-                    }
-                }
-            }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .foregroundStyle(T.C.ink2)
-                .font(.caption)
-        }
-        .padding(.horizontal, T.S.md)
-        .padding(.vertical, T.S.md)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            vm.open(doc)
-        }
-    }
-    
-    @ViewBuilder
     private var loadingView: some View {
         ScrollView {
             VStack(spacing: T.S.lg) {
@@ -464,61 +289,6 @@ struct HomeView: View {
                     ShimmerView()
                         .frame(height: 44)
                         .cornerRadius(8)
-                }
-                .padding(.horizontal, 20)
-                
-                // Saved section placeholder
-                VStack(alignment: .leading, spacing: T.S.sm) {
-                    HStack {
-                        ShimmerView()
-                            .frame(width: 60, height: 20)
-                            .cornerRadius(4)
-                        Spacer()
-                    }
-                    .padding(.horizontal, T.S.xs)
-                    
-                    ShimmerView()
-                        .frame(height: 100)
-                        .cornerRadius(12)
-                }
-                .padding(.horizontal, 20)
-                
-                // Recent section placeholder
-                VStack(alignment: .leading, spacing: T.S.sm) {
-                    HStack {
-                        ShimmerView()
-                            .frame(width: 60, height: 20)
-                            .cornerRadius(4)
-                        Spacer()
-                    }
-                    .padding(.horizontal, T.S.xs)
-                    
-                    VStack(spacing: 0) {
-                        ForEach(0..<3) { index in
-                            HStack(spacing: T.S.md) {
-                                ShimmerView()
-                                    .frame(width: 60, height: 60)
-                                    .cornerRadius(10)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    ShimmerView()
-                                        .frame(width: 150, height: 16)
-                                        .cornerRadius(3)
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, T.S.md)
-                            .padding(.vertical, T.S.md)
-                            
-                            if index < 2 {
-                                Divider()
-                                    .background(T.C.divider.opacity(0.6))
-                                    .padding(.leading, 78)
-                            }
-                        }
-                    }
-                    .card()
                 }
                 .padding(.horizontal, 20)
             }
@@ -598,62 +368,6 @@ struct HomeView: View {
         .padding()
         .background(Color.red.opacity(0.1))
         .cornerRadius(10)
-    }
-    
-    private func documentTitle(for doc: DocumentMetadata) -> String {
-        // Use custom name if available
-        if let customName = doc.customName, !customName.isEmpty {
-            return customName
-        }
-        
-        // Otherwise use default format
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, h:mm a"
-        let type = doc.isVideo ? "Video" : "Screenshot"
-        return "\(type) • \(formatter.string(from: doc.createdAt))"
-    }
-    
-    private func startPhotoPolling() {
-        // Stop any existing timer first
-        stopPhotoPolling()
-        
-        // Check immediately
-        Task {
-            await vm.checkForLatestScreenshot()
-        }
-        
-        // Check for shared images more frequently (every 0.5 seconds for first 5 seconds, then every 2 seconds)
-        var checkCount = 0
-        photoCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
-            checkCount += 1
-            
-            // Shared images are now checked at app level
-            
-            // After 10 checks (5 seconds), slow down to every 2 seconds
-            if checkCount >= 10 {
-                timer.invalidate()
-                self.photoCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                    Task {
-                        await self.vm.checkForLatestScreenshot()
-                    }
-                }
-            } else {
-                Task {
-                    await self.vm.checkForLatestScreenshot()
-                }
-            }
-        }
-    }
-    
-    private func stopPhotoPolling() {
-        photoCheckTimer?.invalidate()
-        photoCheckTimer = nil
-    }
-    
-    private func checkForSharedImages() {
-        // Shared image checking is now handled at app level in SnapzifyApp
-        // This ensures it works regardless of which view is currently active
-        logger.debug("Shared content checking moved to app level")
     }
     
 }
