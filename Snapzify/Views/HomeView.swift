@@ -92,8 +92,22 @@ struct HomeView: View {
                         if !vm.isProcessingAudio && !vm.audioFeedback.isEmpty {
                             HStack(spacing: T.S.sm) {
                                 TextField("Follow up...", text: $vm.audioFollowUp)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .submitLabel(.send)
+                                    .textFieldStyle(.plain)
+                                    .font(.body)
+                                    .foregroundStyle(T.C.ink)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(T.C.card.opacity(0.5))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(T.C.divider, lineWidth: 1)
+                                    )
+                                    .autocorrectionDisabled(true)
+                                    .textInputAutocapitalization(.never)
+                                    .submitLabel(.go)
                                     .onSubmit {
                                         if !vm.audioFollowUp.isEmpty {
                                             Task {
@@ -109,9 +123,13 @@ struct HomeView: View {
                                 } label: {
                                     Image(systemName: "arrow.up.circle.fill")
                                         .font(.title2)
-                                        .foregroundStyle(vm.audioFollowUp.isEmpty ? T.C.ink2 : T.C.accent)
+                                        .foregroundStyle(
+                                            LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
+                                                         startPoint: .leading, 
+                                                         endPoint: .trailing)
+                                        )
                                 }
-                                .disabled(vm.audioFollowUp.isEmpty)
+                                .disabled(vm.audioFollowUp.isEmpty || vm.isProcessingAudio)
                             }
                             .padding(.top, 8)
                         }
