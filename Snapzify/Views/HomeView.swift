@@ -79,13 +79,7 @@ struct HomeView: View {
                                 .font(.body)
                                 .foregroundStyle(T.C.ink2)
                         } else if !vm.audioFeedback.isEmpty {
-                            Text("Feedback")
-                                .font(.headline)
-                                .foregroundStyle(T.C.ink)
-                            
-                            Text(vm.audioFeedback)
-                                .font(.body)
-                                .foregroundStyle(T.C.ink)
+                            TappableChineseFeedbackView(feedbackText: vm.audioFeedback)
                         }
                     }
                     .padding()

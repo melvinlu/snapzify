@@ -11,14 +11,14 @@ struct TextInputView: View {
         self._isPresented = isPresented
         
         // Initialize view model with services
-        let serviceContainer = ServiceContainer.shared
-        let translationService = serviceContainer.resolve(EnglishToChineseTranslationService.self) as? EnglishToChineseTranslationServiceImpl
-            ?? EnglishToChineseTranslationServiceImpl(configService: serviceContainer.configService)
+        let container = ServiceContainer.shared
+        let translationService = container.resolve(EnglishToChineseTranslationService.self) as? EnglishToChineseTranslationServiceImpl
+            ?? EnglishToChineseTranslationServiceImpl(configService: container.configService)
         
         self._viewModel = StateObject(wrappedValue: TextInputViewModel(
             translationService: translationService,
-            documentService: serviceContainer.documentService,
-            appState: ServiceContainer.shared.appState
+            documentService: container.documentService,
+            appState: container.appState
         ))
     }
     

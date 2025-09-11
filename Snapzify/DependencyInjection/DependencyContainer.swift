@@ -131,11 +131,11 @@ final class DependencyContainer: ObservableObject {
         }
         
         registerFactory(ChineseProcessingService.self) {
-            ServiceContainer.shared.chineseProcessingService
+            ChineseProcessingService(configService: ConfigServiceImpl())
         }
         
         registerFactory(StreamingChineseProcessingService.self) {
-            ServiceContainer.shared.streamingChineseProcessingService
+            StreamingChineseProcessingService(configService: ConfigServiceImpl())
         }
         
         registerFactory(ScriptConversionService.self) {

@@ -148,8 +148,8 @@ struct OpenRecentScreenshotIntent: AppIntent {
     @MainActor
     private func processImage(at url: URL) async -> Document? {
         // Use the proper processing pipeline to get sentences with bounding boxes
-        let serviceContainer = ServiceContainer.shared
-        let homeViewModel = serviceContainer.makeHomeViewModel(
+        let container = ServiceContainer.shared
+        let homeViewModel = container.makeHomeViewModel(
             onOpenSettings: { },
             onOpenDocument: { _ in }
         )

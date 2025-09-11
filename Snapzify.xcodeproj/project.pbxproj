@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2B49435EBDC73F87E5D9F705 /* TappableChineseFeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 616F4DCB6CC203FBBE6B33E4 /* TappableChineseFeedbackView.swift */; };
 		057AF194E418CBC6A609E857 /* MediaStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3CAB4D9569509E4445624C /* MediaStorageService.swift */; };
 		14FF5D5227ED405755C43183 /* ActionIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 15627FBFFEB1AFE5A161B98D /* ActionIcon.png */; };
 		2400A106E61C6BD7F823EE8D /* ServiceContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E937F459F270D304710898D8 /* ServiceContainer.swift */; };
@@ -116,6 +117,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		616F4DCB6CC203FBBE6B33E4 /* TappableChineseFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TappableChineseFeedbackView.swift; path = Snapzify/Views/Components/TappableChineseFeedbackView.swift; sourceTree = SOURCE_ROOT; };
 		028565A1AA6F498119241E43 /* ScreenshotProcessingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenshotProcessingView.swift; sourceTree = "<group>"; };
 		0366A9F7901316551893D518 /* DocumentService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentService.swift; sourceTree = "<group>"; };
 		0646378E12D0819C51E3B5FA /* ActionViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActionViewController.swift; path = ActionExtension/ActionViewController.swift; sourceTree = "<group>"; };
@@ -350,7 +352,8 @@
 				ACABFE8E66BA35BD21E5B970 /* StreamingTranslationView.swift */,
 				A5414F0017CB63212D83F373 /* StreamingTranslationPopup.swift */,
 				0B7DDE895100600C1B382EBE /* ReverseSnapzifyView.swift */,
-			);
+				616F4DCB6CC203FBBE6B33E4 /* TappableChineseFeedbackView.swift */,
+					);
 			name = Components;
 			sourceTree = "<group>";
 		};
@@ -560,7 +563,8 @@
 				3D9B1A141234567890123456 /* ConfigServiceImpl.swift in Sources */,
 				3D9B1A161234567890123456 /* PlecoLinkServiceImpl.swift in Sources */,
 				3D9B1A181234567890123456 /* HomeView.swift in Sources */,
-				3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */,
+				2B49435EBDC73F87E5D9F705 /* TappableChineseFeedbackView.swift in Sources */,
+						3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */,
 				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
 				3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */,
 				3D9B1A381234567890123470 /* TranscriptView.swift in Sources */,

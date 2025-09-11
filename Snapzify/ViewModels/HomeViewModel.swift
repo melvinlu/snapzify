@@ -38,6 +38,7 @@ class HomeViewModel: ObservableObject {
     private var audioRecorder: AVAudioRecorder?
     private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
     private var recordingURL: URL?
+    private var pronunciationHistory: [String] = [] // Track conversation history for context
     
     weak var appState: AppState?
     
@@ -1393,13 +1394,66 @@ class HomeViewModel: ObservableObject {
             return
         }
         
-        // Use the follow-up text as the new ask text
+        // Store current result before clearing
+        let previousResult = askResult
+        let previousQuestion = askText
+        
         await MainActor.run {
-            askText = askFollowUp
+            isAsking = true
+            askResult = ""
+        }
+        
+        // Add current Q&A to history for context
+        if !previousResult.isEmpty {
+            askHistory.append("User asked: \(previousQuestion)")
+            askHistory.append("Response: \(previousResult)")
+        }
+        
+        // Process follow-up with context
+        let followUpText = askFollowUp
+        
+        // Clear follow-up field
+        await MainActor.run {
             askFollowUp = ""
         }
         
-        await performAsk()
+        // Build a contextual prompt that includes the previous response
+        let contextualPrompt = """
+        Based on this previous response:
+        ---
+        \(previousResult)
+        ---
+        
+        User's follow-up question: \(followUpText)
+        """
+        
+        // Use askWithHistory for contextual follow-up
+        let stream = englishToChineseService.streamAskWithHistory(contextualPrompt, history: askHistory)
+        
+        do {
+            for try await chunk in stream {
+                await MainActor.run {
+                    askResult += chunk
+                }
+            }
+            
+            // Add to history
+            askHistory.append("Follow-up: \(followUpText)")
+            askHistory.append("Response: \(askResult)")
+            
+            // Keep history limited
+            if askHistory.count > 20 {
+                askHistory = Array(askHistory.suffix(20))
+            }
+        } catch {
+            await MainActor.run {
+                askResult = "Error: \(error.localizedDescription)"
+            }
+        }
+        
+        await MainActor.run {
+            isAsking = false
+        }
     }
     
     // performBreakdown() removed - now handled by performTranslation()
@@ -1410,13 +1464,66 @@ class HomeViewModel: ObservableObject {
             return
         }
         
-        // Use the follow-up text as the new translation text
+        // Store current result before clearing
+        let previousResult = translationResult
+        let previousInput = translateText
+        
         await MainActor.run {
-            translateText = translationFollowUp
+            isProcessingTranslation = true
+            translationResult = ""
+        }
+        
+        // Add current translation to history for context
+        if !previousResult.isEmpty {
+            translationHistory.append("User input: \(previousInput)")
+            translationHistory.append("Response: \(previousResult)")
+        }
+        
+        // Process follow-up with context
+        let followUpText = translationFollowUp
+        
+        // Clear follow-up field
+        await MainActor.run {
             translationFollowUp = ""
         }
         
-        await performTranslation()
+        // Build a contextual prompt that includes the previous response
+        let contextualPrompt = """
+        Based on this previous response:
+        ---
+        \(previousResult)
+        ---
+        
+        User's follow-up question: \(followUpText)
+        """
+        
+        // Use askWithHistory for contextual follow-up
+        let stream = englishToChineseService.streamAskWithHistory(contextualPrompt, history: translationHistory)
+        
+        do {
+            for try await chunk in stream {
+                await MainActor.run {
+                    translationResult += chunk
+                }
+            }
+            
+            // Add to history
+            translationHistory.append("Follow-up: \(followUpText)")
+            translationHistory.append("Response: \(translationResult)")
+            
+            // Keep history limited
+            if translationHistory.count > 20 {
+                translationHistory = Array(translationHistory.suffix(20))
+            }
+        } catch {
+            await MainActor.run {
+                translationResult = "Error: \(error.localizedDescription)"
+            }
+        }
+        
+        await MainActor.run {
+            isProcessingTranslation = false
+        }
     }
     
     // MARK: - Audio Recording
@@ -1505,8 +1612,19 @@ class HomeViewModel: ObservableObject {
             let transcription = try await transcribeAudio(url: url)
             print("DEBUG: Transcription: \(transcription)")
             
-            // Then get feedback on the transcription
+            // Add the transcription to history for context
+            pronunciationHistory.append("Student said: \"\(transcription)\"")
+            
+            // Then get feedback on the transcription with context
             let feedback = await getFeedbackOnPronunciation(transcription: transcription)
+            
+            // Add the feedback to history (but limit history size)
+            pronunciationHistory.append(feedback)
+            
+            // Keep only last 10 exchanges (20 items total)
+            if pronunciationHistory.count > 20 {
+                pronunciationHistory = Array(pronunciationHistory.suffix(20))
+            }
             
             await MainActor.run {
                 self.audioFeedback = feedback
@@ -1581,8 +1699,10 @@ class HomeViewModel: ObservableObject {
         
         var result = ""
         
-        // Create a specific prompt for pronunciation feedback
-        let stream = englishToChineseService.streamPronunciationFeedback(transcription)
+        // Use context-aware feedback if we have history, otherwise use regular feedback
+        let stream = pronunciationHistory.isEmpty ?
+            englishToChineseService.streamPronunciationFeedback(transcription) :
+            englishToChineseService.streamPronunciationFeedbackWithContext(transcription, previousFeedback: pronunciationHistory)
         
         do {
             for try await chunk in stream {

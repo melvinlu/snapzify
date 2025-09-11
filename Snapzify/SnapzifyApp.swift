@@ -171,7 +171,7 @@ struct SnapzifyApp: App {
                 logger.info("📱 Queue documents set: \(appState.queueDocuments.map { $0.id })")
                 
                 // Navigate to the first document
-                if let contentView = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController {
+                if (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController != nil {
                     // This will trigger navigation through the ContentView's state
                     NotificationCenter.default.post(name: .openQueueDocument, object: processedDocuments[0])
                 }
@@ -184,8 +184,8 @@ struct SnapzifyApp: App {
     
     private func processQueuedImage(_ image: UIImage, progressIndex: Int, totalItems: Int) async -> Document? {
         // Create a temporary HomeViewModel instance to process the image
-        let serviceContainer = ServiceContainer.shared
-        let homeViewModel = serviceContainer.makeHomeViewModel(
+        let container = ServiceContainer.shared
+        let homeViewModel = container.makeHomeViewModel(
             onOpenSettings: { },
             onOpenDocument: { _ in }
         )
@@ -262,10 +262,9 @@ struct ContentView: View {
     @StateObject private var homeVM: HomeViewModel
     
     private let logger = Logger(subsystem: "com.snapzify.app", category: "ContentView")
-    private let serviceContainer = ServiceContainer.shared
+    private let container = ServiceContainer.shared
     
     init() {
-        let container = ServiceContainer.shared
         let homeViewModel = container.makeHomeViewModel(
             onOpenSettings: { },
             onOpenDocument: { _ in }
@@ -274,6 +273,11 @@ struct ContentView: View {
     }
     
     var body: some View {
+        contentView
+    }
+    
+    @ViewBuilder
+    private var contentView: some View {
         NavigationStack(path: $navigationPath) {
             HomeView(vm: homeVM)
                 .onChange(of: appState.directNavigationDocument) { document in
@@ -325,18 +329,18 @@ struct ContentView: View {
                 .navigationDestination(item: $selectedDocument) { document in
                     // Single document view (when not in queue mode)
                     if document.isVideo {
-                        VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                        VideoDocumentView(vm: container.makeDocumentViewModel(document: document))
                             .id(document.id) // Force view refresh when document changes
                     } else {
-                        DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                        DocumentView(vm: container.makeDocumentViewModel(document: document))
                             .id(document.id) // Force view refresh when document changes
                     }
                 }
                 .navigationDestination(for: Document.self) { document in
                     if document.isVideo {
-                        VideoDocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                        VideoDocumentView(vm: container.makeDocumentViewModel(document: document))
                     } else {
-                        DocumentView(vm: serviceContainer.makeDocumentViewModel(document: document))
+                        DocumentView(vm: container.makeDocumentViewModel(document: document))
                     }
                 }
                 .fullScreenCover(item: $actionExtensionImage) { identifiableImage in
@@ -382,7 +386,7 @@ struct ContentView: View {
         }
         .tint(.white)
         .sheet(isPresented: $showSettings) {
-            SettingsView(vm: serviceContainer.makeSettingsViewModel())
+            SettingsView(vm: container.makeSettingsViewModel())
         }
         .fullScreenCover(isPresented: $appState.isProcessingQueue) {
             QueueProcessingView()
