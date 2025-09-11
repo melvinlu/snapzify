@@ -41,6 +41,7 @@ protocol EnglishToChineseTranslationService {
     func streamBreakdown(_ chineseText: String) -> AsyncThrowingStream<String, Error>
     func streamAsk(_ question: String) -> AsyncThrowingStream<String, Error>
     func streamAskWithHistory(_ question: String, history: [String]) -> AsyncThrowingStream<String, Error>
+    func streamPronunciationFeedback(_ transcription: String) -> AsyncThrowingStream<String, Error>
     func isConfigured() -> Bool
     func clearCache()
 }
@@ -196,6 +197,78 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     """
                     
                     let userPrompt = trimmedText
+                    
+                    let payload: [String: Any] = [
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            ["role": "system", "content": systemPrompt],
+                            ["role": "user", "content": userPrompt]
+                        ],
+                        "stream": true,
+                        "temperature": 0.3
+                    ]
+                    
+                    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                    
+                    let (bytes, _) = try await URLSession.shared.bytes(for: request)
+                    
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("data: ") {
+                            let jsonString = String(line.dropFirst(6))
+                            if jsonString == "[DONE]" {
+                                break
+                            }
+                            
+                            if let data = jsonString.data(using: .utf8),
+                               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let choices = json["choices"] as? [[String: Any]],
+                               let first = choices.first,
+                               let delta = first["delta"] as? [String: Any],
+                               let content = delta["content"] as? String {
+                                continuation.yield(content)
+                            }
+                        }
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func streamPronunciationFeedback(_ transcription: String) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    guard isConfigured() else {
+                        throw EnglishChineseTranslationError.notConfigured
+                    }
+                    
+                    guard let key = configService.openAIKey,
+                          let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+                        throw EnglishChineseTranslationError.invalidConfiguration
+                    }
+                    
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    
+                    let systemPrompt = """
+                    You are a native Chinese speaker and language teacher. You're listening to someone practicing Chinese pronunciation.
+                    
+                    Based on the transcription of what they said, provide feedback in the following format:
+                    
+                    1. FIRST, state in English what you understood them to say (what an average Chinese speaker would understand)
+                    2. THEN provide feedback in Chinese on whether it was a natural way to express it
+                    
+                    Be encouraging but honest. If the pronunciation was unclear or the phrasing unnatural, suggest improvements.
+                    Keep your response concise and practical.
+                    """
+                    
+                    let userPrompt = "The student said: \"\(transcription)\""
                     
                     let payload: [String: Any] = [
                         "model": "gpt-4o-mini",

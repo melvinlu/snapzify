@@ -30,6 +30,15 @@ class HomeViewModel: ObservableObject {
     @Published var askResult: String = ""
     @Published var askFollowUp: String = ""
     @Published var askHistory: [String] = []
+    
+    // Audio recording properties
+    @Published var isRecording: Bool = false
+    @Published var isProcessingAudio: Bool = false
+    @Published var audioFeedback: String = ""
+    private var audioRecorder: AVAudioRecorder?
+    private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
+    private var recordingURL: URL?
+    
     weak var appState: AppState?
     
     struct ProcessingTask: Identifiable {
@@ -52,6 +61,7 @@ class HomeViewModel: ObservableObject {
     private let store: DocumentStore
     private let ocrService: OCRService
     private let scriptConversionService: ScriptConversionService
+    private let configService: ConfigService = ServiceContainer.shared.configService
     private let chineseProcessingService: ChineseProcessingService = ServiceContainer.shared.chineseProcessingService
     private let streamingChineseProcessingService: StreamingChineseProcessingService = ServiceContainer.shared.streamingChineseProcessingService
     private lazy var englishToChineseService: EnglishToChineseTranslationService = {
@@ -1407,6 +1417,186 @@ class HomeViewModel: ObservableObject {
         }
         
         await performTranslation()
+    }
+    
+    // MARK: - Audio Recording
+    
+    func startRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            requestMicrophonePermission { [weak self] granted in
+                if granted {
+                    Task { @MainActor in
+                        self?.beginRecording()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func requestMicrophonePermission(completion: @escaping (Bool) -> Void) {
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted:
+            completion(true)
+        case .denied:
+            completion(false)
+        case .undetermined:
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                completion(granted)
+            }
+        @unknown default:
+            completion(false)
+        }
+    }
+    
+    private func beginRecording() {
+        do {
+            // Configure audio session
+            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setActive(true)
+            
+            // Create recording URL
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            recordingURL = documentsPath.appendingPathComponent("recording_\(Date().timeIntervalSince1970).m4a")
+            
+            // Configure recorder settings
+            let settings: [String: Any] = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 44100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+            
+            // Create and start recorder
+            audioRecorder = try AVAudioRecorder(url: recordingURL!, settings: settings)
+            audioRecorder?.record()
+            
+            isRecording = true
+            print("DEBUG: Started recording to \(recordingURL!)")
+        } catch {
+            print("DEBUG: Failed to start recording: \(error)")
+            errorMessage = "Failed to start recording: \(error.localizedDescription)"
+        }
+    }
+    
+    private func stopRecording() {
+        guard isRecording else { return }
+        
+        audioRecorder?.stop()
+        isRecording = false
+        
+        if let url = recordingURL {
+            print("DEBUG: Stopped recording, file at: \(url)")
+            Task {
+                await processRecording(url: url)
+            }
+        }
+    }
+    
+    private func processRecording(url: URL) async {
+        await MainActor.run {
+            isProcessingAudio = true
+            audioFeedback = ""
+        }
+        
+        do {
+            // First, transcribe the audio using Whisper
+            let transcription = try await transcribeAudio(url: url)
+            print("DEBUG: Transcription: \(transcription)")
+            
+            // Then get feedback on the transcription
+            let feedback = await getFeedbackOnPronunciation(transcription: transcription)
+            
+            await MainActor.run {
+                self.audioFeedback = feedback
+                self.isProcessingAudio = false
+            }
+            
+            // Clean up the recording file
+            try? FileManager.default.removeItem(at: url)
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Failed to process recording: \(error.localizedDescription)"
+                self.isProcessingAudio = false
+            }
+        }
+    }
+    
+    private func transcribeAudio(url: URL) async throws -> String {
+        guard let key = configService.openAIKey,
+              !key.isEmpty else {
+            throw EnglishChineseTranslationError.notConfigured
+        }
+        
+        let whisperURL = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+        var request = URLRequest(url: whisperURL)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        
+        // Create multipart form data
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        
+        // Add model parameter
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n".data(using: .utf8)!)
+        body.append("whisper-1\r\n".data(using: .utf8)!)
+        
+        // Add language parameter (Chinese)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
+        body.append("zh\r\n".data(using: .utf8)!)
+        
+        // Add audio file
+        let audioData = try Data(contentsOf: url)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/m4a\r\n\r\n".data(using: .utf8)!)
+        body.append(audioData)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
+        
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let text = json["text"] as? String {
+            return text
+        }
+        
+        throw EnglishChineseTranslationError.invalidResponse
+    }
+    
+    private func getFeedbackOnPronunciation(transcription: String) async -> String {
+        // Check API key from configService
+        guard let key = configService.openAIKey,
+              !key.isEmpty else {
+            return "OpenAI API key not configured"
+        }
+        
+        var result = ""
+        
+        // Create a specific prompt for pronunciation feedback
+        let stream = englishToChineseService.streamPronunciationFeedback(transcription)
+        
+        do {
+            for try await chunk in stream {
+                await MainActor.run {
+                    result += chunk
+                }
+            }
+        } catch {
+            await MainActor.run {
+                result = "Error getting feedback: \(error.localizedDescription)"
+            }
+        }
+        
+        return result
     }
     
     // Removed old functions - performReverseSnapzify and performBreakdown

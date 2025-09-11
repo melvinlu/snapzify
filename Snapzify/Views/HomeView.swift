@@ -71,7 +71,35 @@ struct HomeView: View {
                         
                         quickActions
                         
-                        reverseSnapzifySection
+                        // Audio feedback section
+                if vm.isProcessingAudio || !vm.audioFeedback.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Pronunciation Feedback")
+                            .font(.headline)
+                            .foregroundStyle(T.C.ink)
+                        
+                        if vm.isProcessingAudio && vm.audioFeedback.isEmpty {
+                            Text("Processing your recording...")
+                                .font(.body)
+                                .foregroundStyle(T.C.ink2)
+                        } else {
+                            Text(vm.audioFeedback)
+                                .font(.body)
+                                .foregroundStyle(T.C.ink)
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(T.C.card)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(T.C.divider, lineWidth: 1)
+                    )
+                }
+                
+                reverseSnapzifySection
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -225,13 +253,31 @@ struct HomeView: View {
     
     @ViewBuilder
     private var quickActions: some View {
-        Button {
-            vm.pickScreenshot()
-        } label: {
-            Label("Analyze Chinese text from media", systemImage: "square.and.arrow.down")
-                .foregroundStyle(T.C.ink)
+        HStack(spacing: T.S.sm) {
+            Button {
+                vm.pickScreenshot()
+            } label: {
+                Label("Analyze Chinese text from media", systemImage: "square.and.arrow.down")
+                    .foregroundStyle(T.C.ink)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+            
+            Button {
+                vm.startRecording()
+            } label: {
+                Image(systemName: vm.isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(
+                        vm.isRecording ? 
+                        LinearGradient(colors: [Color.red, Color.red], 
+                                     startPoint: .leading, 
+                                     endPoint: .trailing) :
+                        LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
+                                     startPoint: .leading, 
+                                     endPoint: .trailing)
+                    )
+            }
         }
-        .buttonStyle(SecondaryButtonStyle())
     }
     
     @ViewBuilder

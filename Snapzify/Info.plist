@@ -55,5 +55,7 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Snapzify needs access to your microphone to record and analyze your Chinese pronunciation.</string>
 </dict>
 </plist>
