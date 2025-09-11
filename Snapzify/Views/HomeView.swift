@@ -75,11 +75,45 @@ struct HomeView: View {
                 if vm.isProcessingAudio || !vm.audioFeedback.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         if vm.isProcessingAudio && vm.audioFeedback.isEmpty {
-                            Text("Processing...")
-                                .font(.body)
-                                .foregroundStyle(T.C.ink2)
-                        } else if !vm.audioFeedback.isEmpty {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Processing...")
+                                    .font(.body)
+                                    .foregroundStyle(T.C.ink2)
+                            }
+                        }
+                        
+                        if !vm.audioFeedback.isEmpty {
                             TappableChineseFeedbackView(feedbackText: vm.audioFeedback)
+                        }
+                        
+                        // Follow-up textbox for audio feedback
+                        if !vm.isProcessingAudio && !vm.audioFeedback.isEmpty {
+                            HStack(spacing: T.S.sm) {
+                                TextField("Follow up...", text: $vm.audioFollowUp)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .submitLabel(.send)
+                                    .onSubmit {
+                                        if !vm.audioFollowUp.isEmpty {
+                                            Task {
+                                                await vm.performAudioFollowUp()
+                                            }
+                                        }
+                                    }
+                                
+                                Button {
+                                    Task {
+                                        await vm.performAudioFollowUp()
+                                    }
+                                } label: {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(vm.audioFollowUp.isEmpty ? T.C.ink2 : T.C.accent)
+                                }
+                                .disabled(vm.audioFollowUp.isEmpty)
+                            }
+                            .padding(.top, 8)
                         }
                     }
                     .padding()
@@ -258,13 +292,17 @@ struct HomeView: View {
             .buttonStyle(SecondaryButtonStyle())
             
             Button {
-                vm.startRecording()
+                if vm.isProcessingAudio {
+                    vm.cancelAudioProcessing()
+                } else {
+                    vm.startRecording()
+                }
             } label: {
                 Label(
-                    vm.isRecording ? "Stop" : "Speak",
-                    systemImage: vm.isRecording ? "stop.circle" : "mic.circle"
+                    vm.isProcessingAudio ? "Cancel" : (vm.isRecording ? "Stop" : "Speak"),
+                    systemImage: vm.isProcessingAudio ? "xmark.circle" : (vm.isRecording ? "stop.circle" : "mic.circle")
                 )
-                .foregroundStyle(vm.isRecording ? Color.red : T.C.ink)
+                .foregroundStyle(vm.isRecording || vm.isProcessingAudio ? Color.red : T.C.ink)
                 .frame(minWidth: 120)
             }
             .buttonStyle(SecondaryButtonStyle())

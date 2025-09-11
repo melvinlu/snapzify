@@ -35,10 +35,12 @@ class HomeViewModel: ObservableObject {
     @Published var isRecording: Bool = false
     @Published var isProcessingAudio: Bool = false
     @Published var audioFeedback: String = ""
+    @Published var audioFollowUp: String = ""
     private var audioRecorder: AVAudioRecorder?
     private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
     private var recordingURL: URL?
     private var pronunciationHistory: [String] = [] // Track conversation history for context
+    private var audioProcessingTask: Task<Void, Never>?
     
     weak var appState: AppState?
     
@@ -1542,6 +1544,96 @@ class HomeViewModel: ObservableObject {
         }
     }
     
+    func cancelAudioProcessing() {
+        // Cancel the current processing task
+        audioProcessingTask?.cancel()
+        audioProcessingTask = nil
+        
+        // Reset state
+        isProcessingAudio = false
+        audioFeedback = ""
+        audioFollowUp = ""
+        
+        // Clean up recording file if it exists
+        if let url = recordingURL {
+            try? FileManager.default.removeItem(at: url)
+            recordingURL = nil
+        }
+    }
+    
+    func performAudioFollowUp() async {
+        guard !audioFollowUp.isEmpty else {
+            print("DEBUG: Cannot perform audio follow-up - no text")
+            return
+        }
+        
+        // Store current feedback before clearing
+        let previousFeedback = audioFeedback
+        
+        await MainActor.run {
+            isProcessingAudio = true
+            audioFeedback = ""
+        }
+        
+        // Process follow-up with context
+        let followUpText = audioFollowUp
+        
+        // Clear follow-up field
+        await MainActor.run {
+            audioFollowUp = ""
+        }
+        
+        // Build a contextual prompt that includes the previous feedback
+        let contextualPrompt = """
+        Based on this previous pronunciation feedback:
+        ---
+        \(previousFeedback)
+        ---
+        
+        User's follow-up question: \(followUpText)
+        """
+        
+        // Use context-aware streaming with the full context
+        let stream = englishToChineseService.streamAskWithHistory(contextualPrompt, history: pronunciationHistory)
+        
+        audioProcessingTask = Task {
+            do {
+                for try await chunk in stream {
+                    // Check for cancellation
+                    if Task.isCancelled {
+                        break
+                    }
+                    
+                    await MainActor.run {
+                        audioFeedback += chunk
+                    }
+                }
+                
+                // Add to history if not cancelled
+                if !Task.isCancelled {
+                    pronunciationHistory.append("Follow-up: \(followUpText)")
+                    pronunciationHistory.append("Response: \(audioFeedback)")
+                    
+                    // Keep history limited
+                    if pronunciationHistory.count > 20 {
+                        pronunciationHistory = Array(pronunciationHistory.suffix(20))
+                    }
+                }
+            } catch {
+                // Don't show error if cancelled
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        audioFeedback = "Error: \(error.localizedDescription)"
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                isProcessingAudio = false
+            }
+        }
+    }
+    
     private func requestMicrophonePermission(completion: @escaping (Bool) -> Void) {
         switch AVAudioSession.sharedInstance().recordPermission {
         case .granted:
@@ -1595,7 +1687,7 @@ class HomeViewModel: ObservableObject {
         
         if let url = recordingURL {
             print("DEBUG: Stopped recording, file at: \(url)")
-            Task {
+            audioProcessingTask = Task {
                 await processRecording(url: url)
             }
         }
@@ -1608,35 +1700,59 @@ class HomeViewModel: ObservableObject {
         }
         
         do {
+            // Check for cancellation before transcription
+            guard !Task.isCancelled else {
+                await MainActor.run {
+                    self.isProcessingAudio = false
+                }
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            
             // First, transcribe the audio using Whisper
             let transcription = try await transcribeAudio(url: url)
             print("DEBUG: Transcription: \(transcription)")
             
+            // Check for cancellation after transcription
+            guard !Task.isCancelled else {
+                await MainActor.run {
+                    self.isProcessingAudio = false
+                }
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            
             // Add the transcription to history for context
             pronunciationHistory.append("Student said: \"\(transcription)\"")
             
-            // Then get feedback on the transcription with context
-            let feedback = await getFeedbackOnPronunciation(transcription: transcription)
+            // Stream the feedback response
+            await streamFeedbackOnPronunciation(transcription: transcription)
             
-            // Add the feedback to history (but limit history size)
-            pronunciationHistory.append(feedback)
-            
-            // Keep only last 10 exchanges (20 items total)
-            if pronunciationHistory.count > 20 {
-                pronunciationHistory = Array(pronunciationHistory.suffix(20))
+            // Only update history if not cancelled
+            if !Task.isCancelled {
+                // Add the feedback to history (but limit history size)
+                let finalFeedback = audioFeedback
+                pronunciationHistory.append(finalFeedback)
+                
+                // Keep only last 10 exchanges (20 items total)
+                if pronunciationHistory.count > 20 {
+                    pronunciationHistory = Array(pronunciationHistory.suffix(20))
+                }
             }
             
             await MainActor.run {
-                self.audioFeedback = feedback
                 self.isProcessingAudio = false
             }
             
             // Clean up the recording file
             try? FileManager.default.removeItem(at: url)
         } catch {
-            await MainActor.run {
-                self.errorMessage = "Failed to process recording: \(error.localizedDescription)"
-                self.isProcessingAudio = false
+            // Don't show error if cancelled
+            if !Task.isCancelled {
+                await MainActor.run {
+                    self.errorMessage = "Failed to process recording: \(error.localizedDescription)"
+                    self.isProcessingAudio = false
+                }
             }
         }
     }
@@ -1690,14 +1806,15 @@ class HomeViewModel: ObservableObject {
         throw EnglishChineseTranslationError.invalidResponse
     }
     
-    private func getFeedbackOnPronunciation(transcription: String) async -> String {
+    private func streamFeedbackOnPronunciation(transcription: String) async {
         // Check API key from configService
         guard let key = configService.openAIKey,
               !key.isEmpty else {
-            return "OpenAI API key not configured"
+            await MainActor.run {
+                audioFeedback = "OpenAI API key not configured"
+            }
+            return
         }
-        
-        var result = ""
         
         // Use context-aware feedback if we have history, otherwise use regular feedback
         let stream = pronunciationHistory.isEmpty ?
@@ -1706,17 +1823,23 @@ class HomeViewModel: ObservableObject {
         
         do {
             for try await chunk in stream {
+                // Check for cancellation
+                if Task.isCancelled {
+                    break
+                }
+                
                 await MainActor.run {
-                    result += chunk
+                    audioFeedback += chunk
                 }
             }
         } catch {
-            await MainActor.run {
-                result = "Error getting feedback: \(error.localizedDescription)"
+            // Don't show error if cancelled
+            if !Task.isCancelled {
+                await MainActor.run {
+                    audioFeedback = "Error getting feedback: \(error.localizedDescription)"
+                }
             }
         }
-        
-        return result
     }
     
     // Removed old functions - performReverseSnapzify and performBreakdown
