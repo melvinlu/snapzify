@@ -39,6 +39,8 @@ protocol EnglishToChineseTranslationService {
     func translate(_ englishText: String) async throws -> TranslationResult
     func streamTranslate(_ englishText: String) -> AsyncThrowingStream<String, Error>
     func streamBreakdown(_ chineseText: String) -> AsyncThrowingStream<String, Error>
+    func streamAsk(_ question: String) -> AsyncThrowingStream<String, Error>
+    func streamAskWithHistory(_ question: String, history: [String]) -> AsyncThrowingStream<String, Error>
     func isConfigured() -> Bool
     func clearCache()
 }
@@ -73,6 +75,166 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
             return false
         }
         return true
+    }
+    
+    func streamAskWithHistory(_ question: String, history: [String]) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    guard isConfigured() else {
+                        throw EnglishChineseTranslationError.notConfigured
+                    }
+                    
+                    let trimmedText = question.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmedText.isEmpty else {
+                        throw EnglishChineseTranslationError.invalidInput("Empty input text")
+                    }
+                    
+                    guard let key = configService.openAIKey,
+                          let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+                        throw EnglishChineseTranslationError.invalidConfiguration
+                    }
+                    
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    
+                    let systemPrompt = """
+                    You are a native Chinese language expert with deep knowledge of Chinese language, culture, idioms, and colloquial expressions.
+                    
+                    Answer questions about Chinese language and culture in a helpful, clear, and concise manner.
+                    Provide examples when helpful, using Chinese characters with pinyin when relevant.
+                    Be direct and practical in your responses.
+                    
+                    No headers, labels, or unnecessary formatting. Just provide clear, helpful answers.
+                    """
+                    
+                    // Build messages array with history
+                    var messages: [[String: String]] = [["role": "system", "content": systemPrompt]]
+                    
+                    // Add conversation history
+                    for item in history {
+                        if item.hasPrefix("Q: ") {
+                            messages.append(["role": "user", "content": String(item.dropFirst(3))])
+                        } else if item.hasPrefix("A: ") {
+                            messages.append(["role": "assistant", "content": String(item.dropFirst(3))])
+                        }
+                    }
+                    
+                    // Add current question
+                    messages.append(["role": "user", "content": trimmedText])
+                    
+                    let payload: [String: Any] = [
+                        "model": "gpt-4o-mini",
+                        "messages": messages,
+                        "stream": true,
+                        "temperature": 0.3
+                    ]
+                    
+                    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                    
+                    let (bytes, _) = try await URLSession.shared.bytes(for: request)
+                    
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("data: ") {
+                            let jsonString = String(line.dropFirst(6))
+                            if jsonString == "[DONE]" {
+                                break
+                            }
+                            
+                            if let data = jsonString.data(using: .utf8),
+                               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let choices = json["choices"] as? [[String: Any]],
+                               let first = choices.first,
+                               let delta = first["delta"] as? [String: Any],
+                               let content = delta["content"] as? String {
+                                continuation.yield(content)
+                            }
+                        }
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func streamAsk(_ question: String) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    guard isConfigured() else {
+                        throw EnglishChineseTranslationError.notConfigured
+                    }
+                    
+                    let trimmedText = question.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmedText.isEmpty else {
+                        throw EnglishChineseTranslationError.invalidInput("Empty input text")
+                    }
+                    
+                    guard let key = configService.openAIKey,
+                          let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+                        throw EnglishChineseTranslationError.invalidConfiguration
+                    }
+                    
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    
+                    let systemPrompt = """
+                    You are a native Chinese language expert with deep knowledge of Chinese language, culture, idioms, and colloquial expressions.
+                    
+                    Answer questions about Chinese language and culture in a helpful, clear, and concise manner.
+                    Provide examples when helpful, using Chinese characters with pinyin when relevant.
+                    Be direct and practical in your responses.
+                    
+                    No headers, labels, or unnecessary formatting. Just provide clear, helpful answers.
+                    """
+                    
+                    let userPrompt = trimmedText
+                    
+                    let payload: [String: Any] = [
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            ["role": "system", "content": systemPrompt],
+                            ["role": "user", "content": userPrompt]
+                        ],
+                        "stream": true,
+                        "temperature": 0.3
+                    ]
+                    
+                    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                    
+                    let (bytes, _) = try await URLSession.shared.bytes(for: request)
+                    
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("data: ") {
+                            let jsonString = String(line.dropFirst(6))
+                            if jsonString == "[DONE]" {
+                                break
+                            }
+                            
+                            if let data = jsonString.data(using: .utf8),
+                               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let choices = json["choices"] as? [[String: Any]],
+                               let first = choices.first,
+                               let delta = first["delta"] as? [String: Any],
+                               let content = delta["content"] as? String {
+                                continuation.yield(content)
+                            }
+                        }
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
     
     func streamBreakdown(_ chineseText: String) -> AsyncThrowingStream<String, Error> {

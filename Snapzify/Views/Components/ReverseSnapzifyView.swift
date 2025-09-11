@@ -1,19 +1,26 @@
 import SwiftUI
 
 struct ReverseSnapzifyView: View {
-    @Binding var text: String
+    // Unified translation properties
+    @Binding var translateText: String
     @Binding var translationResult: String
-    let isTranslating: Bool
+    @Binding var translationFollowUp: String
+    let isProcessing: Bool
     let onTranslate: () -> Void
+    let onTranslationFollowUp: () -> Void
     
-    // Breakdown properties
-    @Binding var breakdownText: String
-    @Binding var breakdownResult: String
-    let isBreakingDown: Bool
-    let onBreakdown: () -> Void
+    // Ask properties (keeping as separate feature)
+    @Binding var askText: String
+    @Binding var askResult: String
+    @Binding var askFollowUp: String
+    let isAsking: Bool
+    let onAsk: () -> Void
+    let onAskFollowUp: () -> Void
     
-    @FocusState private var isTextFieldFocused: Bool
-    @FocusState private var isBreakdownFieldFocused: Bool
+    @FocusState private var isTranslateFieldFocused: Bool
+    @FocusState private var isAskFieldFocused: Bool
+    @FocusState private var isTranslationFollowUpFieldFocused: Bool
+    @FocusState private var isAskFollowUpFieldFocused: Bool
     
     private func containsChineseCharacters(_ text: String) -> Bool {
         for scalar in text.unicodeScalars {
@@ -45,9 +52,9 @@ struct ReverseSnapzifyView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
+            // Unified translation/breakdown textbox
             HStack(spacing: T.S.sm) {
-                // Text field
-                TextField("Translate to colloquial Chinese...", text: $text)
+                TextField("Translate...", text: $translateText)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .foregroundStyle(T.C.ink)
@@ -64,20 +71,19 @@ struct ReverseSnapzifyView: View {
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.never)
                     .submitLabel(.go)
-                    .focused($isTextFieldFocused)
+                    .focused($isTranslateFieldFocused)
                     .onSubmit {
-                        if !text.isEmpty {
+                        if !translateText.isEmpty {
                             onTranslate()
-                            isTextFieldFocused = false
+                            isTranslateFieldFocused = false
                         }
                     }
                 
-                // Translate button
                 Button {
-                    isTextFieldFocused = false
+                    isTranslateFieldFocused = false
                     onTranslate()
                 } label: {
-                    Image(systemName: "text.magnifyingglass")
+                    Image(systemName: "character.book.closed.fill")
                         .font(.title2)
                         .foregroundStyle(
                             LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
@@ -85,40 +91,58 @@ struct ReverseSnapzifyView: View {
                                          endPoint: .trailing)
                         )
                 }
-                .disabled(text.isEmpty || isTranslating)
+                .disabled(translateText.isEmpty || isProcessing)
             }
             
-            // Translation results
-            if isTranslating || !translationResult.isEmpty {
+            // Translation/Breakdown results
+            if isProcessing || !translationResult.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    // Show the word/phrase being translated as header
+                    // Show header based on what was processed
                     if let currentTranslation = UserDefaults.standard.string(forKey: "currentTranslationQuery"), !currentTranslation.isEmpty {
                         Text(currentTranslation)
                             .font(.headline)
                             .foregroundStyle(T.C.ink)
+                    } else if let currentBreakdown = UserDefaults.standard.string(forKey: "currentBreakdownQuery"), !currentBreakdown.isEmpty {
+                        // Extract only Chinese characters for Pleco
+                        let chineseOnly = currentBreakdown.filter { char in
+                            let scalar = String(char).unicodeScalars.first
+                            if let value = scalar?.value {
+                                return (0x4E00...0x9FFF).contains(value) ||
+                                       (0x3400...0x4DBF).contains(value) ||
+                                       (0x20000...0x2A6DF).contains(value)
+                            }
+                            return false
+                        }
+                        
+                        Button {
+                            openInPleco(text: chineseOnly.isEmpty ? currentBreakdown : chineseOnly)
+                        } label: {
+                            Text(currentBreakdown)
+                                .font(.headline)
+                                .foregroundStyle(T.C.ink)
+                        }
+                        .buttonStyle(.plain)
                     }
                     
-                    if isTranslating && translationResult.isEmpty {
-                        Text("Reverse Snapzifying...")
+                    if isProcessing && translationResult.isEmpty {
+                        Text("Processing...")
                             .font(.body)
                             .foregroundStyle(T.C.ink2)
                     } else {
-                        // Same display for both streaming and completed
+                        // Display results
                         let lines = translationResult.components(separatedBy: "\n")
                         ForEach(lines.indices, id: \.self) { index in
                             let line = lines[index]
                             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
                             if !trimmedLine.isEmpty {
-                                // Check if this is the main translation line (starts with ** and contains Chinese)
+                                // Check if this is a Chinese translation result (starts with ** and contains Chinese)
                                 if trimmedLine.hasPrefix("**") && containsChineseCharacters(trimmedLine) {
-                                    // Extract Chinese characters from the markdown
                                     let cleanedLine = trimmedLine
                                         .replacingOccurrences(of: "**", with: "")
                                         .components(separatedBy: "•")
                                         .first?
                                         .trimmingCharacters(in: .whitespaces) ?? trimmedLine
                                     
-                                    // Make the translation itself clickable
                                     Button {
                                         openInPleco(text: cleanedLine)
                                     } label: {
@@ -127,20 +151,64 @@ struct ReverseSnapzifyView: View {
                                                 .font(.body)
                                                 .foregroundStyle(T.C.ink)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                                .underline(color: T.C.ink.opacity(0.3))
                                         } else {
                                             Text(line)
                                                 .font(.body)
                                                 .foregroundStyle(T.C.ink)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                                .underline(color: T.C.ink.opacity(0.3))
                                         }
                                     }
                                     .buttonStyle(.plain)
                                 }
-                                // Check if this line contains Chinese characters for example sentences
-                                else if containsChineseCharacters(trimmedLine) && !trimmedLine.hasPrefix("**") {
-                                    // Make Chinese example sentences tappable to open in Pleco
+                                // Check for lines with bullet points (character breakdowns)
+                                else if trimmedLine.contains("•") && containsChineseCharacters(trimmedLine) {
+                                    let components = trimmedLine.components(separatedBy: "•")
+                                    HStack(spacing: 4) {
+                                        ForEach(components.indices, id: \.self) { compIndex in
+                                            let component = components[compIndex].trimmingCharacters(in: .whitespaces)
+                                            if compIndex == 0 && containsChineseCharacters(component) {
+                                                // Extract only Chinese characters
+                                                let chineseOnly = component.filter { char in
+                                                    let scalar = String(char).unicodeScalars.first
+                                                    if let value = scalar?.value {
+                                                        return (0x4E00...0x9FFF).contains(value) ||
+                                                               (0x3400...0x4DBF).contains(value) ||
+                                                               (0x20000...0x2A6DF).contains(value)
+                                                    }
+                                                    return false
+                                                }
+                                                
+                                                Button {
+                                                    openInPleco(text: chineseOnly.isEmpty ? component : chineseOnly)
+                                                } label: {
+                                                    Text(component)
+                                                        .font(.body)
+                                                        .foregroundStyle(T.C.ink)
+                                                }
+                                                .buttonStyle(.plain)
+                                                
+                                                if compIndex < components.count - 1 {
+                                                    Text(" • ")
+                                                        .font(.body)
+                                                        .foregroundStyle(T.C.ink2)
+                                                }
+                                            } else {
+                                                Text(component)
+                                                    .font(.body)
+                                                    .foregroundStyle(T.C.ink)
+                                                
+                                                if compIndex < components.count - 1 {
+                                                    Text(" • ")
+                                                        .font(.body)
+                                                        .foregroundStyle(T.C.ink2)
+                                                }
+                                            }
+                                        }
+                                        Spacer()
+                                    }
+                                }
+                                // Chinese sentences or overall meanings
+                                else if containsChineseCharacters(trimmedLine) {
                                     Button {
                                         openInPleco(text: trimmedLine)
                                     } label: {
@@ -148,11 +216,10 @@ struct ReverseSnapzifyView: View {
                                             .font(.body)
                                             .foregroundStyle(T.C.ink)
                                             .frame(maxWidth: .infinity, alignment: .leading)
-                                            .underline(color: T.C.ink.opacity(0.3))
                                     }
                                     .buttonStyle(.plain)
                                 } else {
-                                    // Regular text (context, dividers, etc.)
+                                    // Regular text
                                     if let attributedString = try? AttributedString(markdown: line) {
                                         Text(attributedString)
                                             .font(.body)
@@ -168,6 +235,51 @@ struct ReverseSnapzifyView: View {
                             }
                         }
                     }
+                    
+                    // Follow-up textbox
+                    if !isProcessing && !translationResult.isEmpty {
+                        HStack(spacing: T.S.sm) {
+                            TextField("Follow up...", text: $translationFollowUp)
+                                .textFieldStyle(.plain)
+                                .font(.body)
+                                .foregroundStyle(T.C.ink)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(T.C.card.opacity(0.5))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(T.C.divider, lineWidth: 1)
+                                )
+                                .autocorrectionDisabled(true)
+                                .textInputAutocapitalization(.never)
+                                .submitLabel(.go)
+                                .focused($isTranslationFollowUpFieldFocused)
+                                .onSubmit {
+                                    if !translationFollowUp.isEmpty {
+                                        onTranslationFollowUp()
+                                        isTranslationFollowUpFieldFocused = false
+                                    }
+                                }
+                            
+                            Button {
+                                isTranslationFollowUpFieldFocused = false
+                                onTranslationFollowUp()
+                            } label: {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
+                                                     startPoint: .leading, 
+                                                     endPoint: .trailing)
+                                    )
+                            }
+                            .disabled(translationFollowUp.isEmpty || isProcessing)
+                        }
+                        .padding(.top, 8)
+                    }
                 }
                 .padding()
                 .background(
@@ -180,10 +292,9 @@ struct ReverseSnapzifyView: View {
                 )
             }
             
-            // Breakdown section
+            // Ask section
             HStack(spacing: T.S.sm) {
-                // Breakdown text field
-                TextField("Breakdown Chinese text...", text: $breakdownText)
+                TextField("Ask...", text: $askText)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .foregroundStyle(T.C.ink)
@@ -200,20 +311,19 @@ struct ReverseSnapzifyView: View {
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.never)
                     .submitLabel(.go)
-                    .focused($isBreakdownFieldFocused)
+                    .focused($isAskFieldFocused)
                     .onSubmit {
-                        if !breakdownText.isEmpty {
-                            onBreakdown()
-                            isBreakdownFieldFocused = false
+                        if !askText.isEmpty {
+                            onAsk()
+                            isAskFieldFocused = false
                         }
                     }
                 
-                // Breakdown button
                 Button {
-                    isBreakdownFieldFocused = false
-                    onBreakdown()
+                    isAskFieldFocused = false
+                    onAsk()
                 } label: {
-                    Image(systemName: "text.magnifyingglass")
+                    Image(systemName: "questionmark.circle.fill")
                         .font(.title2)
                         .foregroundStyle(
                             LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
@@ -221,79 +331,50 @@ struct ReverseSnapzifyView: View {
                                          endPoint: .trailing)
                         )
                 }
-                .disabled(breakdownText.isEmpty || isBreakingDown)
+                .disabled(askText.isEmpty || isAsking)
             }
             
-            // Breakdown results
-            if isBreakingDown || !breakdownResult.isEmpty {
+            // Ask results
+            if isAsking || !askResult.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    // Show the text being broken down as header
-                    if let currentBreakdown = UserDefaults.standard.string(forKey: "currentBreakdownQuery"), !currentBreakdown.isEmpty {
-                        Button {
-                            openInPleco(text: currentBreakdown)
-                        } label: {
-                            Text(currentBreakdown)
-                                .font(.headline)
-                                .foregroundStyle(T.C.ink)
-                                .underline(color: T.C.ink.opacity(0.3))
-                        }
-                        .buttonStyle(.plain)
+                    if let currentAsk = UserDefaults.standard.string(forKey: "currentAskQuery"), !currentAsk.isEmpty {
+                        Text(currentAsk)
+                            .font(.headline)
+                            .foregroundStyle(T.C.ink)
                     }
                     
-                    if isBreakingDown && breakdownResult.isEmpty {
-                        Text("Breaking down text...")
+                    if isAsking && askResult.isEmpty {
+                        Text("Asking...")
                             .font(.body)
                             .foregroundStyle(T.C.ink2)
                     } else {
-                        // Display breakdown results with streaming
-                        let lines = breakdownResult.components(separatedBy: "\n")
+                        let lines = askResult.components(separatedBy: "\n")
                         ForEach(lines.indices, id: \.self) { index in
                             let line = lines[index]
                             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
                             if !trimmedLine.isEmpty {
-                                // Parse line to make Chinese characters individually tappable
                                 if containsChineseCharacters(trimmedLine) {
-                                    // For lines with bullet points (character breakdowns)
-                                    if trimmedLine.contains("•") {
-                                        let components = trimmedLine.components(separatedBy: "•")
-                                        HStack(spacing: 0) {
-                                            ForEach(components.indices, id: \.self) { compIndex in
-                                                let component = components[compIndex].trimmingCharacters(in: .whitespaces)
-                                                if compIndex == 0 && containsChineseCharacters(component) {
-                                                    // First component is the Chinese character - make it tappable
-                                                    Button {
-                                                        openInPleco(text: component)
-                                                    } label: {
-                                                        Text(component)
-                                                            .font(.body)
-                                                            .foregroundStyle(T.C.ink)
-                                                            .underline(color: T.C.ink.opacity(0.3))
-                                                    }
-                                                    .buttonStyle(.plain)
-                                                } else if compIndex > 0 {
-                                                    // Other components (pinyin, meaning) with bullet
-                                                    Text(" • \(component)")
-                                                        .font(.body)
-                                                        .foregroundStyle(T.C.ink)
-                                                }
-                                            }
-                                            Spacer()
+                                    // Extract only Chinese characters for Pleco
+                                    let chineseOnly = trimmedLine.filter { char in
+                                        let scalar = String(char).unicodeScalars.first
+                                        if let value = scalar?.value {
+                                            return (0x4E00...0x9FFF).contains(value) ||
+                                                   (0x3400...0x4DBF).contains(value) ||
+                                                   (0x20000...0x2A6DF).contains(value)
                                         }
-                                    } else {
-                                        // For lines that are just Chinese text (like overall meaning)
-                                        Button {
-                                            openInPleco(text: trimmedLine)
-                                        } label: {
-                                            Text(line)
-                                                .font(.body)
-                                                .foregroundStyle(T.C.ink)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                                .underline(color: T.C.ink.opacity(0.3))
-                                        }
-                                        .buttonStyle(.plain)
+                                        return false
                                     }
+                                    
+                                    Button {
+                                        openInPleco(text: chineseOnly.isEmpty ? trimmedLine : chineseOnly)
+                                    } label: {
+                                        Text(line)
+                                            .font(.body)
+                                            .foregroundStyle(T.C.ink)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .buttonStyle(.plain)
                                 } else {
-                                    // Non-Chinese text (labels, etc.)
                                     Text(line)
                                         .font(.body)
                                         .foregroundStyle(T.C.ink)
@@ -301,6 +382,51 @@ struct ReverseSnapzifyView: View {
                                 }
                             }
                         }
+                    }
+                    
+                    // Follow-up textbox for Ask
+                    if !isAsking && !askResult.isEmpty {
+                        HStack(spacing: T.S.sm) {
+                            TextField("Follow up...", text: $askFollowUp)
+                                .textFieldStyle(.plain)
+                                .font(.body)
+                                .foregroundStyle(T.C.ink)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(T.C.card.opacity(0.5))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(T.C.divider, lineWidth: 1)
+                                )
+                                .autocorrectionDisabled(true)
+                                .textInputAutocapitalization(.never)
+                                .submitLabel(.go)
+                                .focused($isAskFollowUpFieldFocused)
+                                .onSubmit {
+                                    if !askFollowUp.isEmpty {
+                                        onAskFollowUp()
+                                        isAskFollowUpFieldFocused = false
+                                    }
+                                }
+                            
+                            Button {
+                                isAskFollowUpFieldFocused = false
+                                onAskFollowUp()
+                            } label: {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
+                                                     startPoint: .leading, 
+                                                     endPoint: .trailing)
+                                    )
+                            }
+                            .disabled(askFollowUp.isEmpty || isAsking)
+                        }
+                        .padding(.top, 8)
                     }
                 }
                 .padding()

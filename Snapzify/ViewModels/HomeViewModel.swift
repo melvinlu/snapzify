@@ -17,15 +17,19 @@ class HomeViewModel: ObservableObject {
     @Published var processingProgress: String = ""
     @Published var activeProcessingTasks: [ProcessingTask] = []
     
-    // Reverse Snapzify properties
-    @Published var reverseSnapzifyText: String = ""
-    @Published var isTranslating: Bool = false
+    // Unified translation properties (handles both translation and breakdown)
+    @Published var translateText: String = ""
+    @Published var isProcessingTranslation: Bool = false
     @Published var translationResult: String = ""
+    @Published var translationFollowUp: String = ""
+    @Published var translationHistory: [String] = []
     
-    // Chinese breakdown properties
-    @Published var breakdownText: String = ""
-    @Published var isBreakingDown: Bool = false
-    @Published var breakdownResult: String = ""
+    // Ask expert properties
+    @Published var askText: String = ""
+    @Published var isAsking: Bool = false
+    @Published var askResult: String = ""
+    @Published var askFollowUp: String = ""
+    @Published var askHistory: [String] = []
     weak var appState: AppState?
     
     struct ProcessingTask: Identifiable {
@@ -1250,57 +1254,29 @@ class HomeViewModel: ObservableObject {
         return savedDocument
     }
     
-    // MARK: - Reverse Snapzify
+    // MARK: - Translation/Breakdown
     
-    func performBreakdown() async {
-        guard !breakdownText.isEmpty else {
-            print("DEBUG: Cannot perform breakdown - no text")
-            return
-        }
-        guard englishToChineseService.isConfigured() else {
-            print("DEBUG: Service not configured")
-            await MainActor.run {
-                errorMessage = "OpenAI API key not configured. Please add it in Settings."
-            }
-            return
-        }
-        
-        // Save the query to show as header
-        let queryText = breakdownText
-        UserDefaults.standard.set(queryText, forKey: "currentBreakdownQuery")
-        
-        print("DEBUG: Starting breakdown for: \(queryText)")
-        await MainActor.run {
-            isBreakingDown = true
-            breakdownResult = ""
-            // Clear the text field after submit
-            breakdownText = ""
-        }
-        
-        do {
-            let stream = englishToChineseService.streamBreakdown(queryText)
-            
-            for try await chunk in stream {
-                await MainActor.run {
-                    self.breakdownResult += chunk
-                }
-            }
-            
-            await MainActor.run {
-                self.isBreakingDown = false
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = "Breakdown failed: \(error.localizedDescription)"
-                self.isBreakingDown = false
+    private func containsChineseCharacters(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            // Check for CJK Unified Ideographs range
+            if (0x4E00...0x9FFF).contains(scalar.value) ||
+               (0x3400...0x4DBF).contains(scalar.value) ||
+               (0x20000...0x2A6DF).contains(scalar.value) ||
+               (0x2A700...0x2B73F).contains(scalar.value) ||
+               (0x2B740...0x2B81F).contains(scalar.value) ||
+               (0x2B820...0x2CEAF).contains(scalar.value) ||
+               (0x2CEB0...0x2EBEF).contains(scalar.value) ||
+               (0x30000...0x3134F).contains(scalar.value) {
+                return true
             }
         }
+        return false
     }
     
-    func performReverseSnapzify() async {
-        guard !reverseSnapzifyText.isEmpty else { 
-            print("DEBUG: Cannot perform reverse snapzify - no text")
-            return 
+    func performTranslation() async {
+        guard !translateText.isEmpty else {
+            print("DEBUG: Cannot perform translation - no text")
+            return
         }
         guard englishToChineseService.isConfigured() else {
             print("DEBUG: Service not configured")
@@ -1310,42 +1286,132 @@ class HomeViewModel: ObservableObject {
             return
         }
         
-        // Save the query to show as header
-        let queryText = reverseSnapzifyText
-        UserDefaults.standard.set(queryText, forKey: "currentTranslationQuery")
+        let queryText = translateText
+        let isChineseInput = containsChineseCharacters(queryText)
         
-        print("DEBUG: Starting translation for: \(queryText)")
+        // Save the query to show as header
+        UserDefaults.standard.set(queryText, forKey: isChineseInput ? "currentBreakdownQuery" : "currentTranslationQuery")
+        
+        print("DEBUG: Starting \(isChineseInput ? "breakdown" : "translation") for: \(queryText)")
         await MainActor.run {
-            isTranslating = true
+            isProcessingTranslation = true
             translationResult = ""
             // Clear the text field after submit
-            reverseSnapzifyText = ""
+            translateText = ""
         }
         
         do {
-            let stream = englishToChineseService.streamTranslate(queryText)
+            // Choose the appropriate stream based on input language
+            let stream = isChineseInput ? 
+                englishToChineseService.streamBreakdown(queryText) : 
+                englishToChineseService.streamTranslate(queryText)
             
-            print("DEBUG: Starting to read stream")
             for try await chunk in stream {
-                print("DEBUG: Received chunk: \(chunk)")
                 await MainActor.run {
                     self.translationResult += chunk
-                    print("DEBUG: Total result so far: \(self.translationResult)")
                 }
             }
             
-            print("DEBUG: Stream finished")
             await MainActor.run {
-                self.isTranslating = false
+                self.isProcessingTranslation = false
             }
         } catch {
             await MainActor.run {
-                self.errorMessage = "Translation failed: \(error.localizedDescription)"
-                self.isTranslating = false
+                self.errorMessage = "\(isChineseInput ? "Breakdown" : "Translation") failed: \(error.localizedDescription)"
+                self.isProcessingTranslation = false
             }
         }
     }
     
+    // MARK: - Reverse Snapzify
+    
+    func performAsk() async {
+        guard !askText.isEmpty else {
+            print("DEBUG: Cannot perform ask - no text")
+            return
+        }
+        guard englishToChineseService.isConfigured() else {
+            print("DEBUG: Service not configured")
+            await MainActor.run {
+                errorMessage = "OpenAI API key not configured. Please add it in Settings."
+            }
+            return
+        }
+        
+        // Save the query to show as header
+        let queryText = askText
+        UserDefaults.standard.set(queryText, forKey: "currentAskQuery")
+        
+        print("DEBUG: Starting ask for: \(queryText)")
+        await MainActor.run {
+            isAsking = true
+            // Add previous Q&A to history if exists
+            if !askResult.isEmpty {
+                if let previousQ = UserDefaults.standard.string(forKey: "currentAskQuery") {
+                    askHistory.append("Q: \(previousQ)")
+                    askHistory.append("A: \(askResult)")
+                }
+            }
+            askResult = ""
+            // Clear the text field after submit
+            askText = ""
+        }
+        
+        do {
+            let stream = englishToChineseService.streamAskWithHistory(queryText, history: askHistory)
+            
+            for try await chunk in stream {
+                await MainActor.run {
+                    self.askResult += chunk
+                }
+            }
+            
+            await MainActor.run {
+                self.isAsking = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Ask failed: \(error.localizedDescription)"
+                self.isAsking = false
+            }
+        }
+    }
+    
+    func performAskFollowUp() async {
+        guard !askFollowUp.isEmpty else {
+            print("DEBUG: Cannot perform follow-up - no text")
+            return
+        }
+        
+        // Use the follow-up text as the new ask text
+        await MainActor.run {
+            askText = askFollowUp
+            askFollowUp = ""
+        }
+        
+        await performAsk()
+    }
+    
+    // performBreakdown() removed - now handled by performTranslation()
+    
+    func performTranslationFollowUp() async {
+        guard !translationFollowUp.isEmpty else {
+            print("DEBUG: Cannot perform follow-up - no text")
+            return
+        }
+        
+        // Use the follow-up text as the new translation text
+        await MainActor.run {
+            translateText = translationFollowUp
+            translationFollowUp = ""
+        }
+        
+        await performTranslation()
+    }
+    
+    // Removed old functions - performReverseSnapzify and performBreakdown
+    // These are now handled by performTranslation() which automatically detects
+    // whether to translate English or breakdown Chinese
 }
 
 // MARK: - Timeout Utilities

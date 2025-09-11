@@ -237,20 +237,32 @@ struct HomeView: View {
     @ViewBuilder
     private var reverseSnapzifySection: some View {
         ReverseSnapzifyView(
-            text: $vm.reverseSnapzifyText,
+            translateText: $vm.translateText,
             translationResult: $vm.translationResult,
-            isTranslating: vm.isTranslating,
+            translationFollowUp: $vm.translationFollowUp,
+            isProcessing: vm.isProcessingTranslation,
             onTranslate: {
                 Task {
-                    await vm.performReverseSnapzify()
+                    await vm.performTranslation()
                 }
             },
-            breakdownText: $vm.breakdownText,
-            breakdownResult: $vm.breakdownResult,
-            isBreakingDown: vm.isBreakingDown,
-            onBreakdown: {
+            onTranslationFollowUp: {
                 Task {
-                    await vm.performBreakdown()
+                    await vm.performTranslationFollowUp()
+                }
+            },
+            askText: $vm.askText,
+            askResult: $vm.askResult,
+            askFollowUp: $vm.askFollowUp,
+            isAsking: vm.isAsking,
+            onAsk: {
+                Task {
+                    await vm.performAsk()
+                }
+            },
+            onAskFollowUp: {
+                Task {
+                    await vm.performAskFollowUp()
                 }
             }
         )
