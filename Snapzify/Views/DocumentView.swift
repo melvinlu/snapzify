@@ -400,8 +400,10 @@ struct DocumentView: View {
                         extendedSentenceIds: $extendedSentenceIds
                     )
                     .id("\(sentence.id)-\(displaySentences.count)") // Force re-render when sentence or count changes
-                    .position(x: geometry.size.width / 2,
-                             y: min(tapLocation.y + 150, geometry.size.height - 200))
+                    .position(
+                        x: geometry.size.width / 2,
+                        y: geometry.size.height / 2
+                    )
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(100)
                 }

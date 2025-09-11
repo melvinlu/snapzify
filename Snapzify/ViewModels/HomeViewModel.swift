@@ -23,6 +23,7 @@ class HomeViewModel: ObservableObject {
     @Published var translationResult: String = ""
     @Published var translationFollowUp: String = ""
     @Published var translationHistory: [String] = []
+    @Published var isTranslationExpanded: Bool = false
     
     // Ask expert properties
     @Published var askText: String = ""
@@ -30,12 +31,14 @@ class HomeViewModel: ObservableObject {
     @Published var askResult: String = ""
     @Published var askFollowUp: String = ""
     @Published var askHistory: [String] = []
+    @Published var isAskExpanded: Bool = false
     
     // Audio recording properties
     @Published var isRecording: Bool = false
     @Published var isProcessingAudio: Bool = false
     @Published var audioFeedback: String = ""
     @Published var audioFollowUp: String = ""
+    @Published var isAudioExpanded: Bool = false
     private var audioRecorder: AVAudioRecorder?
     private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
     private var recordingURL: URL?
@@ -1267,6 +1270,32 @@ class HomeViewModel: ObservableObject {
         return savedDocument
     }
     
+    // MARK: - Collapse/Expand Methods
+    
+    func collapseAllSections() {
+        isTranslationExpanded = false
+        isAskExpanded = false
+        isAudioExpanded = false
+    }
+    
+    func expandTranslationSection() {
+        isTranslationExpanded = true
+        isAskExpanded = false
+        isAudioExpanded = false
+    }
+    
+    func expandAskSection() {
+        isAskExpanded = true
+        isTranslationExpanded = false
+        isAudioExpanded = false
+    }
+    
+    func expandAudioSection() {
+        isAudioExpanded = true
+        isTranslationExpanded = false
+        isAskExpanded = false
+    }
+    
     // MARK: - Translation/Breakdown
     
     private func containsChineseCharacters(_ text: String) -> Bool {
@@ -1311,6 +1340,7 @@ class HomeViewModel: ObservableObject {
             translationResult = ""
             // Clear the text field after submit
             translateText = ""
+            expandTranslationSection()
         }
         
         do {
@@ -1368,6 +1398,7 @@ class HomeViewModel: ObservableObject {
             askResult = ""
             // Clear the text field after submit
             askText = ""
+            expandAskSection()
         }
         
         do {
@@ -1573,6 +1604,7 @@ class HomeViewModel: ObservableObject {
         await MainActor.run {
             isProcessingAudio = true
             audioFeedback = ""
+            expandAudioSection()
         }
         
         // Process follow-up with context
@@ -1697,6 +1729,7 @@ class HomeViewModel: ObservableObject {
         await MainActor.run {
             isProcessingAudio = true
             audioFeedback = ""
+            expandAudioSection()
         }
         
         do {

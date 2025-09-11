@@ -73,68 +73,102 @@ struct HomeView: View {
                         
                         // Audio feedback section
                 if vm.isProcessingAudio || !vm.audioFeedback.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if vm.isProcessingAudio && vm.audioFeedback.isEmpty {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Processing...")
-                                    .font(.body)
-                                    .foregroundStyle(T.C.ink2)
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Header with collapse button
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                vm.isAudioExpanded.toggle()
                             }
-                        }
-                        
-                        if !vm.audioFeedback.isEmpty {
-                            TappableChineseFeedbackView(feedbackText: vm.audioFeedback)
-                        }
-                        
-                        // Follow-up textbox for audio feedback
-                        if !vm.isProcessingAudio && !vm.audioFeedback.isEmpty {
-                            HStack(spacing: T.S.sm) {
-                                TextField("Follow up...", text: $vm.audioFollowUp)
-                                    .textFieldStyle(.plain)
-                                    .font(.body)
+                        } label: {
+                            HStack {
+                                Text("Voice Feedback")
+                                    .font(.headline)
                                     .foregroundStyle(T.C.ink)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(T.C.card.opacity(0.5))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(T.C.divider, lineWidth: 1)
-                                    )
-                                    .autocorrectionDisabled(true)
-                                    .textInputAutocapitalization(.never)
-                                    .submitLabel(.go)
-                                    .onSubmit {
-                                        if !vm.audioFollowUp.isEmpty {
-                                            Task {
-                                                await vm.performAudioFollowUp()
+                                
+                                Spacer()
+                                
+                                Image(systemName: vm.isAudioExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.caption)
+                                    .foregroundStyle(T.C.ink2)
+                                    .rotationEffect(.degrees(vm.isAudioExpanded ? 0 : -90))
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: vm.isAudioExpanded)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            if vm.isProcessingAudio && vm.audioFeedback.isEmpty {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Processing...")
+                                        .font(.body)
+                                        .foregroundStyle(T.C.ink2)
+                                }
+                                .padding(.horizontal)
+                            }
+                            
+                            if !vm.audioFeedback.isEmpty {
+                                TappableChineseFeedbackView(feedbackText: vm.audioFeedback)
+                                    .padding(.horizontal)
+                            }
+                            
+                            // Follow-up textbox for audio feedback
+                            if !vm.isProcessingAudio && !vm.audioFeedback.isEmpty {
+                                HStack(spacing: T.S.sm) {
+                                    TextField("Follow up...", text: $vm.audioFollowUp)
+                                        .textFieldStyle(.plain)
+                                        .font(.body)
+                                        .foregroundStyle(T.C.ink)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(T.C.card.opacity(0.5))
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(T.C.divider, lineWidth: 1)
+                                        )
+                                        .autocorrectionDisabled(true)
+                                        .textInputAutocapitalization(.never)
+                                        .submitLabel(.go)
+                                        .onSubmit {
+                                            if !vm.audioFollowUp.isEmpty {
+                                                Task {
+                                                    await vm.performAudioFollowUp()
+                                                }
                                             }
                                         }
+                                    
+                                    Button {
+                                        Task {
+                                            await vm.performAudioFollowUp()
+                                        }
+                                    } label: {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.title2)
+                                            .foregroundStyle(
+                                                LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
+                                                             startPoint: .leading, 
+                                                             endPoint: .trailing)
+                                            )
                                     }
-                                
-                                Button {
-                                    Task {
-                                        await vm.performAudioFollowUp()
-                                    }
-                                } label: {
-                                    Image(systemName: "arrow.up.circle.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(
-                                            LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
-                                                         startPoint: .leading, 
-                                                         endPoint: .trailing)
-                                        )
+                                    .disabled(vm.audioFollowUp.isEmpty || vm.isProcessingAudio)
                                 }
-                                .disabled(vm.audioFollowUp.isEmpty || vm.isProcessingAudio)
+                                .padding(.horizontal)
+                                .padding(.top, 8)
                             }
-                            .padding(.top, 8)
                         }
+                        .padding(.bottom)
+                        .frame(maxHeight: vm.isAudioExpanded ? .infinity : 0)
+                        .clipped()
+                        .opacity(vm.isAudioExpanded ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.3), value: vm.isAudioExpanded)
                     }
-                    .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(T.C.card)
@@ -283,11 +317,15 @@ struct HomeView: View {
         }
         .onAppear {
             isVisible = true
+            // Collapse all sections when returning to the view
+            vm.collapseAllSections()
             
             // Shared images and action extension images are checked at app level
         }
         .onDisappear {
             isVisible = false
+            // Collapse all sections when leaving the view
+            vm.collapseAllSections()
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
@@ -344,6 +382,7 @@ struct HomeView: View {
                     await vm.performTranslationFollowUp()
                 }
             },
+            isTranslationExpanded: $vm.isTranslationExpanded,
             askText: $vm.askText,
             askResult: $vm.askResult,
             askFollowUp: $vm.askFollowUp,
@@ -357,7 +396,8 @@ struct HomeView: View {
                 Task {
                     await vm.performAskFollowUp()
                 }
-            }
+            },
+            isAskExpanded: $vm.isAskExpanded
         )
     }
     
