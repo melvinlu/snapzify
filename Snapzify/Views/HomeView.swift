@@ -74,15 +74,15 @@ struct HomeView: View {
                         // Audio feedback section
                 if vm.isProcessingAudio || !vm.audioFeedback.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Pronunciation Feedback")
-                            .font(.headline)
-                            .foregroundStyle(T.C.ink)
-                        
                         if vm.isProcessingAudio && vm.audioFeedback.isEmpty {
-                            Text("Processing your recording...")
+                            Text("Processing...")
                                 .font(.body)
                                 .foregroundStyle(T.C.ink2)
-                        } else {
+                        } else if !vm.audioFeedback.isEmpty {
+                            Text("Feedback")
+                                .font(.headline)
+                                .foregroundStyle(T.C.ink)
+                            
                             Text(vm.audioFeedback)
                                 .font(.body)
                                 .foregroundStyle(T.C.ink)
@@ -257,26 +257,23 @@ struct HomeView: View {
             Button {
                 vm.pickScreenshot()
             } label: {
-                Label("Analyze Chinese text from media", systemImage: "square.and.arrow.down")
+                Label("Analyze", systemImage: "square.and.arrow.down")
                     .foregroundStyle(T.C.ink)
+                    .frame(minWidth: 120)
             }
             .buttonStyle(SecondaryButtonStyle())
             
             Button {
                 vm.startRecording()
             } label: {
-                Image(systemName: vm.isRecording ? "stop.circle.fill" : "mic.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(
-                        vm.isRecording ? 
-                        LinearGradient(colors: [Color.red, Color.red], 
-                                     startPoint: .leading, 
-                                     endPoint: .trailing) :
-                        LinearGradient(colors: [T.C.brandStart, T.C.brandEnd], 
-                                     startPoint: .leading, 
-                                     endPoint: .trailing)
-                    )
+                Label(
+                    vm.isRecording ? "Stop" : "Feedback",
+                    systemImage: vm.isRecording ? "stop.circle" : "mic.circle"
+                )
+                .foregroundStyle(vm.isRecording ? Color.red : T.C.ink)
+                .frame(minWidth: 120)
             }
+            .buttonStyle(SecondaryButtonStyle())
         }
     }
     
