@@ -267,7 +267,7 @@ struct HomeView: View {
                 vm.startRecording()
             } label: {
                 Label(
-                    vm.isRecording ? "Stop" : "Feedback",
+                    vm.isRecording ? "Stop" : "Speak",
                     systemImage: vm.isRecording ? "stop.circle" : "mic.circle"
                 )
                 .foregroundStyle(vm.isRecording ? Color.red : T.C.ink)
