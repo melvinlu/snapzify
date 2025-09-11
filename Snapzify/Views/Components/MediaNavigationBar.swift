@@ -18,21 +18,21 @@ struct MediaNavigationBar: View {
             
             Spacer()
             
-            // Rename button
-            NavigationButton(
-                systemName: "pencil",
-                action: {
-                    newDocumentName = vm.document.customName ?? ""
-                    showingRenameAlert = true
-                }
-            )
+            // Rename button - Removed per user request
+            // NavigationButton(
+            //     systemName: "pencil",
+            //     action: {
+            //         newDocumentName = vm.document.customName ?? ""
+            //         showingRenameAlert = true
+            //     }
+            // )
             
-            // Pin/Save button
-            NavigationButton(
-                systemName: vm.document.isSaved ? "pin.fill" : "pin",
-                foregroundColor: vm.document.isSaved ? T.C.accent : .white,
-                action: { vm.toggleImageSave() }
-            )
+            // Pin/Save button - Removed per user request
+            // NavigationButton(
+            //     systemName: vm.document.isSaved ? "pin.fill" : "pin",
+            //     foregroundColor: vm.document.isSaved ? T.C.accent : .white,
+            //     action: { vm.toggleImageSave() }
+            // )
             
             // Delete button (if from photos)
             if vm.document.assetIdentifier != nil {

@@ -153,7 +153,7 @@ struct ChatGPTContextInputPopup: View {
         
         streamTask = Task {
             do {
-                for try await chunk in chatGPTService.streamBreakdown(chineseText: chineseText) {
+                for try await chunk in chatGPTService.streamBreakdown(chineseText: chineseText, isStandalone: false) {
                     if !Task.isCancelled {
                         await MainActor.run {
                             streamedResponse += chunk
@@ -486,17 +486,17 @@ struct DocumentView: View {
                                 .background(Capsule().fill(Color.black.opacity(0.5)))
                         }
                         
-                        // Rename button
-                        Button {
-                            newDocumentName = vm.document.customName ?? ""
-                            showingRenameAlert = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .foregroundColor(.white)
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(Circle().fill(Color.black.opacity(0.5)))
-                        }
+                        // Rename button - Removed per user request
+                        // Button {
+                        //     newDocumentName = vm.document.customName ?? ""
+                        //     showingRenameAlert = true
+                        // } label: {
+                        //     Image(systemName: "pencil")
+                        //         .foregroundColor(.white)
+                        //         .font(.title2)
+                        //         .frame(width: 44, height: 44)
+                        //         .background(Circle().fill(Color.black.opacity(0.5)))
+                        // }
                         
                         // Transcript button
                         Button {
@@ -513,16 +513,16 @@ struct DocumentView: View {
                                 .background(Circle().fill(Color.black.opacity(0.5)))
                         }
                         
-                        // Pin/Save button
-                        Button {
-                            vm.toggleImageSave()
-                        } label: {
-                            Image(systemName: vm.document.isSaved ? "pin.fill" : "pin")
-                                .foregroundStyle(vm.document.isSaved ? T.C.accent : .white)
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(Circle().fill(Color.black.opacity(0.5)))
-                        }
+                        // Pin/Save button - Removed per user request
+                        // Button {
+                        //     vm.toggleImageSave()
+                        // } label: {
+                        //     Image(systemName: vm.document.isSaved ? "pin.fill" : "pin")
+                        //         .foregroundStyle(vm.document.isSaved ? T.C.accent : .white)
+                        //         .font(.title2)
+                        //         .frame(width: 44, height: 44)
+                        //         .background(Circle().fill(Color.black.opacity(0.5)))
+                        // }
                         
                         // Delete button (if from photos)
                         if vm.document.assetIdentifier != nil {

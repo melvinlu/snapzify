@@ -32,47 +32,54 @@ struct SentencePopup: View {
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     
     var body: some View {
-        VStack(alignment: .leading, spacing: T.S.sm) {
-            // Chinese text
-            Text(sentence.text)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(T.C.ink)
-            
-            // Pinyin
-            if !vm.sentence.pinyin.isEmpty {
-                Text(vm.sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-            } else if !sentence.pinyin.isEmpty {
-                Text(sentence.pinyin.joined(separator: " "))
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-            }
-            
-            // ChatGPT breakdown instead of English translation
-            if isLoadingBreakdown {
-                HStack {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Loading breakdown...")
-                        .font(.system(size: 14))
-                        .foregroundStyle(T.C.ink2)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Chinese text
+                    Text(sentence.text)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(T.C.ink)
+                        .id("top")
+                    
+                    // ChatGPT breakdown instead of English translation
+                    if isLoadingBreakdown {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading breakdown...")
+                                .font(.system(size: 14))
+                                .foregroundStyle(T.C.ink2)
+                        }
+                        .padding(.top, 8)
+                    } else if !chatGPTBreakdown.isEmpty {
+                        Text(chatGPTBreakdown)
+                            .font(.system(size: 14))
+                            .foregroundStyle(T.C.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 8)
+                            .id("breakdown")
+                    }
+                    
+                    // Action buttons
+                    PopupActionButtons(
+                        vm: vm,
+                        showingChatGPTInput: $showingChatGPTInput
+                    )
+                    .padding(.top, T.S.sm)
+                    .id("buttons")
                 }
-            } else if !chatGPTBreakdown.isEmpty {
-                Text(chatGPTBreakdown)
-                    .font(.system(size: 14))
-                    .foregroundStyle(T.C.ink2)
-                    .lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true)
+                .padding(T.S.lg)
             }
-            
-            // Action buttons
-            PopupActionButtons(
-                vm: vm,
-                showingChatGPTInput: $showingChatGPTInput
-            )
+            .frame(maxHeight: 400) // Set a max height for scrollability
+            .onChange(of: chatGPTBreakdown) { newValue in
+                // Auto-scroll to show new content as it streams in
+                if !newValue.isEmpty {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo("buttons", anchor: .bottom)
+                    }
+                }
+            }
         }
-        .padding(T.S.lg)
         .background(
             RoundedRectangle(cornerRadius: Constants.UI.cornerRadius)
                 .fill(T.C.card)

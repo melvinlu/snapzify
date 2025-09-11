@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Feedback Response Model
 struct FeedbackResponse {
@@ -62,11 +63,6 @@ struct TappableChineseFeedbackView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header
-            Text("Feedback")
-                .font(.headline)
-                .foregroundStyle(T.C.ink)
-            
             // Chinese text with tappable characters
             if !parsedResponse.chineseText.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
@@ -74,7 +70,7 @@ struct TappableChineseFeedbackView: View {
                         .font(.caption)
                         .foregroundStyle(T.C.ink2)
                     
-                    TappableChineseTextView(text: parsedResponse.chineseText, fontSize: 24)
+                    TappableChineseTextView(text: parsedResponse.chineseText, fontSize: 22)
                     
                     // Pinyin if available
                     if let pinyin = parsedResponse.pinyin, !pinyin.isEmpty {
@@ -115,7 +111,7 @@ struct TappableChineseFeedbackView: View {
                         .foregroundStyle(T.C.ink2)
                     
                     // Make feedback text tappable too if it contains Chinese
-                    TappableChineseTextView(text: parsedResponse.feedback)
+                    TappableChineseTextView(text: parsedResponse.feedback, fontSize: 18)
                 }
             } else if parsedResponse.chineseText.isEmpty {
                 // Show raw response if parsing failed
@@ -132,13 +128,11 @@ struct TappableChineseTextView: View {
     let text: String
     var fontSize: CGFloat = 18  // Default font size, can be customized
     
+    @State private var showingPopup = false
+    
     var body: some View {
         Button {
-            // Direct deeplink to Pleco with the entire text
-            if let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-               let url = URL(string: "plecoapi://x-callback-url/s?q=\(encodedText)") {
-                UIApplication.shared.open(url)
-            }
+            showingPopup = true
         } label: {
             // Try to render with markdown support
             if let attributedString = try? AttributedString(markdown: text) {
@@ -156,6 +150,29 @@ struct TappableChineseTextView: View {
             }
         }
         .buttonStyle(.plain)
+        .fullScreenCover(isPresented: $showingPopup) {
+            ZStack {
+                // Semi-transparent background that blocks interaction
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        showingPopup = false
+                    }
+                
+                // Popup centered on screen
+                StandaloneChinesePopup(
+                    chineseText: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    isShowing: $showingPopup,
+                    position: CGPoint(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 3)
+                )
+                .transition(.opacity)
+            }
+            .presentationBackground(.clear)
+            .transaction { transaction in
+                transaction.disablesAnimations = true
+            }
+        }
     }
 }
+
 

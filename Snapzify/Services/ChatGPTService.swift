@@ -1,7 +1,7 @@
 import Foundation
 
 protocol ChatGPTService {
-    func streamBreakdown(chineseText: String) -> AsyncThrowingStream<String, Error>
+    func streamBreakdown(chineseText: String, isStandalone: Bool) -> AsyncThrowingStream<String, Error>
     func streamCustomPrompt(chineseText: String, userPrompt: String) -> AsyncThrowingStream<String, Error>
     func streamCharacterAnalysis(character: String, context: String, position: Int) -> AsyncThrowingStream<String, Error>
     func isConfigured() -> Bool
@@ -23,8 +23,25 @@ class ChatGPTServiceImpl: ChatGPTService {
         return true
     }
     
-    func streamBreakdown(chineseText: String) -> AsyncThrowingStream<String, Error> {
-        let prompt = "Translate this Chinese sentence to English: \(chineseText)\n\nProvide only the English translation. Be concise and natural. Do not include pinyin, character breakdowns, or any other analysis. Just the English meaning."
+    func streamBreakdown(chineseText: String, isStandalone: Bool = false) -> AsyncThrowingStream<String, Error> {
+        let prompt: String
+        if isStandalone {
+            // For standalone popup, provide overall meaning followed by character/word breakdown
+            prompt = """
+            Analyze this Chinese text: \(chineseText)
+            
+            First provide the overall English translation.
+            
+            Then provide a character/word breakdown in format:
+            - [Chinese word/character]: [pinyin], [meaning]
+            
+            Group multi-character words together.
+            Be concise and clear. Do not number the sections.
+            """
+        } else {
+            // For document view, just provide translation
+            prompt = "Translate this Chinese sentence to English: \(chineseText)\n\nProvide only the English translation. Be concise and natural. Do not include pinyin, character breakdowns, or any other analysis. Just the English meaning."
+        }
         return streamChatGPT(prompt: prompt)
     }
     

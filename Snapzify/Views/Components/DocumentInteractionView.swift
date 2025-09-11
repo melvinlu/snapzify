@@ -673,7 +673,7 @@ struct SelectedSentencePopup: View {
         breakdownTask = Task {
             do {
                 var isFirstChunk = true
-                for try await chunk in chatGPTService.streamBreakdown(chineseText: concatenatedText) {
+                for try await chunk in chatGPTService.streamBreakdown(chineseText: concatenatedText, isStandalone: false) {
                     if !Task.isCancelled {
                         await MainActor.run {
                             if isFirstChunk {

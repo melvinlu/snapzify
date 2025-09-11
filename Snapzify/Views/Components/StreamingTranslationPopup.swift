@@ -120,49 +120,50 @@ struct StreamingTranslationPopup: View {
                             .id("streaming")
                         } else {
                             // Full formatted display after streaming completes
-                            VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 0) {
                                 // Split content by double newlines to separate translations
                                 let translations = content.components(separatedBy: "\n\n")
+                                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                    .filter { !$0.isEmpty }
                                 
                                 ForEach(Array(translations.enumerated()), id: \.offset) { index, translation in
-                                    if !translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            // Parse each translation block
-                                            let lines = translation.components(separatedBy: "\n")
-                                            ForEach(Array(lines.enumerated()), id: \.offset) { lineIndex, line in
-                                                let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-                                                if !trimmedLine.isEmpty {
-                                                    // Check if this line looks like a Chinese example sentence
-                                                    // (doesn't start with ** and contains Chinese characters)
-                                                    if lineIndex == lines.count - 1 && 
-                                                       !trimmedLine.hasPrefix("**") &&
-                                                       containsChineseCharacters(trimmedLine) {
-                                                        // Make example sentence tappable to open in Pleco
-                                                        Button {
-                                                            openInPleco(text: trimmedLine)
-                                                        } label: {
-                                                            Text(trimmedLine)
-                                                                .font(.body)
-                                                                .fontWeight(.bold)
-                                                                .foregroundStyle(T.C.ink)
-                                                        }
-                                                        .buttonStyle(.plain)
-                                                    } else {
-                                                        // Regular text
-                                                        if let attributedString = try? AttributedString(markdown: line) {
-                                                            Text(attributedString)
-                                                                .font(.body)
-                                                                .foregroundStyle(T.C.ink)
-                                                        } else {
-                                                            Text(line)
-                                                                .font(.body)
-                                                                .foregroundStyle(T.C.ink)
-                                                        }
-                                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        // Parse each translation block
+                                        let lines = translation.components(separatedBy: "\n")
+                                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                                            .filter { !$0.isEmpty }
+                                        
+                                        ForEach(Array(lines.enumerated()), id: \.offset) { lineIndex, trimmedLine in
+                                            // Check if this line looks like a Chinese example sentence
+                                            // (doesn't start with ** and contains Chinese characters)
+                                            if lineIndex == lines.count - 1 && 
+                                               !trimmedLine.hasPrefix("**") &&
+                                               containsChineseCharacters(trimmedLine) {
+                                                // Make example sentence tappable to open in Pleco
+                                                Button {
+                                                    openInPleco(text: trimmedLine)
+                                                } label: {
+                                                    Text(trimmedLine)
+                                                        .font(.body)
+                                                        .fontWeight(.bold)
+                                                        .foregroundStyle(T.C.ink)
+                                                }
+                                                .buttonStyle(.plain)
+                                            } else {
+                                                // Regular text
+                                                if let attributedString = try? AttributedString(markdown: trimmedLine) {
+                                                    Text(attributedString)
+                                                        .font(.body)
+                                                        .foregroundStyle(T.C.ink)
+                                                } else {
+                                                    Text(trimmedLine)
+                                                        .font(.body)
+                                                        .foregroundStyle(T.C.ink)
                                                 }
                                             }
                                         }
                                     }
+                                    .padding(.top, index > 0 ? 12 : 0)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)

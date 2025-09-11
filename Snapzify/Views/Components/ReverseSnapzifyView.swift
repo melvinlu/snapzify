@@ -41,16 +41,7 @@ struct ReverseSnapzifyView: View {
         return false
     }
     
-    private func openInPleco(text: String) {
-        guard let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "plecoapi://x-callback-url/s?q=\(encodedText)") else {
-            return
-        }
-        
-        if UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url)
-        }
-    }
+    // Removed openInPleco - now using TappableChineseTextView with sentence popup
     
     var body: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
@@ -142,14 +133,10 @@ struct ReverseSnapzifyView: View {
                                 return false
                             }
                             
-                            Button {
-                                openInPleco(text: chineseOnly.isEmpty ? currentBreakdown : chineseOnly)
-                            } label: {
-                                Text(currentBreakdown)
-                                    .font(.headline)
-                                    .foregroundStyle(T.C.ink)
-                            }
-                            .buttonStyle(.plain)
+                            TappableChineseTextView(
+                                text: chineseOnly.isEmpty ? currentBreakdown : chineseOnly,
+                                fontSize: 20
+                            )
                         }
                         
                         if isProcessing && translationResult.isEmpty {
@@ -171,22 +158,10 @@ struct ReverseSnapzifyView: View {
                                             .first?
                                             .trimmingCharacters(in: .whitespaces) ?? trimmedLine
                                         
-                                        Button {
-                                            openInPleco(text: cleanedLine)
-                                        } label: {
-                                            if let attributedString = try? AttributedString(markdown: line) {
-                                                Text(attributedString)
-                                                    .font(.body)
-                                                    .foregroundStyle(T.C.ink)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                            } else {
-                                                Text(line)
-                                                    .font(.body)
-                                                    .foregroundStyle(T.C.ink)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                            }
-                                        }
-                                        .buttonStyle(.plain)
+                                        TappableChineseTextView(
+                                            text: cleanedLine,
+                                            fontSize: 18
+                                        )
                                     }
                                     // Check for lines with bullet points (character breakdowns)
                                     else if trimmedLine.contains("•") && containsChineseCharacters(trimmedLine) {
@@ -206,14 +181,10 @@ struct ReverseSnapzifyView: View {
                                                         return false
                                                     }
                                                     
-                                                    Button {
-                                                        openInPleco(text: chineseOnly.isEmpty ? component : chineseOnly)
-                                                    } label: {
-                                                        Text(component)
-                                                            .font(.body)
-                                                            .foregroundStyle(T.C.ink)
-                                                    }
-                                                    .buttonStyle(.plain)
+                                                    TappableChineseTextView(
+                                                        text: chineseOnly.isEmpty ? component : chineseOnly,
+                                                        fontSize: 18
+                                                    )
                                                     
                                                     if compIndex < components.count - 1 {
                                                         Text(" • ")
@@ -237,15 +208,10 @@ struct ReverseSnapzifyView: View {
                                     }
                                     // Chinese sentences or overall meanings
                                     else if containsChineseCharacters(trimmedLine) {
-                                        Button {
-                                            openInPleco(text: trimmedLine)
-                                        } label: {
-                                            Text(trimmedLine)
-                                                .font(.body)
-                                                .foregroundStyle(T.C.ink)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                        .buttonStyle(.plain)
+                                        TappableChineseTextView(
+                                            text: trimmedLine,
+                                            fontSize: 18
+                                        )
                                     } else {
                                         // Regular text
                                         if let attributedString = try? AttributedString(markdown: line) {
@@ -425,15 +391,10 @@ struct ReverseSnapzifyView: View {
                                             return false
                                         }
                                         
-                                        Button {
-                                            openInPleco(text: chineseOnly.isEmpty ? trimmedLine : chineseOnly)
-                                        } label: {
-                                            Text(line)
-                                                .font(.body)
-                                                .foregroundStyle(T.C.ink)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                        .buttonStyle(.plain)
+                                        TappableChineseTextView(
+                                            text: chineseOnly.isEmpty ? trimmedLine : chineseOnly,
+                                            fontSize: 18
+                                        )
                                     } else {
                                         Text(line)
                                             .font(.body)
