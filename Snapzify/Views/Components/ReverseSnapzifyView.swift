@@ -19,6 +19,11 @@ struct ReverseSnapzifyView: View {
     let onAskFollowUp: () -> Void
     @Binding var isAskExpanded: Bool
     
+    // Audio recording for Ask
+    let isRecordingForAsk: Bool
+    let onStartRecordingForAsk: () -> Void
+    let onStopRecordingForAsk: () -> Void
+    
     @FocusState private var isTranslateFieldFocused: Bool
     @FocusState private var isAskFieldFocused: Bool
     @FocusState private var isTranslationFollowUpFieldFocused: Bool
@@ -319,6 +324,27 @@ struct ReverseSnapzifyView: View {
                         }
                     }
                 
+                // Microphone button for voice input
+                Button {
+                    if isRecordingForAsk {
+                        onStopRecordingForAsk()
+                    } else {
+                        onStartRecordingForAsk()
+                    }
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .font(.title2)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: isRecordingForAsk ? [Color.red, Color.red] : [T.C.brandStart, T.C.brandEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+                .disabled(isAsking)
+                
+                // Submit button
                 Button {
                     isAskFieldFocused = false
                     onAsk()

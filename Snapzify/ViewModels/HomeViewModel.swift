@@ -39,7 +39,10 @@ class HomeViewModel: ObservableObject {
     @Published var audioFeedback: String = ""
     @Published var audioFollowUp: String = ""
     @Published var isAudioExpanded: Bool = false
+    @Published var isRecordingForAsk: Bool = false
+    @Published var isProcessingAskAudio: Bool = false
     private var audioRecorder: AVAudioRecorder?
+    private var askAudioRecorder: AVAudioRecorder?
     private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
     private var recordingURL: URL?
     private var pronunciationHistory: [String] = [] // Track conversation history for context
@@ -1878,6 +1881,98 @@ class HomeViewModel: ObservableObject {
     // Removed old functions - performReverseSnapzify and performBreakdown
     // These are now handled by performTranslation() which automatically detects
     // whether to translate English or breakdown Chinese
+    
+    // MARK: - Audio Recording for Ask
+    
+    func startRecordingForAsk() {
+        if isRecordingForAsk {
+            stopRecordingForAsk()
+        } else {
+            requestMicrophonePermission { [weak self] granted in
+                if granted {
+                    Task { @MainActor in
+                        self?.beginRecordingForAsk()
+                    }
+                }
+            }
+        }
+    }
+    
+    func stopRecordingForAsk() {
+        guard isRecordingForAsk else { return }
+        
+        askAudioRecorder?.stop()
+        isRecordingForAsk = false
+        
+        if let url = recordingURL {
+            print("DEBUG: Stopped recording for ask, file at: \(url)")
+            Task {
+                await processAskRecording(url: url)
+            }
+        }
+    }
+    
+    private func beginRecordingForAsk() {
+        do {
+            // Configure audio session
+            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setActive(true)
+            
+            // Create recording URL
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            recordingURL = documentsPath.appendingPathComponent("ask_recording_\(Date().timeIntervalSince1970).m4a")
+            
+            // Configure recorder
+            let settings = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 12000,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+            
+            askAudioRecorder = try AVAudioRecorder(url: recordingURL!, settings: settings)
+            askAudioRecorder?.delegate = nil
+            askAudioRecorder?.record()
+            
+            isRecordingForAsk = true
+            print("DEBUG: Started recording for ask to \(recordingURL!)")
+        } catch {
+            print("DEBUG: Failed to start recording for ask: \(error)")
+            errorMessage = "Failed to start recording: \(error.localizedDescription)"
+        }
+    }
+    
+    private func processAskRecording(url: URL) async {
+        await MainActor.run {
+            isProcessingAskAudio = true
+            askText = "Transcribing..."
+        }
+        
+        do {
+            // Transcribe the audio
+            let transcription = try await transcribeAudio(url: url)
+            
+            await MainActor.run {
+                // Set the transcribed text as the ask input
+                askText = transcription
+                isProcessingAskAudio = false
+                
+                // Automatically submit the question
+                Task {
+                    await performAsk()
+                }
+            }
+            
+            // Clean up the recording file
+            try? FileManager.default.removeItem(at: url)
+        } catch {
+            await MainActor.run {
+                askText = ""
+                errorMessage = "Failed to transcribe audio: \(error.localizedDescription)"
+                isProcessingAskAudio = false
+            }
+        }
+    }
 }
 
 // MARK: - Timeout Utilities

@@ -94,7 +94,7 @@ class ChatGPTServiceImpl: ChatGPTService {
                     let payload: [String: Any] = [
                         "model": "gpt-4o-mini",
                         "messages": [
-                            ["role": "system", "content": "You are a helpful Chinese language tutor. Provide clear, concise explanations of Chinese text, breaking down meanings, grammar, and cultural context as needed."],
+                            ["role": "system", "content": "You are a helpful Chinese language tutor. Always use simplified Chinese characters (简体字) in your responses, never traditional Chinese (繁體字). Provide clear, concise explanations of Chinese text, breaking down meanings, grammar, and cultural context as needed."],
                             ["role": "user", "content": prompt]
                         ],
                         "temperature": 0.7,

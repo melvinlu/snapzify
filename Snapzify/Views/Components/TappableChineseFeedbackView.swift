@@ -70,7 +70,7 @@ struct TappableChineseFeedbackView: View {
                         .font(.caption)
                         .foregroundStyle(T.C.ink2)
                     
-                    TappableChineseTextView(text: parsedResponse.chineseText, fontSize: 22)
+                    TappableChineseTextView(text: parsedResponse.chineseText, fontSize: 18)
                     
                     // Pinyin if available
                     if let pinyin = parsedResponse.pinyin, !pinyin.isEmpty {

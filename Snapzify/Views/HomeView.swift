@@ -81,7 +81,7 @@ struct HomeView: View {
                             }
                         } label: {
                             HStack {
-                                Text("Voice Feedback")
+                                Text("Feedback")
                                     .font(.headline)
                                     .foregroundStyle(T.C.ink)
                                 
@@ -397,7 +397,14 @@ struct HomeView: View {
                     await vm.performAskFollowUp()
                 }
             },
-            isAskExpanded: $vm.isAskExpanded
+            isAskExpanded: $vm.isAskExpanded,
+            isRecordingForAsk: vm.isRecordingForAsk,
+            onStartRecordingForAsk: {
+                vm.startRecordingForAsk()
+            },
+            onStopRecordingForAsk: {
+                vm.stopRecordingForAsk()
+            }
         )
     }
     

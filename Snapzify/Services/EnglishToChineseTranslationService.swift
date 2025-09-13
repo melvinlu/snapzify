@@ -107,7 +107,8 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     You are a native Chinese language expert with deep knowledge of Chinese language, culture, idioms, and colloquial expressions.
                     
                     Answer questions about Chinese language and culture in a helpful, clear, and concise manner.
-                    Provide examples when helpful, using Chinese characters with pinyin when relevant.
+                    ALWAYS use simplified Chinese characters (简体字) in your responses, never traditional Chinese (繁體字).
+                    Provide examples when helpful, using simplified Chinese characters with pinyin when relevant.
                     Be direct and practical in your responses.
                     
                     No headers, labels, or unnecessary formatting. Just provide clear, helpful answers.
@@ -192,7 +193,8 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     You are a native Chinese language expert with deep knowledge of Chinese language, culture, idioms, and colloquial expressions.
                     
                     Answer questions about Chinese language and culture in a helpful, clear, and concise manner.
-                    Provide examples when helpful, using Chinese characters with pinyin when relevant.
+                    ALWAYS use simplified Chinese characters (简体字) in your responses, never traditional Chinese (繁體字).
+                    Provide examples when helpful, using simplified Chinese characters with pinyin when relevant.
                     Be direct and practical in your responses.
                     
                     No headers, labels, or unnecessary formatting. Just provide clear, helpful answers.
@@ -262,12 +264,12 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     You are a native Chinese speaker and language teacher. You're listening to someone practicing Chinese.
                     
                     Format your response EXACTLY as follows:
-                    Chinese: [The Chinese characters that were spoken]
+                    Chinese: [The simplified Chinese characters (简体字) that were spoken]
                     Pinyin: [The pinyin with tone marks]
                     English: [The English translation]
-                    Feedback: [用中文评价语法和表达的自然程度。只评论语法是否正确、表达是否自然地道，不要评论发音。]
+                    Feedback: [用简体中文评价语法和表达的自然程度。只评论语法是否正确、表达是否自然地道，不要评论发音。]
                     
-                    The feedback MUST be in Chinese and focus ONLY on:
+                    The feedback MUST be in simplified Chinese and focus ONLY on:
                     - 语法是否正确 (grammatical correctness)
                     - 表达是否自然 (naturalness of expression)
                     - 用词是否地道 (idiomatic usage)
@@ -518,8 +520,9 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     
                     let systemPrompt = """
-                    You are a professional English-to-Chinese translator specializing in colloquial and everyday language. For the given English word or phrase, provide Chinese translations that are commonly used in casual conversation and daily life.
+                    You are a professional English-to-Chinese translator specializing in colloquial and everyday language. For the given English word or phrase, provide simplified Chinese (简体字) translations that are commonly used in casual conversation and daily life.
                     
+                    ALWAYS use simplified Chinese characters (简体字), never traditional Chinese (繁體字).
                     PRIORITIZE colloquial usage over formal or literary translations. Rank translations by how frequently they appear in everyday spoken Chinese, with the most colloquial and commonly used translation first.
                     
                     DO NOT include any header, introduction, brackets, or horizontal rules. Start directly with the translations.
