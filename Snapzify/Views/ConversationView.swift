@@ -63,6 +63,28 @@ struct ConversationView: View {
                                 .cornerRadius(8)
                         }
                         .disabled(!viewModel.canStartConversation)
+
+                        // Resume previous chat button (if available)
+                        if viewModel.hasPreviousSession {
+                            Button {
+                                viewModel.resumePreviousSession()
+                                focusedField = nil
+                            } label: {
+                                Text("Resume")
+                                    .font(.headline)
+                                    .foregroundStyle(T.C.ink)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(T.C.card)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(T.C.divider, lineWidth: 1)
+                                    )
+                            }
+                        }
             }
             .padding(20)
         }
@@ -82,9 +104,9 @@ struct ConversationView: View {
                                         .environmentObject(viewModel)
                                         .id(message.id)
                                         .environment(\.openURL, OpenURLAction { url in
-                                            if url.scheme == "chinese",
-                                               let text = url.host?.removingPercentEncoding {
-                                                viewModel.selectChineseText(text)
+                                            if url.scheme == "chinese" {
+                                                // Show the entire message content when any Chinese text is tapped
+                                                viewModel.selectChineseText(message.content)
                                                 return .handled
                                             }
                                             return .systemAction
@@ -199,17 +221,13 @@ struct ConversationView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if viewModel.isConversationActive {
-                        Button("Close") {
-                            viewModel.endConversation()
+                    Button("Close") {
+                        if viewModel.isConversationActive {
+                            viewModel.saveCurrentSession()
                         }
-                        .foregroundStyle(T.C.ink)
-                    } else {
-                        Button("Close") {
-                            dismiss()
-                        }
-                        .foregroundStyle(T.C.ink)
+                        dismiss()
                     }
+                    .foregroundStyle(T.C.ink)
                 }
             }
         }
@@ -258,55 +276,32 @@ struct MessageBubble: View {
                     .font(.caption)
                     .foregroundStyle(T.C.ink2)
 
-                if message.chineseSegments.isEmpty {
-                    Text(message.content)
-                        .font(.body)
-                        .foregroundStyle(message.isUser ? .white : T.C.ink)
-                        .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(
-                                    message.isUser
-                                        ? LinearGradient(
-                                            colors: [T.C.brandStart, T.C.brandEnd],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                        : LinearGradient(
-                                            colors: [T.C.card, T.C.card],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
+                // All messages with tappable Chinese segments
+                InteractiveTextView(
+                    content: message.content,
+                    chineseSegments: message.chineseSegments,
+                    isUser: message.isUser,
+                    onChineseTap: { _ in
+                        // This callback is not used since we handle taps via openURL
+                    }
+                )
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            message.isUser
+                                ? LinearGradient(
+                                    colors: [T.C.brandStart, T.C.brandEnd],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                : LinearGradient(
+                                    colors: [T.C.card, T.C.card],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
                         )
-                } else {
-                    // Message with tappable Chinese segments
-                    InteractiveTextView(
-                        content: message.content,
-                        chineseSegments: message.chineseSegments,
-                        isUser: message.isUser,
-                        onChineseTap: { text in
-                            viewModel.selectChineseText(text)
-                        }
-                    )
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                message.isUser
-                                    ? LinearGradient(
-                                        colors: [T.C.brandStart, T.C.brandEnd],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                    : LinearGradient(
-                                        colors: [T.C.card, T.C.card],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                            )
-                    )
-                }
+                )
             }
 
             if !message.isUser {

@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 import AVFoundation
 
-struct ConversationMessage: Identifiable {
+struct ConversationMessage: Identifiable, Codable {
     let id = UUID()
     let content: String
     let isUser: Bool
@@ -10,17 +10,30 @@ struct ConversationMessage: Identifiable {
     var chineseSegments: [ChineseTextSegment] = []
 }
 
-struct ChineseTextSegment: Identifiable {
+struct ChineseTextSegment: Identifiable, Codable {
     let id = UUID()
     let text: String
-    let range: Range<String.Index>
+    let rangeStart: Int
+    let rangeEnd: Int
+
+    init(text: String, range: Range<String.Index>, in fullText: String) {
+        self.text = text
+        self.rangeStart = fullText.distance(from: fullText.startIndex, to: range.lowerBound)
+        self.rangeEnd = fullText.distance(from: fullText.startIndex, to: range.upperBound)
+    }
+}
+
+struct SessionData: Codable {
+    let scenario: String
+    let messages: [ConversationMessage]
+    let timestamp: Date
 }
 
 @MainActor
 class ConversationViewModel: ObservableObject {
     // Setup fields
     @Published var scenario: String = ""
-    
+
     // Conversation state
     @Published var isConversationActive = false
     @Published var messages: [ConversationMessage] = []
@@ -28,6 +41,7 @@ class ConversationViewModel: ObservableObject {
     @Published var isProcessing = false
     @Published var isGeneratingAudio = false
     @Published var showInfo = false
+    @Published var hasPreviousSession = false
     
     // Services
     private let translationService: EnglishToChineseTranslationService
@@ -56,6 +70,9 @@ class ConversationViewModel: ObservableObject {
             configService: ServiceContainer.shared.configService
         )
         // Don't setup audio session here - defer until needed
+
+        // Check if there's a previous session
+        loadPreviousSessionIfExists()
     }
 
     private func setupAudioSession() {
@@ -136,15 +153,17 @@ class ConversationViewModel: ObservableObject {
     
     func sendMessage() {
         guard !userInput.isEmpty, !isProcessing else { return }
-        
+
         let userMessage = userInput
         userInput = ""
-        
-        // Add user message
-        let message = ConversationMessage(
+
+        // Add user message with Chinese segments detected
+        let segments = detectChineseSegments(in: userMessage)
+        var message = ConversationMessage(
             content: userMessage,
             isUser: true
         )
+        message.chineseSegments = segments
         messages.append(message)
         
         // Process AI response
@@ -200,14 +219,64 @@ class ConversationViewModel: ObservableObject {
     }
     
     func endConversation() {
+        // Save current session before ending
+        if !messages.isEmpty {
+            saveSession()
+        }
+
         conversationTask?.cancel()
         isConversationActive = false
         isProcessing = false
-        
+
         // Reset for next conversation
         scenario = ""
         userInput = ""
         messages = []
+    }
+
+    // MARK: - Session Persistence
+
+    func saveCurrentSession() {
+        if !messages.isEmpty {
+            saveSession()
+        }
+    }
+
+    private func saveSession() {
+        let sessionData = SessionData(
+            scenario: scenario,
+            messages: messages,
+            timestamp: Date()
+        )
+
+        if let encoded = try? JSONEncoder().encode(sessionData) {
+            UserDefaults.standard.set(encoded, forKey: "lastConversationSession")
+            hasPreviousSession = true
+        }
+    }
+
+    private func loadPreviousSessionIfExists() {
+        if let data = UserDefaults.standard.data(forKey: "lastConversationSession"),
+           let session = try? JSONDecoder().decode(SessionData.self, from: data) {
+            hasPreviousSession = true
+        } else {
+            hasPreviousSession = false
+        }
+    }
+
+    func resumePreviousSession() {
+        guard let data = UserDefaults.standard.data(forKey: "lastConversationSession"),
+              let session = try? JSONDecoder().decode(SessionData.self, from: data) else {
+            return
+        }
+
+        // Restore the session
+        scenario = session.scenario
+        messages = session.messages
+        isConversationActive = true
+
+        // Setup audio session when resuming
+        setupAudioSession()
     }
     
     // MARK: - TTS Functions
@@ -260,7 +329,7 @@ class ConversationViewModel: ObservableObject {
             for match in matches {
                 if let range = Range(match.range, in: text) {
                     let chineseText = String(text[range])
-                    segments.append(ChineseTextSegment(text: chineseText, range: range))
+                    segments.append(ChineseTextSegment(text: chineseText, range: range, in: text))
                 }
             }
         } catch {
