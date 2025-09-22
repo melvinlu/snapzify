@@ -157,19 +157,29 @@ struct ConversationView: View {
                         .disabled(viewModel.isProcessing)
 
                         Button {
-                            viewModel.sendMessage()
+                            if viewModel.isRecording {
+                                viewModel.toggleRecording()
+                            } else {
+                                viewModel.sendMessage()
+                            }
                         } label: {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.title)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [T.C.brandStart, T.C.brandEnd],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                            if viewModel.isRecording {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title)
+                                    .foregroundStyle(Color.red)
+                            } else {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.title)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [T.C.brandStart, T.C.brandEnd],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
-                                )
+                            }
                         }
-                        .disabled(viewModel.userInput.isEmpty || viewModel.isProcessing)
+                        .disabled(!viewModel.isRecording && (viewModel.userInput.isEmpty || viewModel.isProcessing))
                     }
                     .padding()
                     .background(T.C.bg)
