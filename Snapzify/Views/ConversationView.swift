@@ -5,40 +5,43 @@ struct ConversationView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = ConversationViewModel()
     @FocusState private var focusedField: Field?
-    
+
     enum Field: Hashable {
         case scenario, userInput
     }
     
-    var body: some View {
-        NavigationStack {
-            Group {
-                if !viewModel.isConversationActive {
-                // Setup screen
-                ScrollView {
-                    VStack(alignment: .leading, spacing: T.S.lg) {
-                        // Scenario field
-                        VStack(alignment: .leading, spacing: T.S.xs) {
-                            Text("Scenario")
-                                .font(.headline)
-                                .foregroundStyle(T.C.ink)
-                            
-                            TextField("e.g., Ordering boba", text: $viewModel.scenario)
-                                .textFieldStyle(.plain)
-                                .font(.body)
-                                .foregroundStyle(T.C.ink)
-                                .padding(12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(T.C.card)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(T.C.divider, lineWidth: 1)
-                                )
-                                .focused($focusedField, equals: .scenario)
-                            
+    @ViewBuilder
+    private var setupView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: T.S.lg) {
+                // Scenario field
+                VStack(alignment: .leading, spacing: T.S.xs) {
+                    Text("Scenario")
+                        .font(.headline)
+                        .foregroundStyle(T.C.ink)
+
+                    TextField("e.g., Ordering boba", text: $viewModel.scenario)
+                        .textFieldStyle(.plain)
+                        .font(.body)
+                        .foregroundStyle(T.C.ink)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(T.C.card)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(T.C.divider, lineWidth: 1)
+                        )
+                        .focused($focusedField, equals: .scenario)
+                        .onAppear {
+                            // Auto-focus when view appears
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                focusedField = .scenario
+                            }
                         }
+
+                }
                         
                         // Start button
                         Button {
@@ -60,11 +63,14 @@ struct ConversationView: View {
                                 .cornerRadius(8)
                         }
                         .disabled(!viewModel.canStartConversation)
-                    }
-                    .padding(20)
-                }
-                .scrollIndicators(.hidden)
-            } else {
+            }
+            .padding(20)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    @ViewBuilder
+    private var conversationView: some View {
                 // Active conversation screen
                 VStack(spacing: 0) {
                     // Messages list
@@ -85,11 +91,11 @@ struct ConversationView: View {
                                         })
                                 }
                                 
-                                if viewModel.isProcessing {
+                                if viewModel.isProcessing || viewModel.isGeneratingAudio {
                                     HStack {
                                         ProgressView()
                                             .scaleEffect(0.8)
-                                        Text("Snap is thinking...")
+                                        Text(viewModel.isGeneratingAudio ? "Generating audio..." : "Snap is thinking...")
                                             .font(.caption)
                                             .foregroundStyle(T.C.ink2)
                                     }
@@ -108,28 +114,6 @@ struct ConversationView: View {
                     
                     // Input bar
                     HStack(spacing: T.S.sm) {
-                        // Mic button
-                        Button {
-                            viewModel.toggleRecording()
-                        } label: {
-                            Image(systemName: viewModel.isRecording ? "mic.fill" : "mic")
-                                .font(.title2)
-                                .foregroundStyle(
-                                    viewModel.isRecording
-                                        ? LinearGradient(
-                                            colors: [T.C.brandStart, T.C.brandEnd],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                        : LinearGradient(
-                                            colors: [T.C.ink2, T.C.ink2],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                )
-                        }
-                        .disabled(viewModel.isProcessing)
-
                         TextField("Your response...", text: $viewModel.userInput)
                             .textFieldStyle(.plain)
                             .font(.body)
@@ -150,6 +134,28 @@ struct ConversationView: View {
                                 }
                             }
 
+                        // Mic button
+                        Button {
+                            viewModel.toggleRecording()
+                        } label: {
+                            if viewModel.isRecording {
+                                Image(systemName: "stop.circle.fill")
+                                    .font(.title)
+                                    .foregroundStyle(Color.red)
+                            } else {
+                                Image(systemName: "mic.circle.fill")
+                                    .font(.title)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [T.C.brandStart, T.C.brandEnd],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            }
+                        }
+                        .disabled(viewModel.isProcessing)
+
                         Button {
                             viewModel.sendMessage()
                         } label: {
@@ -167,29 +173,32 @@ struct ConversationView: View {
                     }
                     .padding()
                     .background(T.C.bg)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if !viewModel.isConversationActive {
+                    setupView
+                } else {
+                    conversationView
                 }
-            }
             }
             .navigationTitle(viewModel.isConversationActive ? viewModel.scenario : "Conversation Setup")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if !viewModel.isConversationActive {
+                    if viewModel.isConversationActive {
+                        Button("Close") {
+                            viewModel.endConversation()
+                        }
+                        .foregroundStyle(T.C.ink)
+                    } else {
                         Button("Close") {
                             dismiss()
                         }
                         .foregroundStyle(T.C.ink)
-                    }
-                }
-
-                if viewModel.isConversationActive {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            viewModel.endConversation()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.red)
-                        }
                     }
                 }
             }
@@ -317,10 +326,7 @@ struct InteractiveTextView: View {
 
         for segment in chineseSegments {
             if let range = attributedString.range(of: segment.text) {
-                attributedString[range].underlineStyle = .single
-                attributedString[range].underlineColor = isUser ? UIColor.white.withAlphaComponent(0.6) : UIColor(T.C.brandStart)
-
-                // Create a link attribute for tap handling
+                // Create a link attribute for tap handling (without underline)
                 attributedString[range].link = URL(string: "chinese://\(segment.text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
             }
         }

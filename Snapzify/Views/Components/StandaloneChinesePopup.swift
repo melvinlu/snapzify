@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // MARK: - Standalone Chinese Popup
 // Reusable popup component for displaying Chinese text with full interaction capabilities
@@ -20,6 +21,8 @@ struct StandaloneChinesePopup: View {
     @State private var isPlaying = false
     @State private var isGeneratingAudio = false
     @State private var audioAsset: AudioAsset?
+    @State private var audioPlayer: AVAudioPlayer?
+    @State private var audioPlayerDelegate: AudioPlayerDelegate?
     
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     private let ttsService = ServiceContainer.shared.ttsService
@@ -215,7 +218,9 @@ struct StandaloneChinesePopup: View {
             showAllBreakdowns = false
             isLoadingAllBreakdowns = false
             
-            // Audio cleanup handled automatically when view disappears
+            // Audio cleanup
+            audioPlayer?.stop()
+            audioPlayer = nil
             isPlaying = false
         }
     }
@@ -248,7 +253,8 @@ struct StandaloneChinesePopup: View {
     
     private func playOrPauseAudio() {
         if isPlaying {
-            // Can't pause with current TTSService protocol, just stop
+            // Stop playing
+            audioPlayer?.stop()
             isPlaying = false
         } else {
             if audioAsset != nil {
@@ -263,45 +269,90 @@ struct StandaloneChinesePopup: View {
     
     private func playAudio() {
         guard let audioAsset = audioAsset else { return }
-        
-        isPlaying = true
-        
-        Task {
-            do {
-                // TTSService doesn't have a play method in current protocol
-                // Would need to handle audio playback differently
-                // For now, just simulate playback
-                await MainActor.run {
-                    // Simulate audio playing for 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        isPlaying = false
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    isPlaying = false
+
+        do {
+            // Configure audio session for playback
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playback, mode: .default, options: [])
+            try audioSession.setActive(true)
+
+            // Create audio player
+            audioPlayer = try AVAudioPlayer(contentsOf: audioAsset.fileURL)
+            audioPlayer?.volume = 1.0
+
+            // Create and set delegate
+            audioPlayerDelegate = AudioPlayerDelegate {
+                DispatchQueue.main.async { [self] in
+                    self.isPlaying = false
+                    self.audioPlayer = nil
+                    self.audioPlayerDelegate = nil
                 }
             }
+            audioPlayer?.delegate = audioPlayerDelegate
+
+            // Prepare and play
+            audioPlayer?.prepareToPlay()
+            if audioPlayer?.play() == true {
+                isPlaying = true
+            } else {
+                print("Failed to start audio playback")
+                isPlaying = false
+                audioPlayer = nil
+                audioPlayerDelegate = nil
+            }
+        } catch {
+            print("Failed to create audio player: \(error)")
+            isPlaying = false
         }
     }
     
     private func generateAndPlayAudio() {
         guard ttsService.isConfigured() else { return }
-        
+
         isGeneratingAudio = true
-        
+
         Task {
             do {
                 // Determine script from the Chinese text
                 let script: ChineseScript = .simplified // Default to simplified
                 let asset = try await ttsService.generateAudio(for: chineseText, script: script)
-                self.audioAsset = asset
-                
+
                 await MainActor.run {
+                    self.audioAsset = asset
                     isGeneratingAudio = false
-                    // Simulate playing
-                    isPlaying = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+
+                    // Play the audio
+                    do {
+                        // Configure audio session for playback
+                        let audioSession = AVAudioSession.sharedInstance()
+                        try audioSession.setCategory(.playback, mode: .default, options: [])
+                        try audioSession.setActive(true)
+
+                        self.audioPlayer = try AVAudioPlayer(contentsOf: asset.fileURL)
+                        self.audioPlayer?.volume = 1.0
+
+                        // Create and set delegate
+                        self.audioPlayerDelegate = AudioPlayerDelegate {
+                            DispatchQueue.main.async { [self] in
+                                self.isPlaying = false
+                                self.audioPlayer = nil
+                                self.audioPlayerDelegate = nil
+                            }
+                        }
+                        self.audioPlayer?.delegate = self.audioPlayerDelegate
+
+                        // Prepare and play
+                        self.audioPlayer?.prepareToPlay()
+                        if self.audioPlayer?.play() == true {
+                            self.isPlaying = true
+                        } else {
+                            print("Failed to start audio playback")
+                            self.isPlaying = false
+                            self.audioPlayer = nil
+                            self.audioPlayerDelegate = nil
+                        }
+                    } catch {
+                        print("Failed to create audio player: \(error)")
                         isPlaying = false
                     }
                 }
@@ -496,6 +547,20 @@ struct StandaloneChinesePopup: View {
 }
 
 // MARK: - Standalone Popup Button Style
+// MARK: - Audio Player Delegate
+private class AudioPlayerDelegate: NSObject, AVAudioPlayerDelegate {
+    let onFinish: () -> Void
+
+    init(onFinish: @escaping () -> Void) {
+        self.onFinish = onFinish
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        onFinish()
+    }
+}
+
+// MARK: - Button Style
 private struct StandalonePopupButtonStyle: ButtonStyle {
     var isActive: Bool = false
     
