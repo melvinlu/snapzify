@@ -43,6 +43,7 @@ protocol EnglishToChineseTranslationService {
     func streamAskWithHistory(_ question: String, history: [String]) -> AsyncThrowingStream<String, Error>
     func streamPronunciationFeedback(_ transcription: String) -> AsyncThrowingStream<String, Error>
     func streamPronunciationFeedbackWithContext(_ transcription: String, previousFeedback: [String]) -> AsyncThrowingStream<String, Error>
+    func streamConversation(scenario: String, messages: [(String, String)], userMessage: String) -> AsyncThrowingStream<String, Error>
     func isConfigured() -> Bool
     func clearCache()
 }
@@ -798,6 +799,93 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
         if let diskCache = diskCache {
             try? FileManager.default.removeItem(at: diskCache)
             try? FileManager.default.createDirectory(at: diskCache, withIntermediateDirectories: true)
+        }
+    }
+    
+    func streamConversation(scenario: String, messages: [(String, String)], userMessage: String) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    guard isConfigured() else {
+                        throw EnglishChineseTranslationError.notConfigured
+                    }
+                    
+                    guard let key = configService.openAIKey,
+                          let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+                        throw EnglishChineseTranslationError.invalidConfiguration
+                    }
+                    
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    
+                    let systemPrompt = """
+                    You are role-playing a conversation in Chinese for this scenario: \(scenario)
+                    
+                    CRITICAL INSTRUCTIONS:
+                    1. You MUST respond entirely in simplified Chinese (简体字)
+                    2. Stay in character for the given scenario
+                    3. Make the conversation natural and realistic
+                    4. Use appropriate vocabulary and expressions for the context
+                    5. Keep responses conversational and appropriately sized
+                    6. Be encouraging and helpful to practice Chinese, but maintain the role-play
+                    
+                    Remember: You are the OTHER person in this conversation scenario, not a teacher or assistant.
+                    Respond naturally as someone would in this real-life situation.
+                    
+                    If the user message is "[START]", provide an appropriate greeting or opening line for this scenario.
+                    """
+                    
+                    // Build messages array
+                    var chatMessages: [[String: String]] = [
+                        ["role": "system", "content": systemPrompt]
+                    ]
+                    
+                    // Add conversation history
+                    for (role, content) in messages {
+                        let chatRole = role == "User" ? "user" : "assistant"
+                        chatMessages.append(["role": chatRole, "content": content])
+                    }
+                    
+                    // Add current user message
+                    chatMessages.append(["role": "user", "content": userMessage])
+                    
+                    let payload: [String: Any] = [
+                        "model": "gpt-4o-mini",
+                        "messages": chatMessages,
+                        "stream": true,
+                        "temperature": 0.7,
+                        "max_tokens": 500
+                    ]
+                    
+                    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                    
+                    let (bytes, _) = try await URLSession.shared.bytes(for: request)
+                    
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("data: ") {
+                            let jsonString = String(line.dropFirst(6))
+                            if jsonString == "[DONE]" {
+                                break
+                            }
+                            
+                            if let data = jsonString.data(using: .utf8),
+                               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let choices = json["choices"] as? [[String: Any]],
+                               let first = choices.first,
+                               let delta = first["delta"] as? [String: Any],
+                               let content = delta["content"] as? String {
+                                continuation.yield(content)
+                            }
+                        }
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
         }
     }
 }

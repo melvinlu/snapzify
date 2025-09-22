@@ -41,6 +41,7 @@
 		3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A231234567890123456 /* DocumentViewModel.swift */; };
 		3D9B1A241234567890123456 /* SentenceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A251234567890123456 /* SentenceViewModel.swift */; };
 		3D9B1A261234567890123456 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A271234567890123456 /* SettingsViewModel.swift */; };
+		3D9B1A271234567890123457 /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A281234567890123457 /* ConversationViewModel.swift */; };
 		3D9B1A281234567890123456 /* SnapzifyConfig.json in Resources */ = {isa = PBXBuildFile; fileRef = 3D9B1A291234567890123456 /* SnapzifyConfig.json */; };
 		3D9B1A2A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D9B1A2B1234567890123456 /* Assets.xcassets */; };
 		3D9B1A311234567890123461 /* ChineseProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A301234567890123460 /* ChineseProcessingService.swift */; };
@@ -160,6 +161,7 @@
 		3D9B1A231234567890123456 /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
 		3D9B1A251234567890123456 /* SentenceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceViewModel.swift; sourceTree = "<group>"; };
 		3D9B1A271234567890123456 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		3D9B1A281234567890123457 /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
 		3D9B1A291234567890123456 /* SnapzifyConfig.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = SnapzifyConfig.json; sourceTree = "<group>"; };
 		3D9B1A2B1234567890123456 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3D9B1A2D1234567890123456 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -324,6 +326,7 @@
 				3D9B1A231234567890123456 /* DocumentViewModel.swift */,
 				3D9B1A251234567890123456 /* SentenceViewModel.swift */,
 				3D9B1A271234567890123456 /* SettingsViewModel.swift */,
+				3D9B1A281234567890123457 /* ConversationViewModel.swift */,
 				994DEB4BE3D314E5A2911EA6 /* TextInputViewModel.swift */,
 			);
 			path = ViewModels;
@@ -588,6 +591,7 @@
 				3D9B1A221234567890123456 /* DocumentViewModel.swift in Sources */,
 				3D9B1A241234567890123456 /* SentenceViewModel.swift in Sources */,
 				3D9B1A261234567890123456 /* SettingsViewModel.swift in Sources */,
+				3D9B1A271234567890123457 /* ConversationViewModel.swift in Sources */,
 				6C10D521A75AB7C28AB8B387 /* DocumentStoreImpl.swift in Sources */,
 				2400A106E61C6BD7F823EE8D /* ServiceContainer.swift in Sources */,
 				C8490D8C4CB39322122165AD /* ActionExtensionLoadingView.swift in Sources */,

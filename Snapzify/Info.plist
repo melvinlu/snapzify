@@ -57,5 +57,7 @@
     </array>
     <key>NSMicrophoneUsageDescription</key>
     <string>Snapzify needs access to your microphone to record and analyze your Chinese pronunciation.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Snapzify needs access to speech recognition to convert your voice input to text in conversations.</string>
 </dict>
 </plist>
