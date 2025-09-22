@@ -104,14 +104,7 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     
                     let systemPrompt = """
-                    You are a native Chinese language expert with deep knowledge of Chinese language, culture, idioms, and colloquial expressions.
-                    
-                    Answer questions about Chinese language and culture in a helpful, clear, and concise manner.
-                    ALWAYS use simplified Chinese characters (简体字) in your responses, never traditional Chinese (繁體字).
-                    Provide examples when helpful, using simplified Chinese characters with pinyin when relevant.
-                    Be direct and practical in your responses.
-                    
-                    No headers, labels, or unnecessary formatting. Just provide clear, helpful answers.
+                    You are a native Chinese language expert. Answer the question provided in detail. Just the answer, no headers, labels, or formatting. Ensure that enough detail is being included for the user to be able to understand and apply to the given question. Use simplified Chinese.
                     """
                     
                     // Build messages array with history
@@ -190,14 +183,7 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     
                     let systemPrompt = """
-                    You are a native Chinese language expert with deep knowledge of Chinese language, culture, idioms, and colloquial expressions.
-                    
-                    Answer questions about Chinese language and culture in a helpful, clear, and concise manner.
-                    ALWAYS use simplified Chinese characters (简体字) in your responses, never traditional Chinese (繁體字).
-                    Provide examples when helpful, using simplified Chinese characters with pinyin when relevant.
-                    Be direct and practical in your responses.
-                    
-                    No headers, labels, or unnecessary formatting. Just provide clear, helpful answers.
+                    You are a native Chinese language expert. Answer the question provided in detail. Just the answer, no headers, labels, or formatting. Ensure that enough detail is being included for the user to be able to understand and apply to the given question. Use simplified Chinese.
                     """
                     
                     let userPrompt = trimmedText

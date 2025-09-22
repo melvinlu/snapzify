@@ -212,6 +212,9 @@ struct HomeView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .fullScreenCover(isPresented: $vm.showConversation) {
+            ConversationView()
+        }
         .photosPicker(
             isPresented: $vm.showPhotoPicker,
             selection: $selectedPhotos,
@@ -343,7 +346,7 @@ struct HomeView: View {
             } label: {
                 Label("Analyze", systemImage: "square.and.arrow.down")
                     .foregroundStyle(T.C.ink)
-                    .frame(minWidth: 120)
+                    .frame(minWidth: 90)
             }
             .buttonStyle(SecondaryButtonStyle())
             
@@ -359,7 +362,16 @@ struct HomeView: View {
                     systemImage: vm.isProcessingAudio ? "xmark.circle" : (vm.isRecording ? "stop.circle" : "mic.circle")
                 )
                 .foregroundStyle(vm.isRecording || vm.isProcessingAudio ? Color.red : T.C.ink)
-                .frame(minWidth: 120)
+                .frame(minWidth: 90)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+            
+            Button {
+                vm.showConversation = true
+            } label: {
+                Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                    .foregroundStyle(T.C.ink)
+                    .frame(minWidth: 90)
             }
             .buttonStyle(SecondaryButtonStyle())
         }
@@ -368,7 +380,7 @@ struct HomeView: View {
     @ViewBuilder
     private var reverseSnapzifySection: some View {
         ReverseSnapzifyView(
-            translateText: $vm.translateText,
+            inputText: $vm.unifiedInputText,
             translationResult: $vm.translationResult,
             translationFollowUp: $vm.translationFollowUp,
             isProcessing: vm.isProcessingTranslation,
@@ -383,7 +395,6 @@ struct HomeView: View {
                 }
             },
             isTranslationExpanded: $vm.isTranslationExpanded,
-            askText: $vm.askText,
             askResult: $vm.askResult,
             askFollowUp: $vm.askFollowUp,
             isAsking: vm.isAsking,
@@ -397,14 +408,7 @@ struct HomeView: View {
                     await vm.performAskFollowUp()
                 }
             },
-            isAskExpanded: $vm.isAskExpanded,
-            isRecordingForAsk: vm.isRecordingForAsk,
-            onStartRecordingForAsk: {
-                vm.startRecordingForAsk()
-            },
-            onStopRecordingForAsk: {
-                vm.stopRecordingForAsk()
-            }
+            isAskExpanded: $vm.isAskExpanded
         )
     }
     

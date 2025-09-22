@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct ReverseSnapzifyView: View {
-    // Unified translation properties
-    @Binding var translateText: String
+    // Unified input text
+    @Binding var inputText: String
+    
+    // Translation properties
     @Binding var translationResult: String
     @Binding var translationFollowUp: String
     let isProcessing: Bool
@@ -10,8 +12,7 @@ struct ReverseSnapzifyView: View {
     let onTranslationFollowUp: () -> Void
     @Binding var isTranslationExpanded: Bool
     
-    // Ask properties (keeping as separate feature)
-    @Binding var askText: String
+    // Ask properties
     @Binding var askResult: String
     @Binding var askFollowUp: String
     let isAsking: Bool
@@ -19,13 +20,7 @@ struct ReverseSnapzifyView: View {
     let onAskFollowUp: () -> Void
     @Binding var isAskExpanded: Bool
     
-    // Audio recording for Ask
-    let isRecordingForAsk: Bool
-    let onStartRecordingForAsk: () -> Void
-    let onStopRecordingForAsk: () -> Void
-    
-    @FocusState private var isTranslateFieldFocused: Bool
-    @FocusState private var isAskFieldFocused: Bool
+    @FocusState private var isInputFieldFocused: Bool
     @FocusState private var isTranslationFollowUpFieldFocused: Bool
     @FocusState private var isAskFollowUpFieldFocused: Bool
     
@@ -50,9 +45,9 @@ struct ReverseSnapzifyView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: T.S.sm) {
-            // Unified translation/breakdown textbox
+            // Unified input textbox with action buttons
             HStack(spacing: T.S.sm) {
-                TextField("Translate...", text: $translateText)
+                TextField("Translate or ask...", text: $inputText)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .foregroundStyle(T.C.ink)
@@ -69,27 +64,48 @@ struct ReverseSnapzifyView: View {
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.never)
                     .submitLabel(.go)
-                    .focused($isTranslateFieldFocused)
+                    .focused($isInputFieldFocused)
                     .onSubmit {
-                        if !translateText.isEmpty {
+                        if !inputText.isEmpty {
+                            // Default to translate on return key
                             onTranslate()
-                            isTranslateFieldFocused = false
+                            isInputFieldFocused = false
                         }
                     }
                 
+                // Translate button (icon only)
                 Button {
-                    isTranslateFieldFocused = false
+                    isInputFieldFocused = false
                     onTranslate()
                 } label: {
                     Image(systemName: "character.book.closed.fill")
                         .font(.title2)
                         .foregroundStyle(
-                            LinearGradient(colors: [T.C.brandStart, T.C.brandEnd],
-                                           startPoint: .leading,
-                                           endPoint: .trailing)
+                            LinearGradient(
+                                colors: [T.C.brandStart, T.C.brandEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
                 }
-                .disabled(translateText.isEmpty || isProcessing)
+                .disabled(inputText.isEmpty || isProcessing)
+                
+                // Ask button (icon only)
+                Button {
+                    isInputFieldFocused = false
+                    onAsk()
+                } label: {
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [T.C.brandStart, T.C.brandEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+                .disabled(inputText.isEmpty || isAsking)
             }
             
             // Translation/Breakdown results
@@ -295,69 +311,6 @@ struct ReverseSnapzifyView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(T.C.divider, lineWidth: 1)
                 )
-            }
-            
-            // Ask section
-            HStack(spacing: T.S.sm) {
-                TextField("Ask...", text: $askText)
-                    .textFieldStyle(.plain)
-                    .font(.body)
-                    .foregroundStyle(T.C.ink)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(T.C.card)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(T.C.divider, lineWidth: 1)
-                    )
-                    .autocorrectionDisabled(true)
-                    .textInputAutocapitalization(.never)
-                    .submitLabel(.go)
-                    .focused($isAskFieldFocused)
-                    .onSubmit {
-                        if !askText.isEmpty {
-                            onAsk()
-                            isAskFieldFocused = false
-                        }
-                    }
-                
-                // Microphone button for voice input
-                Button {
-                    if isRecordingForAsk {
-                        onStopRecordingForAsk()
-                    } else {
-                        onStartRecordingForAsk()
-                    }
-                } label: {
-                    Image(systemName: "mic.fill")
-                        .font(.title2)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: isRecordingForAsk ? [Color.red, Color.red] : [T.C.brandStart, T.C.brandEnd],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                }
-                .disabled(isAsking)
-                
-                // Submit button
-                Button {
-                    isAskFieldFocused = false
-                    onAsk()
-                } label: {
-                    Image(systemName: "questionmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(
-                            LinearGradient(colors: [T.C.brandStart, T.C.brandEnd],
-                                           startPoint: .leading,
-                                           endPoint: .trailing)
-                        )
-                }
-                .disabled(askText.isEmpty || isAsking)
             }
             
             // Ask results

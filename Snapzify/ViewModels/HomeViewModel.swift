@@ -13,12 +13,15 @@ class HomeViewModel: ObservableObject {
     @Published var isProcessingSharedImage = false
     @Published var isLoading = false
     @Published var showPhotoPicker = false
+    @Published var showConversation = false
     @Published var errorMessage: String?
     @Published var processingProgress: String = ""
     @Published var activeProcessingTasks: [ProcessingTask] = []
     
-    // Unified translation properties (handles both translation and breakdown)
-    @Published var translateText: String = ""
+    // Unified input text for both translate and ask
+    @Published var unifiedInputText: String = ""
+    
+    // Translation properties
     @Published var isProcessingTranslation: Bool = false
     @Published var translationResult: String = ""
     @Published var translationFollowUp: String = ""
@@ -26,7 +29,6 @@ class HomeViewModel: ObservableObject {
     @Published var isTranslationExpanded: Bool = false
     
     // Ask expert properties
-    @Published var askText: String = ""
     @Published var isAsking: Bool = false
     @Published var askResult: String = ""
     @Published var askFollowUp: String = ""
@@ -39,10 +41,10 @@ class HomeViewModel: ObservableObject {
     @Published var audioFeedback: String = ""
     @Published var audioFollowUp: String = ""
     @Published var isAudioExpanded: Bool = false
-    @Published var isRecordingForAsk: Bool = false
-    @Published var isProcessingAskAudio: Bool = false
+    @Published var isRecordingUnified: Bool = false
+    @Published var isProcessingUnifiedAudio: Bool = false
     private var audioRecorder: AVAudioRecorder?
-    private var askAudioRecorder: AVAudioRecorder?
+    private var unifiedAudioRecorder: AVAudioRecorder?
     private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
     private var recordingURL: URL?
     private var pronunciationHistory: [String] = [] // Track conversation history for context
@@ -1319,7 +1321,7 @@ class HomeViewModel: ObservableObject {
     }
     
     func performTranslation() async {
-        guard !translateText.isEmpty else {
+        guard !unifiedInputText.isEmpty else {
             print("DEBUG: Cannot perform translation - no text")
             return
         }
@@ -1331,7 +1333,7 @@ class HomeViewModel: ObservableObject {
             return
         }
         
-        let queryText = translateText
+        let queryText = unifiedInputText
         let isChineseInput = containsChineseCharacters(queryText)
         
         // Save the query to show as header
@@ -1341,8 +1343,7 @@ class HomeViewModel: ObservableObject {
         await MainActor.run {
             isProcessingTranslation = true
             translationResult = ""
-            // Clear the text field after submit
-            translateText = ""
+            // Don't clear the unified input - user might want to use it for Ask
             expandTranslationSection()
         }
         
@@ -1372,7 +1373,7 @@ class HomeViewModel: ObservableObject {
     // MARK: - Reverse Snapzify
     
     func performAsk() async {
-        guard !askText.isEmpty else {
+        guard !unifiedInputText.isEmpty else {
             print("DEBUG: Cannot perform ask - no text")
             return
         }
@@ -1385,7 +1386,7 @@ class HomeViewModel: ObservableObject {
         }
         
         // Save the query to show as header
-        let queryText = askText
+        let queryText = unifiedInputText
         UserDefaults.standard.set(queryText, forKey: "currentAskQuery")
         
         print("DEBUG: Starting ask for: \(queryText)")
@@ -1399,8 +1400,7 @@ class HomeViewModel: ObservableObject {
                 }
             }
             askResult = ""
-            // Clear the text field after submit
-            askText = ""
+            // Don't clear the unified input - user might want to use it for Translate
             expandAskSection()
         }
         
@@ -1432,9 +1432,14 @@ class HomeViewModel: ObservableObject {
         
         // Store current result before clearing
         let previousResult = askResult
-        let previousQuestion = askText
+        let previousQuestion = UserDefaults.standard.string(forKey: "currentAskQuery") ?? ""
+        
+        // Update the header to show the follow-up question
+        UserDefaults.standard.set(askFollowUp, forKey: "currentAskQuery")
         
         await MainActor.run {
+            // Update unified input to reflect what's being asked
+            unifiedInputText = askFollowUp
             isAsking = true
             askResult = ""
         }
@@ -1502,9 +1507,16 @@ class HomeViewModel: ObservableObject {
         
         // Store current result before clearing
         let previousResult = translationResult
-        let previousInput = translateText
+        let previousInput = UserDefaults.standard.string(forKey: "currentTranslationQuery") ?? UserDefaults.standard.string(forKey: "currentBreakdownQuery") ?? ""
+        
+        // Update the header to show the follow-up query
+        // Detect if follow-up is Chinese or English
+        let followUpIsChineseInput = translationFollowUp.range(of: "\\p{Script=Han}", options: .regularExpression) != nil
+        UserDefaults.standard.set(translationFollowUp, forKey: followUpIsChineseInput ? "currentBreakdownQuery" : "currentTranslationQuery")
         
         await MainActor.run {
+            // Update unified input to reflect what's being translated
+            unifiedInputText = translationFollowUp
             isProcessingTranslation = true
             translationResult = ""
         }
@@ -1882,37 +1894,37 @@ class HomeViewModel: ObservableObject {
     // These are now handled by performTranslation() which automatically detects
     // whether to translate English or breakdown Chinese
     
-    // MARK: - Audio Recording for Ask
+    // MARK: - Audio Recording for Unified Input
     
-    func startRecordingForAsk() {
-        if isRecordingForAsk {
-            stopRecordingForAsk()
+    func startRecordingUnified() {
+        if isRecordingUnified {
+            stopRecordingUnified()
         } else {
             requestMicrophonePermission { [weak self] granted in
                 if granted {
                     Task { @MainActor in
-                        self?.beginRecordingForAsk()
+                        self?.beginRecordingUnified()
                     }
                 }
             }
         }
     }
     
-    func stopRecordingForAsk() {
-        guard isRecordingForAsk else { return }
+    func stopRecordingUnified() {
+        guard isRecordingUnified else { return }
         
-        askAudioRecorder?.stop()
-        isRecordingForAsk = false
+        unifiedAudioRecorder?.stop()
+        isRecordingUnified = false
         
         if let url = recordingURL {
-            print("DEBUG: Stopped recording for ask, file at: \(url)")
+            print("DEBUG: Stopped recording for unified input, file at: \(url)")
             Task {
-                await processAskRecording(url: url)
+                await processUnifiedRecording(url: url)
             }
         }
     }
     
-    private func beginRecordingForAsk() {
+    private func beginRecordingUnified() {
         do {
             // Configure audio session
             try audioSession.setCategory(.playAndRecord, mode: .default)
@@ -1920,7 +1932,7 @@ class HomeViewModel: ObservableObject {
             
             // Create recording URL
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            recordingURL = documentsPath.appendingPathComponent("ask_recording_\(Date().timeIntervalSince1970).m4a")
+            recordingURL = documentsPath.appendingPathComponent("unified_recording_\(Date().timeIntervalSince1970).m4a")
             
             // Configure recorder
             let settings = [
@@ -1930,22 +1942,22 @@ class HomeViewModel: ObservableObject {
                 AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
             ]
             
-            askAudioRecorder = try AVAudioRecorder(url: recordingURL!, settings: settings)
-            askAudioRecorder?.delegate = nil
-            askAudioRecorder?.record()
+            unifiedAudioRecorder = try AVAudioRecorder(url: recordingURL!, settings: settings)
+            unifiedAudioRecorder?.delegate = nil
+            unifiedAudioRecorder?.record()
             
-            isRecordingForAsk = true
-            print("DEBUG: Started recording for ask to \(recordingURL!)")
+            isRecordingUnified = true
+            print("DEBUG: Started recording for unified input to \(recordingURL!)")
         } catch {
-            print("DEBUG: Failed to start recording for ask: \(error)")
+            print("DEBUG: Failed to start recording for unified input: \(error)")
             errorMessage = "Failed to start recording: \(error.localizedDescription)"
         }
     }
     
-    private func processAskRecording(url: URL) async {
+    private func processUnifiedRecording(url: URL) async {
         await MainActor.run {
-            isProcessingAskAudio = true
-            askText = "Transcribing..."
+            isProcessingUnifiedAudio = true
+            unifiedInputText = "Transcribing..."
         }
         
         do {
@@ -1953,26 +1965,24 @@ class HomeViewModel: ObservableObject {
             let transcription = try await transcribeAudio(url: url)
             
             await MainActor.run {
-                // Set the transcribed text as the ask input
-                askText = transcription
-                isProcessingAskAudio = false
-                
-                // Automatically submit the question
-                Task {
-                    await performAsk()
-                }
+                // Set the transcribed text as the unified input
+                unifiedInputText = transcription
+                isProcessingUnifiedAudio = false
+                // User will choose whether to translate or ask
             }
             
             // Clean up the recording file
             try? FileManager.default.removeItem(at: url)
         } catch {
             await MainActor.run {
-                askText = ""
+                unifiedInputText = ""
                 errorMessage = "Failed to transcribe audio: \(error.localizedDescription)"
-                isProcessingAskAudio = false
+                isProcessingUnifiedAudio = false
             }
         }
     }
+    
+    
 }
 
 // MARK: - Timeout Utilities

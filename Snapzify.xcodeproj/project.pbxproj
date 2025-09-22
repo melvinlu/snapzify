@@ -27,6 +27,7 @@
 		3D9B1A161234567890123456 /* PlecoLinkServiceImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */; };
 		3D9B1A181234567890123456 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A191234567890123456 /* HomeView.swift */; };
 		3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1B1234567890123456 /* DocumentView.swift */; };
+		F3F2DD531112AC10D6B4CFBA /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C7C0B0D415B1A9BEDD9AAC6 /* ConversationView.swift */; };
 		3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1D1234567890123456 /* SentenceRowView.swift */; };
 		3D9B1A1E1234567890123456 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123456 /* SettingsView.swift */; };
 		3D9B1A1F1234567890123458 /* QueueProcessingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9B1A1F1234567890123457 /* QueueProcessingView.swift */; };
@@ -145,6 +146,7 @@
 		3D9B1A171234567890123456 /* PlecoLinkServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlecoLinkServiceImpl.swift; sourceTree = "<group>"; };
 		3D9B1A191234567890123456 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		3D9B1A1B1234567890123456 /* DocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentView.swift; sourceTree = "<group>"; };
+		2C7C0B0D415B1A9BEDD9AAC6 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
 		3D9B1A1D1234567890123456 /* SentenceRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceRowView.swift; sourceTree = "<group>"; };
 		3D9B1A1F1234567890123456 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3D9B1A1F1234567890123457 /* QueueProcessingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueProcessingView.swift; sourceTree = "<group>"; };
@@ -295,6 +297,7 @@
 			children = (
 				3D9B1A191234567890123456 /* HomeView.swift */,
 				3D9B1A1B1234567890123456 /* DocumentView.swift */,
+				2C7C0B0D415B1A9BEDD9AAC6 /* ConversationView.swift */,
 				3D9B1A1D1234567890123456 /* SentenceRowView.swift */,
 				3D9B1A351234567890123465 /* ShimmerView.swift */,
 				3D9B1A371234567890123467 /* VersionHistoryView.swift */,
@@ -569,6 +572,7 @@
 				2B49435EBDC73F87E5D9F705 /* TappableChineseFeedbackView.swift in Sources */,
 				3D9B1A1F1234567890123468 /* StandaloneChinesePopup.swift in Sources */,
 						3D9B1A1A1234567890123456 /* DocumentView.swift in Sources */,
+				F3F2DD531112AC10D6B4CFBA /* ConversationView.swift in Sources */,
 				3D9B1A1C1234567890123456 /* SentenceRowView.swift in Sources */,
 				3D9B1A381234567890123468 /* VideoDocumentView.swift in Sources */,
 				3D9B1A381234567890123470 /* TranscriptView.swift in Sources */,
