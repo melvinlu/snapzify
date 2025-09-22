@@ -158,7 +158,7 @@ struct ConversationView: View {
 
                         Button {
                             if viewModel.isRecording {
-                                viewModel.toggleRecording()
+                                viewModel.cancelRecording()
                             } else {
                                 viewModel.sendMessage()
                             }

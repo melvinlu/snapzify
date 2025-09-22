@@ -285,6 +285,25 @@ class ConversationViewModel: ObservableObject {
         }
     }
 
+    func cancelRecording() {
+        guard isRecording else { return }
+
+        // Stop recording
+        audioRecorder?.stop()
+        isRecording = false
+
+        // Delete the recording file if it exists
+        if let url = recordingURL {
+            try? FileManager.default.removeItem(at: url)
+            print("Recording cancelled and file deleted")
+        }
+
+        // Clear recording state
+        recordingURL = nil
+        recordingTask?.cancel()
+        recordingTask = nil
+    }
+
     private func startRecording() {
         // Setup audio session if not already done
         setupAudioSession()
