@@ -8,6 +8,8 @@ struct ConversationMessage: Identifiable, Codable {
     let isUser: Bool
     let timestamp = Date()
     var chineseSegments: [ChineseTextSegment] = []
+    var isNatural: Bool? = nil
+    var suggestions: String? = nil
 }
 
 struct ChineseTextSegment: Identifiable, Codable {
@@ -164,10 +166,26 @@ class ConversationViewModel: ObservableObject {
             isUser: true
         )
         message.chineseSegments = segments
+        let messageIndex = messages.count
         messages.append(message)
-        
-        // Process AI response
+
+        // Check naturalness and process response
         Task {
+            // If message contains Chinese, check naturalness first
+            if !segments.isEmpty {
+                await checkMessageNaturalness(at: messageIndex)
+
+                // Only process AI response if the message is natural
+                await MainActor.run {
+                    if let isNatural = self.messages[messageIndex].isNatural, !isNatural {
+                        // Message is unnatural, don't send to AI
+                        print("Message deemed unnatural, not sending to AI")
+                        return
+                    }
+                }
+            }
+
+            // Process AI response (if message is natural or doesn't contain Chinese)
             await processAIResponse(userMessage: userMessage)
         }
     }
@@ -342,6 +360,20 @@ class ConversationViewModel: ObservableObject {
     func selectChineseText(_ text: String) {
         selectedChineseText = text
         showChinesePopup = true
+    }
+
+    private func checkMessageNaturalness(at index: Int) async {
+        guard index < messages.count, messages[index].isUser else { return }
+
+        do {
+            let result = try await translationService.checkNaturalness(messages[index].content)
+            await MainActor.run {
+                messages[index].isNatural = result.isNatural
+                messages[index].suggestions = result.suggestions
+            }
+        } catch {
+            print("Failed to check naturalness: \(error)")
+        }
     }
 
     // MARK: - Voice Recording

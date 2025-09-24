@@ -44,6 +44,7 @@ protocol EnglishToChineseTranslationService {
     func streamPronunciationFeedback(_ transcription: String) -> AsyncThrowingStream<String, Error>
     func streamPronunciationFeedbackWithContext(_ transcription: String, previousFeedback: [String]) -> AsyncThrowingStream<String, Error>
     func streamConversation(scenario: String, messages: [(String, String)], userMessage: String) -> AsyncThrowingStream<String, Error>
+    func checkNaturalness(_ chineseText: String) async throws -> (isNatural: Bool, suggestions: String?)
     func isConfigured() -> Bool
     func clearCache()
 }
@@ -792,7 +793,70 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
             try? data.write(to: fileURL)
         }
     }
-    
+
+    func checkNaturalness(_ chineseText: String) async throws -> (isNatural: Bool, suggestions: String?) {
+        guard isConfigured() else {
+            throw EnglishChineseTranslationError.notConfigured
+        }
+
+        guard let key = configService.openAIKey,
+              let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+            throw EnglishChineseTranslationError.invalidConfiguration
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let systemPrompt = """
+        You are a native Chinese speaker and language expert. Evaluate if the given Chinese text sounds natural in spoken conversation.
+
+        Return a JSON response with this exact format:
+        {
+            "isNatural": true/false,
+            "suggestions": "If not natural, provide 2-3 more natural alternatives separated by newlines. If natural, this should be null."
+        }
+
+        Focus on:
+        - Natural spoken Chinese patterns
+        - Common colloquial expressions
+        - Appropriate formality level for casual conversation
+
+        Use simplified Chinese for all suggestions.
+        """
+
+        let payload: [String: Any] = [
+            "model": "gpt-4o-mini",
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": chineseText]
+            ],
+            "temperature": 0.3,
+            "response_format": ["type": "json_object"]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let choices = json["choices"] as? [[String: Any]],
+           let first = choices.first,
+           let message = first["message"] as? [String: Any],
+           let content = message["content"] as? String,
+           let responseData = content.data(using: .utf8),
+           let response = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] {
+
+            let isNatural = response["isNatural"] as? Bool ?? true
+            let suggestions = response["suggestions"] as? String
+
+            return (isNatural, suggestions)
+        }
+
+        throw EnglishChineseTranslationError.invalidResponse
+    }
+
     func clearCache() {
         cache.removeAllObjects()
         

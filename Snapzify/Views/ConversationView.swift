@@ -264,6 +264,7 @@ struct ConversationView: View {
 struct MessageBubble: View {
     let message: ConversationMessage
     @EnvironmentObject var viewModel: ConversationViewModel
+    @State private var showSuggestions = false
 
     var body: some View {
         HStack {
@@ -302,6 +303,26 @@ struct MessageBubble: View {
                                 )
                         )
                 )
+
+                // Naturalness indicator for user messages with Chinese text
+                if message.isUser, !message.chineseSegments.isEmpty, let isNatural = message.isNatural {
+                    Button {
+                        if !isNatural {
+                            showSuggestions = true
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isNatural ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(isNatural ? Color.green : Color.orange)
+                            Text(isNatural ? "Natural" : "Tap for suggestions")
+                                .font(.caption2)
+                                .foregroundStyle(T.C.ink2)
+                        }
+                    }
+                    .disabled(isNatural)
+                    .padding(.top, 2)
+                }
             }
 
             if !message.isUser {
@@ -309,6 +330,12 @@ struct MessageBubble: View {
             }
         }
         .padding(.horizontal)
+        .sheet(isPresented: $showSuggestions) {
+            SuggestionsView(
+                originalText: message.content,
+                suggestions: message.suggestions ?? ""
+            )
+        }
     }
 }
 
@@ -379,6 +406,117 @@ struct ConversationInfoSheet: View {
                         dismiss()
                     }
                     .foregroundStyle(T.C.ink)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+struct SuggestionsView: View {
+    let originalText: String
+    let suggestions: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedText: String? = nil
+    @State private var showChinesePopup = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: T.S.lg) {
+                    // Original text
+                    VStack(alignment: .leading, spacing: T.S.xs) {
+                        Text("Your message")
+                            .font(.headline)
+                            .foregroundStyle(T.C.ink)
+                        Button {
+                            selectedText = originalText
+                            showChinesePopup = true
+                        } label: {
+                            Text(originalText)
+                                .font(.body)
+                                .foregroundStyle(T.C.ink2)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(T.C.card)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(T.C.divider, lineWidth: 1)
+                                )
+                        }
+                    }
+
+                    // Suggestions
+                    VStack(alignment: .leading, spacing: T.S.xs) {
+                        Text("More natural alternatives")
+                            .font(.headline)
+                            .foregroundStyle(T.C.ink)
+
+                        ForEach(suggestions.components(separatedBy: "\n"), id: \.self) { suggestion in
+                            if !suggestion.isEmpty {
+                                Button {
+                                    selectedText = suggestion
+                                    showChinesePopup = true
+                                } label: {
+                                    Text(suggestion)
+                                        .font(.body)
+                                        .foregroundStyle(T.C.ink)
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(
+                                                    LinearGradient(
+                                                        colors: [T.C.card, T.C.card.opacity(0.8)],
+                                                        startPoint: .leading,
+                                                        endPoint: .trailing
+                                                    )
+                                                )
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(T.C.divider, lineWidth: 1)
+                                        )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .scrollIndicators(.hidden)
+            .background(T.C.bg)
+            .navigationTitle("Suggestions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundStyle(T.C.ink)
+                }
+            }
+            .overlay(alignment: .center) {
+                if showChinesePopup, let text = selectedText {
+                    ZStack {
+                        // Backdrop
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                showChinesePopup = false
+                            }
+
+                        // Use the standalone popup from home page
+                        StandaloneChinesePopup(
+                            chineseText: text,
+                            isShowing: $showChinesePopup,
+                            position: CGPoint(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2)
+                        )
+                    }
+                    .zIndex(1000)
                 }
             }
         }
