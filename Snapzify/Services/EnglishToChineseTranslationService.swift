@@ -44,7 +44,7 @@ protocol EnglishToChineseTranslationService {
     func streamPronunciationFeedback(_ transcription: String) -> AsyncThrowingStream<String, Error>
     func streamPronunciationFeedbackWithContext(_ transcription: String, previousFeedback: [String]) -> AsyncThrowingStream<String, Error>
     func streamConversation(scenario: String, messages: [(String, String)], userMessage: String) -> AsyncThrowingStream<String, Error>
-    func checkNaturalness(_ chineseText: String) async throws -> (isNatural: Bool, suggestions: String?)
+    func checkNaturalness(_ chineseText: String, conversationContext: String?) async throws -> (isNatural: Bool, suggestions: String?)
     func isConfigured() -> Bool
     func clearCache()
 }
@@ -794,7 +794,7 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
         }
     }
 
-    func checkNaturalness(_ chineseText: String) async throws -> (isNatural: Bool, suggestions: String?) {
+    func checkNaturalness(_ chineseText: String, conversationContext: String?) async throws -> (isNatural: Bool, suggestions: String?) {
         guard isConfigured() else {
             throw EnglishChineseTranslationError.notConfigured
         }
@@ -809,7 +809,7 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let systemPrompt = """
+        var systemPrompt = """
         You are a native Chinese speaker and language expert. Evaluate if the given Chinese text sounds natural in spoken conversation.
 
         Return a JSON response with this exact format:
@@ -825,6 +825,17 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
 
         Use simplified Chinese for all suggestions.
         """
+
+        if let context = conversationContext, !context.isEmpty {
+            systemPrompt += """
+
+
+            IMPORTANT: The suggestions must be contextually appropriate for the following conversation:
+            \(context)
+
+            Make sure the alternatives maintain the same intent and are appropriate responses in this specific conversation context.
+            """
+        }
 
         let payload: [String: Any] = [
             "model": "gpt-4o-mini",

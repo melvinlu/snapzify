@@ -175,13 +175,25 @@ class ConversationViewModel: ObservableObject {
             if !segments.isEmpty {
                 await checkMessageNaturalness(at: messageIndex)
 
-                // Only process AI response if the message is natural
-                await MainActor.run {
-                    if let isNatural = self.messages[messageIndex].isNatural, !isNatural {
-                        // Message is unnatural, don't send to AI
-                        print("Message deemed unnatural, not sending to AI")
-                        return
+                // Wait for the naturalness check to complete and check the result
+                let shouldProceed = await MainActor.run {
+                    // Get the actual updated message
+                    guard messageIndex < self.messages.count else { return true }
+
+                    // Check if naturalness has been determined
+                    if let isNatural = self.messages[messageIndex].isNatural {
+                        if !isNatural {
+                            // Message is unnatural, don't send to AI
+                            print("Message deemed unnatural, not sending to AI")
+                            return false
+                        }
                     }
+                    return true
+                }
+
+                // Exit early if message is unnatural
+                if !shouldProceed {
+                    return
                 }
             }
 
@@ -362,17 +374,44 @@ class ConversationViewModel: ObservableObject {
         showChinesePopup = true
     }
 
+    func forceSendMessage(at index: Int) {
+        guard index < messages.count, messages[index].isUser else { return }
+
+        let userMessage = messages[index].content
+
+        // Process AI response regardless of naturalness
+        Task {
+            await processAIResponse(userMessage: userMessage)
+        }
+    }
+
     private func checkMessageNaturalness(at index: Int) async {
         guard index < messages.count, messages[index].isUser else { return }
 
+        // Build conversation context for better suggestions
+        var conversationContext = "Scenario: \(scenario)\n\n"
+
+        // Include recent conversation history (last 5 exchanges)
+        let recentMessages = messages.prefix(index).suffix(10)
+        for msg in recentMessages {
+            conversationContext += "\(msg.isUser ? "User" : "AI"): \(msg.content)\n"
+        }
+
         do {
-            let result = try await translationService.checkNaturalness(messages[index].content)
+            let result = try await translationService.checkNaturalness(
+                messages[index].content,
+                conversationContext: conversationContext
+            )
             await MainActor.run {
                 messages[index].isNatural = result.isNatural
                 messages[index].suggestions = result.suggestions
             }
         } catch {
             print("Failed to check naturalness: \(error)")
+            // On error, allow the message to proceed
+            await MainActor.run {
+                messages[index].isNatural = true
+            }
         }
     }
 

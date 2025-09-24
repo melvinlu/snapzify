@@ -306,21 +306,41 @@ struct MessageBubble: View {
 
                 // Naturalness indicator for user messages with Chinese text
                 if message.isUser, !message.chineseSegments.isEmpty, let isNatural = message.isNatural {
-                    Button {
-                        if !isNatural {
-                            showSuggestions = true
+                    HStack(spacing: 8) {
+                        Button {
+                            if !isNatural {
+                                showSuggestions = true
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: isNatural ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(isNatural ? Color.green : Color.orange)
+                                Text(isNatural ? "Natural" : "Tap for suggestions")
+                                    .font(.caption2)
+                                    .foregroundStyle(T.C.ink2)
+                            }
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: isNatural ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                                .font(.caption2)
-                                .foregroundStyle(isNatural ? Color.green : Color.orange)
-                            Text(isNatural ? "Natural" : "Tap for suggestions")
-                                .font(.caption2)
-                                .foregroundStyle(T.C.ink2)
+                        .disabled(isNatural)
+
+                        // Force send button for unnatural messages
+                        if !isNatural {
+                            Button {
+                                if let index = viewModel.messages.firstIndex(where: { $0.id == message.id }) {
+                                    viewModel.forceSendMessage(at: index)
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(T.C.brandStart)
+                                    Text("Send anyway")
+                                        .font(.caption2)
+                                        .foregroundStyle(T.C.ink2)
+                                }
+                            }
                         }
                     }
-                    .disabled(isNatural)
                     .padding(.top, 2)
                 }
             }
