@@ -134,7 +134,7 @@ struct CaptureResultView: View {
                                                     ForEach(chatHistory.indices, id: \.self) { index in
                                                         let message = chatHistory[index]
                                                         HStack(alignment: .top, spacing: T.S.sm) {
-                                                            Text(message.role == "user" ? "You:" : "AI:")
+                                                            Text(message.role == "user" ? "Question:" : "Answer:")
                                                                 .font(.system(size: 13, weight: .semibold))
                                                                 .foregroundStyle(T.C.ink2)
                                                                 .frame(width: 40, alignment: .topLeading)
