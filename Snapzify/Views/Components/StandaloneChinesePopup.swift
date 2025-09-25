@@ -23,6 +23,13 @@ struct StandaloneChinesePopup: View {
     @State private var audioAsset: AudioAsset?
     @State private var audioPlayer: AVAudioPlayer?
     @State private var audioPlayerDelegate: AudioPlayerDelegate?
+    @State private var showChatInterface = false
+    @State private var chatInput = ""
+    @State private var chatResponse = ""
+    @State private var isLoadingChatResponse = false
+    @State private var chatTask: Task<Void, Never>?
+    @State private var chatHistory: [(role: String, content: String)] = []
+    @FocusState private var isChatInputFocused: Bool
     
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     private let ttsService = ServiceContainer.shared.ttsService
@@ -38,10 +45,10 @@ struct StandaloneChinesePopup: View {
                     .font(.system(size: 16))
             }
             .buttonStyle(StandalonePopupButtonStyle())
-            
+
             // Spacing after Pleco
             Spacer().frame(width: T.S.sm)
-            
+
             // Audio button
             if isGeneratingAudio {
                 HStack(spacing: 4) {
@@ -69,6 +76,21 @@ struct StandaloneChinesePopup: View {
                 }
                 .buttonStyle(StandalonePopupButtonStyle(isActive: isPlaying))
             }
+
+            // Spacing after Audio
+            Spacer().frame(width: T.S.sm)
+
+            // ChatGPT button (with question mark icon like home page)
+            Button {
+                showChatInterface.toggle()
+                if showChatInterface {
+                    isChatInputFocused = true
+                }
+            } label: {
+                Image(systemName: showChatInterface ? "xmark.circle.fill" : "questionmark.circle")
+                    .font(.system(size: 16))
+            }
+            .buttonStyle(StandalonePopupButtonStyle(isActive: showChatInterface))
             
             // Removed All Characters button - automatic breakdown in prompt instead
             
@@ -90,8 +112,9 @@ struct StandaloneChinesePopup: View {
             .padding(T.S.lg)
             
             // Scrollable middle section for translation and breakdowns
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: T.S.sm) {
+            ScrollViewReader { mainScrollProxy in
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(alignment: .leading, spacing: T.S.sm) {
                     // Always show sentence translation first
                     if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
                         HStack {
@@ -166,12 +189,89 @@ struct StandaloneChinesePopup: View {
                             .padding(.horizontal, 4)
                         }
                     }
+
+                    // ChatGPT Interface
+                    if showChatInterface {
+                        Divider()
+                            .padding(.vertical, 4)
+                            .id("chatInterface")
+
+                        VStack(alignment: .leading, spacing: T.S.sm) {
+                            // Chat input
+                            HStack {
+                                TextField("Ask about this text...", text: $chatInput)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .focused($isChatInputFocused)
+                                    .onSubmit {
+                                        sendChatMessage()
+                                    }
+
+                                Button {
+                                    sendChatMessage()
+                                } label: {
+                                    Image(systemName: "paperplane.fill")
+                                        .font(.system(size: 14))
+                                }
+                                .disabled(chatInput.isEmpty || isLoadingChatResponse)
+                                .buttonStyle(PlainButtonStyle())
+                                .foregroundColor(chatInput.isEmpty || isLoadingChatResponse ? .gray : T.C.accent)
+                            }
+
+                            // Chat response area (no nested scroll)
+                            VStack(alignment: .leading, spacing: 8) {
+                                if !chatResponse.isEmpty {
+                                    Text(chatResponse)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(T.C.ink2)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(Color.gray.opacity(0.1))
+                                        )
+                                }
+
+                                if isLoadingChatResponse {
+                                    HStack {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Thinking...")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(T.C.ink2)
+                                    }
+                                    .padding(.horizontal, 4)
+                                }
+
+                                // Anchor for scrolling to bottom of response
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id("chatResponseBottom")
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, T.S.lg)
                 .padding(.vertical, T.S.sm)
+                    .onChange(of: isLoadingChatResponse) { loading in
+                        if loading {
+                            // Small delay to ensure UI updates
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    mainScrollProxy.scrollTo("chatResponseBottom", anchor: .bottom)
+                                }
+                            }
+                        }
+                    }
+                    .onChange(of: chatResponse) { _ in
+                        // Keep scrolling to bottom as response streams in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            mainScrollProxy.scrollTo("chatResponseBottom", anchor: .bottom)
+                        }
+                    }
+                }
+                .frame(maxHeight: .infinity)
+                .scrollIndicators(.visible, axes: .vertical)
             }
-            .frame(maxHeight: .infinity)
-            .scrollIndicators(.visible, axes: .vertical)
             
             // Action buttons anchored at bottom
             actionButtons
@@ -199,6 +299,12 @@ struct StandaloneChinesePopup: View {
             isLoadingAllBreakdowns = false
             characterTask?.cancel()
             breakdownTask?.cancel()
+            chatTask?.cancel()
+            showChatInterface = false
+            chatInput = ""
+            chatResponse = ""
+            chatHistory = []
+            isLoadingChatResponse = false
             
             // Load the sentence translation
             loadChatGPTBreakdown()
@@ -210,6 +316,7 @@ struct StandaloneChinesePopup: View {
             // Clean up when popup disappears
             breakdownTask?.cancel()
             characterTask?.cancel()
+            chatTask?.cancel()
             selectedWords.removeAll()
             characterAnalyses.removeAll()
             chatGPTBreakdown = ""
@@ -217,6 +324,10 @@ struct StandaloneChinesePopup: View {
             isLoadingBreakdown = false
             showAllBreakdowns = false
             isLoadingAllBreakdowns = false
+            showChatInterface = false
+            chatInput = ""
+            chatResponse = ""
+            isLoadingChatResponse = false
             
             // Audio cleanup
             audioPlayer?.stop()
@@ -233,7 +344,83 @@ struct StandaloneChinesePopup: View {
             UIApplication.shared.open(url)
         }
     }
-    
+
+    private func sendChatMessage() {
+        guard !chatInput.isEmpty, chatGPTService.isConfigured() else { return }
+
+        let userQuestion = chatInput
+        chatInput = ""
+        isLoadingChatResponse = true
+        chatResponse = ""
+
+        // Add user question to history
+        chatHistory.append((role: "user", content: userQuestion))
+
+        // Build context for the chat
+        var contextPrompt = "Context: The user is studying this Chinese text: \"\(chineseText)\""
+
+        if !chatGPTBreakdown.isEmpty {
+            contextPrompt += "\n\nTranslation: \(chatGPTBreakdown)"
+        }
+
+        if !characterAnalyses.isEmpty {
+            contextPrompt += "\n\nCharacter breakdowns:"
+            for (word, analysis) in characterAnalyses {
+                contextPrompt += "\n\(word): \(analysis)"
+            }
+        }
+
+        // Add conversation history for context
+        if chatHistory.count > 1 {
+            contextPrompt += "\n\nConversation history:"
+            for (index, message) in chatHistory.enumerated() {
+                if index < chatHistory.count - 1 {  // Don't duplicate the current question
+                    contextPrompt += "\n\(message.role == "user" ? "User" : "Assistant"): \(message.content)"
+                }
+            }
+        }
+
+        contextPrompt += "\n\nCurrent user question: \(userQuestion)"
+        contextPrompt += """
+
+        Please answer the user's question about this Chinese text, considering the conversation history.
+
+        IMPORTANT: Structure your response as follows:
+        1. First, provide your answer in Chinese (if the question is about Chinese language)
+        2. Then add one line break
+        3. Then provide the English translation of your Chinese response (no brackets or prefix, just the translation)
+        4. Then add one line break
+        5. Then provide the pinyin transcription of YOUR CHINESE RESPONSE ONLY (not the original text, but the Chinese answer you just gave)
+
+        Be concise and helpful. If your response doesn't include Chinese, just answer normally without the translation/pinyin.
+        """
+
+        chatTask = Task {
+            do {
+                var fullResponse = ""
+                for try await chunk in chatGPTService.streamCustomPrompt(chineseText: "", userPrompt: contextPrompt) {
+                    if !Task.isCancelled {
+                        fullResponse += chunk
+                        await MainActor.run {
+                            isLoadingChatResponse = false
+                            chatResponse = fullResponse
+                        }
+                    }
+                }
+
+                // Add assistant response to history
+                await MainActor.run {
+                    chatHistory.append((role: "assistant", content: fullResponse))
+                }
+            } catch {
+                await MainActor.run {
+                    chatResponse = "Error: Unable to get response"
+                    isLoadingChatResponse = false
+                }
+            }
+        }
+    }
+
     private func prepareAudio() {
         guard ttsService.isConfigured() else { return }
         

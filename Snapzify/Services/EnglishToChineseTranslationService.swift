@@ -810,7 +810,7 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var systemPrompt = """
-        You are a native Chinese speaker and language expert. Evaluate if the given Chinese text sounds natural in spoken conversation.
+        You are a native Chinese speaker and language expert. Evaluate if the given Chinese text would be reasonably understood by a native speaker in conversation.
 
         Return a JSON response with this exact format:
         {
@@ -818,10 +818,19 @@ class EnglishToChineseTranslationServiceImpl: EnglishToChineseTranslationService
             "suggestions": "If not natural, provide 2-3 more natural alternatives separated by newlines. If natural, this should be null."
         }
 
-        Focus on:
-        - Natural spoken Chinese patterns
-        - Common colloquial expressions
-        - Appropriate formality level for casual conversation
+        IMPORTANT: Be lenient in your evaluation. Consider the text "natural" if:
+        - It would be reasonably understood by a native speaker
+        - The meaning is clear even if the phrasing isn't perfect
+        - It's grammatically acceptable even if not the most common way to express it
+        - It makes sense in conversational context
+
+        Only mark as "not natural" if:
+        - The grammar is seriously incorrect
+        - The meaning is unclear or confusing
+        - Word choices are completely inappropriate
+        - It would genuinely confuse a native speaker
+
+        Remember: Language learners need encouragement. Accept variations that native speakers would understand, even if not perfectly idiomatic.
 
         Use simplified Chinese for all suggestions.
         """
