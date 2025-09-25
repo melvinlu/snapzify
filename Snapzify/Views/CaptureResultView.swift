@@ -137,7 +137,7 @@ struct CaptureResultView: View {
                                                             Text(message.role == "user" ? "Question:" : "Answer:")
                                                                 .font(.system(size: 13, weight: .semibold))
                                                                 .foregroundStyle(T.C.ink2)
-                                                                .frame(width: 40, alignment: .topLeading)
+                                                                .frame(width: 70, alignment: .topLeading)
 
                                                             Text(message.content)
                                                                 .font(.system(size: 14))
