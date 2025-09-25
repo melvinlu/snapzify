@@ -26,17 +26,19 @@ class ChatGPTServiceImpl: ChatGPTService {
     func streamBreakdown(chineseText: String, isStandalone: Bool = false) -> AsyncThrowingStream<String, Error> {
         let prompt: String
         if isStandalone {
-            // For standalone popup, provide overall meaning followed by character/word breakdown
+            // For capture result and standalone popup
             prompt = """
             Analyze this Chinese text: \(chineseText)
-            
-            First provide the overall English translation.
-            
-            Then provide a character/word breakdown in format:
-            - [Chinese word/character]: [pinyin], [meaning]
-            
-            Group multi-character words together.
-            Be concise and clear. Do not number the sections.
+
+            Start with a character/word breakdown:
+            [Chinese word/character]: [pinyin], [meaning]
+
+            Group multi-character words together when they form meaningful units.
+
+            After the breakdown, provide the overall English translation as a natural sentence.
+
+            Do not use headers, prefixes, or labels for these sections. Just present the breakdown followed by the translation.
+            Be concise and clear.
             """
         } else {
             // For document view, just provide translation

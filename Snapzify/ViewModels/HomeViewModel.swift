@@ -14,6 +14,10 @@ class HomeViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var showPhotoPicker = false
     @Published var showConversation = false
+    @Published var showCamera = false
+    @Published var capturedImage: UIImage?
+    @Published var showCaptureResult = false
+    @Published var capturedText: String = ""
     @Published var errorMessage: String?
     @Published var processingProgress: String = ""
     @Published var activeProcessingTasks: [ProcessingTask] = []
@@ -139,6 +143,174 @@ class HomeViewModel: ObservableObject {
     
     func pickScreenshot() {
         showPhotoPicker = true
+    }
+
+    func openCamera() {
+        showCamera = true
+    }
+
+    func processCapturedImage(_ image: UIImage) async {
+        let sessionId = UUID().uuidString.prefix(8)
+        print("\n🔍 === OCR Session \(sessionId) Starting ===")
+
+        // Clear any previous state
+        await MainActor.run {
+            capturedText = ""
+            capturedImage = nil
+        }
+
+        capturedImage = image
+        isProcessing = true
+
+        do {
+            // Perform OCR to get all text
+            print("[\(sessionId)] Starting OCR on image: \(image.size)")
+            let ocrLines = try await ocrService.recognizeText(in: image)
+
+            // Debug: Log raw OCR results
+            print("[\(sessionId)] === OCR Debug ===")
+            print("[\(sessionId)] Total OCR lines detected: \(ocrLines.count)")
+            for (index, line) in ocrLines.enumerated() {
+                print("Line \(index): '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY)")
+            }
+
+            // Filter to only Chinese text with bounds checking
+            let imageWidth = image.size.width
+            let imageHeight = image.size.height
+
+            let chineseOnlyLines = ocrLines.filter { line in
+                let trimmed = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                // Check if bounding box is within image bounds
+                let isInBounds = line.bbox.minX >= 0 &&
+                                line.bbox.minY >= 0 &&
+                                line.bbox.maxX <= imageWidth &&
+                                line.bbox.maxY <= imageHeight
+
+                let hasChinese = containsChinese(trimmed)
+
+                if hasChinese {
+                    if !isInBounds {
+                        print("  ⚠️ OUT OF BOUNDS Chinese text: '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY), maxX:\(line.bbox.maxX), maxY:\(line.bbox.maxY)")
+                    } else {
+                        print("  ✓ Valid Chinese: '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY)")
+                    }
+                }
+
+                return !trimmed.isEmpty && hasChinese && isInBounds
+            }
+
+            print("\nFiltered Chinese lines: \(chineseOnlyLines.count)")
+            print("Image size: width=\(image.size.width), height=\(image.size.height)")
+            for (index, line) in chineseOnlyLines.enumerated() {
+                print("Chinese line \(index): '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY)")
+            }
+
+            guard !chineseOnlyLines.isEmpty else {
+                await MainActor.run {
+                    errorMessage = "No Chinese text found in image"
+                    isProcessing = false
+                }
+                return
+            }
+
+            // Group text into likely subtitle blocks based on X position alignment
+            // Subtitles usually have similar X positions (vertically aligned)
+            var textGroups: [[OCRLine]] = []
+
+            for line in chineseOnlyLines {
+                var foundGroup = false
+
+                // Check if this line belongs to an existing group (similar X position)
+                for i in 0..<textGroups.count {
+                    if let firstInGroup = textGroups[i].first {
+                        // If X positions are within 100 pixels, consider them part of same subtitle column
+                        if abs(line.bbox.minX - firstInGroup.bbox.minX) < 100 {
+                            textGroups[i].append(line)
+                            foundGroup = true
+                            break
+                        }
+                    }
+                }
+
+                if !foundGroup {
+                    textGroups.append([line])
+                }
+            }
+
+            // Find the largest group (likely the main subtitle)
+            let mainGroup = textGroups.max(by: { $0.count < $1.count }) ?? []
+
+            print("\nFound \(textGroups.count) text groups:")
+            for (index, group) in textGroups.enumerated() {
+                let groupText = group.map { $0.text }.joined(separator: "")
+                print("  Group \(index) (\(group.count) items): '\(groupText)' at X≈\(group.first?.bbox.minX ?? 0)")
+            }
+
+            // Additional filtering on the main group
+            let filteredLines = mainGroup.filter { line in
+                // Filter out very small text (likely UI elements)
+                let minTextHeight: CGFloat = 20
+                if line.bbox.height < minTextHeight {
+                    print("  ⚠️ Filtered out small text: '\(line.text)' height=\(line.bbox.height)")
+                    return false
+                }
+
+                // Filter out single characters that are likely noise (unless they're common particles)
+                let commonSingleChars = ["了", "的", "是", "在", "有", "我", "你", "他", "她", "它", "们", "这", "那", "不", "也", "就", "都", "和", "与", "或", "但", "可", "要", "会", "能", "到", "太", "很", "最", "更", "比", "把", "被", "让", "给", "为", "对", "向", "从", "在", "怕"]
+                if line.text.count == 1 && !commonSingleChars.contains(line.text) {
+                    // Check if it's part of a sequence with nearby Y positions
+                    let currentY = line.bbox.minY
+                    let hasNearbyText = mainGroup.contains { other in
+                        other.text != line.text && abs(other.bbox.minY - currentY) < 100
+                    }
+                    if !hasNearbyText {
+                        print("  ⚠️ Filtered out isolated single char: '\(line.text)'")
+                        return false
+                    }
+                }
+
+                return true
+            }
+
+            // Sort by Y position (top to bottom) then reverse for correct reading order
+            let sortedLines = filteredLines.sorted { $0.bbox.minY < $1.bbox.minY }
+            let finalLines = Array(sortedLines.reversed())
+
+            // Combine the text - no spaces for vertical Chinese text
+            let combinedText = finalLines.map { $0.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }.joined(separator: "")
+
+            print("\nFinal combined text: '\(combinedText)'")
+            print("=== End OCR Debug ===\n")
+
+            await MainActor.run {
+                capturedText = combinedText
+                isProcessing = false
+                showCaptureResult = true
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to process image: \(error.localizedDescription)"
+                isProcessing = false
+            }
+        }
+    }
+
+    private func containsChinese(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            // Check for CJK Unified Ideographs ranges
+            if (0x4E00...0x9FFF).contains(scalar.value) ||
+               (0x3400...0x4DBF).contains(scalar.value) ||
+               (0x20000...0x2A6DF).contains(scalar.value) ||
+               (0x2A700...0x2B73F).contains(scalar.value) ||
+               (0x2B740...0x2B81F).contains(scalar.value) ||
+               (0x2B820...0x2CEAF).contains(scalar.value) ||
+               (0xF900...0xFAFF).contains(scalar.value) ||
+               (0x2F800...0x2FA1F).contains(scalar.value) {
+                return true
+            }
+        }
+        return false
     }
     
     func processPickedImageWithTask(_ image: UIImage, taskId: UUID, checkVisibility: @escaping () -> Bool) async {
@@ -936,24 +1108,6 @@ class HomeViewModel: ObservableObject {
             }
         }
     }
-    
-    private func containsChinese(_ text: String) -> Bool {
-        for scalar in text.unicodeScalars {
-            // Check for CJK Unified Ideographs ranges
-            if (0x4E00...0x9FFF).contains(scalar.value) ||
-               (0x3400...0x4DBF).contains(scalar.value) ||
-               (0x20000...0x2A6DF).contains(scalar.value) ||
-               (0x2A700...0x2B73F).contains(scalar.value) ||
-               (0x2B740...0x2B81F).contains(scalar.value) ||
-               (0x2B820...0x2CEAF).contains(scalar.value) ||
-               (0x2CEB0...0x2EBEF).contains(scalar.value) ||
-               (0x30000...0x3134F).contains(scalar.value) {
-                return true
-            }
-        }
-        return false
-    }
-    
     private func processImage(_ image: UIImage, source: DocumentSource, assetIdentifier: String? = nil, forQueue: Bool = false) async throws -> Document {
         let script = ChineseScript(rawValue: selectedScript) ?? .simplified
         let document = try await processImageCore(

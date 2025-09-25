@@ -75,6 +75,9 @@
 		E0231CA15D1740708E0CA1C1 /* QueueActionExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 53383BBD552B4C18A5ECC156 /* QueueActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E4407D16310FD24BBD223D0A /* ChineseDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875ABEB622C89CF71AF70FD1 /* ChineseDetector.swift */; };
 		E81491167A9087FED37A06F2 /* OpenRecentScreenshotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C36FE5E568891BBA7F89A00 /* OpenRecentScreenshotIntent.swift */; };
+		CAM123456789ABCDEF012345 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAM123456789ABCDEF012344 /* CameraView.swift */; };
+		CUST23456789ABCDEF012345 /* CustomCameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CUST23456789ABCDEF012344 /* CustomCameraView.swift */; };
+		CAP123456789ABCDEF012347 /* CaptureResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAP123456789ABCDEF012346 /* CaptureResultView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -195,6 +198,9 @@
 		EBE6093C6A074BEBB56DF36F /* MainInterface.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = Base.lproj/MainInterface.storyboard; sourceTree = "<group>"; };
 		F681F60E8E6F38EEB03596EB /* DocumentStoreImpl.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentStoreImpl.swift; sourceTree = "<group>"; };
 		F9E5A269FB7C4FA73DA52D33 /* EnglishToChineseTranslationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EnglishToChineseTranslationService.swift; sourceTree = "<group>"; };
+		CAM123456789ABCDEF012344 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
+		CUST23456789ABCDEF012344 /* CustomCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCameraView.swift; sourceTree = "<group>"; };
+		CAP123456789ABCDEF012346 /* CaptureResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureResultView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -314,6 +320,9 @@
 				3D9B1A1F1234567890123461 /* DocumentInteractionView.swift */,
 				028565A1AA6F498119241E43 /* ScreenshotProcessingView.swift */,
 				628D7A3BF92046A4B96B822D /* TextInputView.swift */,
+				CAM123456789ABCDEF012344 /* CameraView.swift */,
+				CUST23456789ABCDEF012344 /* CustomCameraView.swift */,
+				CAP123456789ABCDEF012346 /* CaptureResultView.swift */,
 				9A0E2630A46CC43AFC12A77E /* Components */,
 			);
 			path = Views;
@@ -602,6 +611,9 @@
 				E81491167A9087FED37A06F2 /* OpenRecentScreenshotIntent.swift in Sources */,
 				A33117F3C323CEBDFDF76102 /* ScreenshotProcessingView.swift in Sources */,
 				A3263C9387D9202112194648 /* TextInputView.swift in Sources */,
+				CAM123456789ABCDEF012345 /* CameraView.swift in Sources */,
+				CUST23456789ABCDEF012345 /* CustomCameraView.swift in Sources */,
+				CAP123456789ABCDEF012347 /* CaptureResultView.swift in Sources */,
 				D4F8DF1EC6D9FFE58D20D9E4 /* EnglishToChineseTranslationService.swift in Sources */,
 				67C87C45186B6930F15DC8CE /* DocumentService.swift in Sources */,
 				A3C9632FD39ABD40EDFEA52A /* TextInputViewModel.swift in Sources */,

@@ -221,6 +221,29 @@ struct HomeView: View {
             maxSelectionCount: 10,
             matching: .any(of: [.images, .videos])
         )
+        .sheet(isPresented: $vm.showCamera) {
+            CustomCameraView { image in
+                Task {
+                    await vm.processCapturedImage(image)
+                }
+                vm.showCamera = false
+            } onCancel: {
+                vm.showCamera = false
+            }
+        }
+        .fullScreenCover(isPresented: $vm.showCaptureResult) {
+            if !vm.capturedText.isEmpty {
+                CaptureResultView(
+                    chineseText: vm.capturedText,
+                    capturedImage: vm.capturedImage,
+                    isShowing: $vm.showCaptureResult,
+                    onRetake: {
+                        vm.showCaptureResult = false
+                        vm.showCamera = true
+                    }
+                )
+            }
+        }
         .onChange(of: selectedPhotos) { newValues in
             guard !newValues.isEmpty else { return }
             
@@ -340,40 +363,55 @@ struct HomeView: View {
     
     @ViewBuilder
     private var quickActions: some View {
-        HStack(spacing: T.S.sm) {
-            Button {
-                vm.pickScreenshot()
-            } label: {
-                Label("Analyze", systemImage: "square.and.arrow.down")
-                    .foregroundStyle(T.C.ink)
-                    .frame(minWidth: 90)
-            }
-            .buttonStyle(SecondaryButtonStyle())
-            
-            Button {
-                if vm.isProcessingAudio {
-                    vm.cancelAudioProcessing()
-                } else {
-                    vm.startRecording()
+        VStack(spacing: T.S.sm) {
+            // First row: Analyze and Speak buttons (equal width)
+            HStack(spacing: T.S.sm) {
+                Button {
+                    vm.pickScreenshot()
+                } label: {
+                    Label("Analyze", systemImage: "square.and.arrow.down")
+                        .foregroundStyle(T.C.ink)
+                        .frame(maxWidth: .infinity)
                 }
-            } label: {
-                Label(
-                    vm.isProcessingAudio ? "Cancel" : (vm.isRecording ? "Stop" : "Speak"),
-                    systemImage: vm.isProcessingAudio ? "xmark.circle" : (vm.isRecording ? "stop.circle" : "mic.circle")
-                )
-                .foregroundStyle(vm.isRecording || vm.isProcessingAudio ? Color.red : T.C.ink)
-                .frame(minWidth: 90)
+                .buttonStyle(SecondaryButtonStyle())
+
+                Button {
+                    if vm.isProcessingAudio {
+                        vm.cancelAudioProcessing()
+                    } else {
+                        vm.startRecording()
+                    }
+                } label: {
+                    Label(
+                        vm.isProcessingAudio ? "Cancel" : (vm.isRecording ? "Stop" : "Speak"),
+                        systemImage: vm.isProcessingAudio ? "xmark.circle" : (vm.isRecording ? "stop.circle" : "mic.circle")
+                    )
+                    .foregroundStyle(vm.isRecording || vm.isProcessingAudio ? Color.red : T.C.ink)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryButtonStyle())
             }
-            .buttonStyle(SecondaryButtonStyle())
-            
-            Button {
-                vm.showConversation = true
-            } label: {
-                Label("Chat", systemImage: "bubble.left.and.bubble.right")
-                    .foregroundStyle(T.C.ink)
-                    .frame(minWidth: 90)
+
+            // Second row: Chat and Capture buttons
+            HStack(spacing: T.S.sm) {
+                Button {
+                    vm.showConversation = true
+                } label: {
+                    Label("Chat", systemImage: "questionmark.circle")
+                        .foregroundStyle(T.C.ink)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryButtonStyle())
+
+                Button {
+                    vm.openCamera()
+                } label: {
+                    Label("Capture", systemImage: "camera")
+                        .foregroundStyle(T.C.ink)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryButtonStyle())
             }
-            .buttonStyle(SecondaryButtonStyle())
         }
     }
     
