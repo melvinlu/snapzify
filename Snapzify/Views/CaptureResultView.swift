@@ -149,20 +149,20 @@ struct CaptureResultView: View {
 
                                                     if isLoadingChat && chatResponse.isEmpty {
                                                         HStack {
-                                                            Text("AI:")
+                                                            Text("Answer:")
                                                                 .font(.system(size: 13, weight: .semibold))
                                                                 .foregroundStyle(T.C.ink2)
-                                                                .frame(width: 40, alignment: .topLeading)
+                                                                .frame(width: 70, alignment: .topLeading)
                                                             ProgressView()
                                                                 .scaleEffect(0.8)
                                                         }
                                                         .id("loading")
                                                     } else if !chatResponse.isEmpty {
                                                         HStack(alignment: .top, spacing: T.S.sm) {
-                                                            Text("AI:")
+                                                            Text("Answer:")
                                                                 .font(.system(size: 13, weight: .semibold))
                                                                 .foregroundStyle(T.C.ink2)
-                                                                .frame(width: 40, alignment: .topLeading)
+                                                                .frame(width: 70, alignment: .topLeading)
 
                                                             Text(chatResponse)
                                                                 .font(.system(size: 14))
