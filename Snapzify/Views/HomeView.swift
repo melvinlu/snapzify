@@ -237,11 +237,7 @@ struct HomeView: View {
                     chineseText: $vm.capturedText,
                     capturedImage: vm.capturedImage,
                     isShowing: $vm.showCaptureResult,
-                    onRetake: { appendMode in
-                        vm.appendMode = appendMode
-                        vm.showCaptureResult = false
-                        vm.showCamera = true
-                    }
+                    homeViewModel: vm
                 )
             }
         }

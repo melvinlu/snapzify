@@ -10,9 +10,11 @@ struct CaptureResultView: View {
     @Binding var chineseText: String
     let capturedImage: UIImage?
     @Binding var isShowing: Bool
-    var onRetake: ((Bool) -> Void)? = nil
+    let homeViewModel: HomeViewModel
 
     @State private var appendNextCapture = false
+    @State private var showCamera = false
+    @State private var isProcessing = false
 
     @State private var chatGPTBreakdown = ""
     @State private var isLoadingBreakdown = false
@@ -37,6 +39,7 @@ struct CaptureResultView: View {
 
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     private let ttsService = ServiceContainer.shared.ttsService
+    private let ocrService = ServiceContainer.shared.ocrService
 
     var body: some View {
         NavigationView {
@@ -279,12 +282,13 @@ struct CaptureResultView: View {
                             // Capture button row with append checkbox
                             HStack(spacing: T.S.md) {
                                 Button {
-                                    onRetake?(appendNextCapture)
+                                    showCamera = true
                                 } label: {
-                                    Label("Capture", systemImage: "camera")
+                                    Label(isProcessing ? "Processing..." : "Capture", systemImage: "camera")
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(PrimaryButtonStyle())
+                                .disabled(isProcessing)
 
                                 Toggle(isOn: $appendNextCapture) {
                                     Text("Append")
@@ -316,6 +320,27 @@ struct CaptureResultView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showCamera) {
+            CustomCameraView { image in
+                showCamera = false
+                isProcessing = true
+
+                // Update append mode in view model
+                homeViewModel.appendMode = appendNextCapture
+
+                Task {
+                    await homeViewModel.processCapturedImage(image, fromCaptureResult: true)
+
+                    await MainActor.run {
+                        isProcessing = false
+                        // The text binding will automatically update
+                        chineseText = homeViewModel.capturedText
+                    }
+                }
+            } onCancel: {
+                showCamera = false
+            }
+        }
         .onAppear {
             loadChatGPTBreakdown()
             prepareAudio()

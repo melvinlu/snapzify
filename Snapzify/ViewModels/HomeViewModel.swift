@@ -151,7 +151,7 @@ class HomeViewModel: ObservableObject {
         showCamera = true
     }
 
-    func processCapturedImage(_ image: UIImage) async {
+    func processCapturedImage(_ image: UIImage, fromCaptureResult: Bool = false) async {
         let sessionId = UUID().uuidString.prefix(8)
         print("\n🔍 === OCR Session \(sessionId) Starting ===")
         print("Append mode: \(appendMode)")
@@ -322,7 +322,11 @@ class HomeViewModel: ObservableObject {
             await MainActor.run {
                 capturedText = combinedText
                 isProcessing = false
-                showCaptureResult = true
+                // Only show capture result if we're not already in it
+                // (fromCaptureResult indicates we're calling from CaptureResultView)
+                if !fromCaptureResult && !showCaptureResult {
+                    showCaptureResult = true
+                }
             }
         } catch {
             await MainActor.run {
