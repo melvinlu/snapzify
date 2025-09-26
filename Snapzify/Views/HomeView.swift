@@ -234,10 +234,11 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $vm.showCaptureResult) {
             if !vm.capturedText.isEmpty {
                 CaptureResultView(
-                    chineseText: vm.capturedText,
+                    chineseText: $vm.capturedText,
                     capturedImage: vm.capturedImage,
                     isShowing: $vm.showCaptureResult,
-                    onRetake: {
+                    onRetake: { appendMode in
+                        vm.appendMode = appendMode
                         vm.showCaptureResult = false
                         vm.showCamera = true
                     }

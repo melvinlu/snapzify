@@ -7,10 +7,12 @@ import AVFoundation
 // Button styles and RootBackground are in Theme.swift
 
 struct CaptureResultView: View {
-    let chineseText: String
+    @Binding var chineseText: String
     let capturedImage: UIImage?
     @Binding var isShowing: Bool
-    var onRetake: (() -> Void)? = nil
+    var onRetake: ((Bool) -> Void)? = nil
+
+    @State private var appendNextCapture = false
 
     @State private var chatGPTBreakdown = ""
     @State private var isLoadingBreakdown = false
@@ -43,16 +45,6 @@ struct CaptureResultView: View {
                     // Header with Chinese text
                     ScrollView {
                         VStack(spacing: T.S.lg) {
-                            // Captured image thumbnail (optional)
-                            if let image = capturedImage {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(maxHeight: 200)
-                                    .cornerRadius(12)
-                                    .padding(.horizontal)
-                            }
-
                             // Tappable Chinese text
                             TappableCharactersView(
                                 text: chineseText,
@@ -283,6 +275,26 @@ struct CaptureResultView: View {
                                 .buttonStyle(SecondaryButtonStyle())
                             }
                             .padding(.horizontal)
+
+                            // Capture button row with append checkbox
+                            HStack(spacing: T.S.md) {
+                                Button {
+                                    onRetake?(appendNextCapture)
+                                } label: {
+                                    Label("Capture", systemImage: "camera")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(PrimaryButtonStyle())
+
+                                Toggle(isOn: $appendNextCapture) {
+                                    Text("Append")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(T.C.ink2)
+                                }
+                                .toggleStyle(CheckboxToggleStyle())
+                                .frame(width: 100)
+                            }
+                            .padding(.horizontal)
                             .padding(.bottom)
                         }
                     }
@@ -296,25 +308,20 @@ struct CaptureResultView: View {
                         .foregroundStyle(T.C.ink)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        if onRetake != nil {
-                            Button {
-                                onRetake?()
-                            } label: {
-                                Image(systemName: "camera")
-                                    .foregroundStyle(T.C.accent)
-                            }
-                        }
-                        Button("Done") {
-                            isShowing = false
-                        }
-                        .foregroundStyle(T.C.accent)
+                    Button("Done") {
+                        isShowing = false
                     }
+                    .foregroundStyle(T.C.accent)
                 }
             }
         }
         .preferredColorScheme(.dark)
         .onAppear {
+            loadChatGPTBreakdown()
+            prepareAudio()
+        }
+        .onChange(of: chineseText) { _ in
+            // Reload breakdown when text changes (after append)
             loadChatGPTBreakdown()
             prepareAudio()
         }
@@ -591,5 +598,20 @@ private class AudioPlayerDelegate: NSObject, AVAudioPlayerDelegate {
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         onFinish()
+    }
+}
+
+// Custom checkbox toggle style
+struct CheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                .font(.system(size: 20))
+                .foregroundStyle(configuration.isOn ? T.C.accent : T.C.ink2)
+                .onTapGesture {
+                    configuration.isOn.toggle()
+                }
+            configuration.label
+        }
     }
 }

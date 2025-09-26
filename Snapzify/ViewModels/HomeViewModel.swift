@@ -19,6 +19,7 @@ class HomeViewModel: ObservableObject {
     @Published var capturedImage: UIImage?
     @Published var showCaptureResult = false
     @Published var capturedText: String = ""
+    @Published var appendMode: Bool = false
     @Published var errorMessage: String?
     @Published var processingProgress: String = ""
     @Published var activeProcessingTasks: [ProcessingTask] = []
@@ -153,10 +154,16 @@ class HomeViewModel: ObservableObject {
     func processCapturedImage(_ image: UIImage) async {
         let sessionId = UUID().uuidString.prefix(8)
         print("\n🔍 === OCR Session \(sessionId) Starting ===")
+        print("Append mode: \(appendMode)")
 
-        // Clear any previous state
+        // Store previous text if in append mode
+        let previousText = appendMode ? capturedText : ""
+
+        // Clear state for new capture (but preserve text if appending)
         await MainActor.run {
-            capturedText = ""
+            if !appendMode {
+                capturedText = ""
+            }
             capturedImage = nil
         }
 
@@ -301,9 +308,15 @@ class HomeViewModel: ObservableObject {
             let finalLines = Array(sortedLines.reversed())
 
             // Combine the text - no spaces for vertical Chinese text
-            let combinedText = finalLines.map { $0.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }.joined(separator: "")
+            let newText = finalLines.map { $0.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }.joined(separator: "")
+
+            // Append to previous text if in append mode
+            let combinedText = appendMode ? previousText + newText : newText
 
             print("\nFinal combined text: '\(combinedText)'")
+            if appendMode {
+                print("Appended to previous text: '\(previousText)'")
+            }
             print("=== End OCR Debug ===\n")
 
             await MainActor.run {
