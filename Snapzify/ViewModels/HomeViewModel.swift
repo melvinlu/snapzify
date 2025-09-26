@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import UIKit
+import CoreImage
 import Photos
 import AVFoundation
 import os.log
@@ -159,19 +160,24 @@ class HomeViewModel: ObservableObject {
             capturedImage = nil
         }
 
+        // Store original image for display
         capturedImage = image
         isProcessing = true
 
         do {
-            // Perform OCR to get all text
-            print("[\(sessionId)] Starting OCR on image: \(image.size)")
-            let ocrLines = try await ocrService.recognizeText(in: image)
+            // Preprocess image for better OCR
+            let preprocessedImage = preprocessImageForOCR(image)
+
+            // Perform OCR on preprocessed image
+            print("[\(sessionId)] Starting OCR on preprocessed image: \(preprocessedImage.size)")
+            let ocrLines = try await ocrService.recognizeText(in: preprocessedImage)
 
             // Debug: Log raw OCR results
             print("[\(sessionId)] === OCR Debug ===")
             print("[\(sessionId)] Total OCR lines detected: \(ocrLines.count)")
+            print("[\(sessionId)] Image dimensions: \(preprocessedImage.size)")
             for (index, line) in ocrLines.enumerated() {
-                print("Line \(index): '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY)")
+                print("Line \(index): '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY), width:\(line.bbox.width), height:\(line.bbox.height)")
             }
 
             // Filter to only Chinese text with bounds checking
@@ -238,43 +244,60 @@ class HomeViewModel: ObservableObject {
                 }
             }
 
-            // Find the largest group (likely the main subtitle)
-            let mainGroup = textGroups.max(by: { $0.count < $1.count }) ?? []
+            // Filter out noise groups and keep significant ones (more than 2 characters)
+            let significantGroups = textGroups.filter { group in
+                group.count > 2 || group.reduce(0, { $0 + $1.text.count }) > 2
+            }
 
             print("\nFound \(textGroups.count) text groups:")
             for (index, group) in textGroups.enumerated() {
                 let groupText = group.map { $0.text }.joined(separator: "")
                 print("  Group \(index) (\(group.count) items): '\(groupText)' at X≈\(group.first?.bbox.minX ?? 0)")
             }
+            print("Processing \(significantGroups.count) significant groups")
 
-            // Additional filtering on the main group
-            let filteredLines = mainGroup.filter { line in
-                // Filter out very small text (likely UI elements)
-                let minTextHeight: CGFloat = 20
-                if line.bbox.height < minTextHeight {
-                    print("  ⚠️ Filtered out small text: '\(line.text)' height=\(line.bbox.height)")
-                    return false
-                }
+            // Process all significant groups
+            var allFilteredLines: [OCRLine] = []
 
-                // Filter out single characters that are likely noise (unless they're common particles)
-                let commonSingleChars = ["了", "的", "是", "在", "有", "我", "你", "他", "她", "它", "们", "这", "那", "不", "也", "就", "都", "和", "与", "或", "但", "可", "要", "会", "能", "到", "太", "很", "最", "更", "比", "把", "被", "让", "给", "为", "对", "向", "从", "在", "怕"]
-                if line.text.count == 1 && !commonSingleChars.contains(line.text) {
-                    // Check if it's part of a sequence with nearby Y positions
-                    let currentY = line.bbox.minY
-                    let hasNearbyText = mainGroup.contains { other in
-                        other.text != line.text && abs(other.bbox.minY - currentY) < 100
-                    }
-                    if !hasNearbyText {
-                        print("  ⚠️ Filtered out isolated single char: '\(line.text)'")
+            for group in significantGroups {
+                let filteredGroup = group.filter { line in
+                    // Filter out very small text (likely UI elements)
+                    let minTextHeight: CGFloat = 15  // Lowered threshold
+                    if line.bbox.height < minTextHeight {
+                        print("  ⚠️ Filtered out small text: '\(line.text)' height=\(line.bbox.height)")
                         return false
                     }
-                }
 
-                return true
+                    // For groups with many items (likely subtitles), keep all characters
+                    // Only filter single chars if the group is small (likely noise)
+                    if group.count < 5 && line.text.count == 1 {
+                        // Only filter if it's truly isolated
+                        let currentY = line.bbox.minY
+                        let hasNearbyText = group.contains { other in
+                            other.text != line.text && abs(other.bbox.minY - currentY) < 150
+                        }
+                        if !hasNearbyText {
+                            print("  ⚠️ Filtered out isolated single char: '\(line.text)'")
+                            return false
+                        }
+                    }
+
+                    return true
+                }
+                allFilteredLines.append(contentsOf: filteredGroup)
             }
 
-            // Sort by Y position (top to bottom) then reverse for correct reading order
-            let sortedLines = filteredLines.sorted { $0.bbox.minY < $1.bbox.minY }
+            // Sort all lines by X position (for columns) then by Y position within each column
+            let sortedLines = allFilteredLines.sorted { line1, line2 in
+                // If X positions are significantly different (different columns), sort by X (right to left)
+                if abs(line1.bbox.minX - line2.bbox.minX) > 100 {
+                    return line1.bbox.minX > line2.bbox.minX  // Right to left for vertical Chinese
+                }
+                // Otherwise sort by Y position (top to bottom)
+                return line1.bbox.minY < line2.bbox.minY
+            }
+
+            // For vertical text, reverse to get correct reading order
             let finalLines = Array(sortedLines.reversed())
 
             // Combine the text - no spaces for vertical Chinese text
@@ -294,6 +317,72 @@ class HomeViewModel: ObservableObject {
                 isProcessing = false
             }
         }
+    }
+
+    private func preprocessImageForOCR(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        let context = CIContext(options: nil)
+
+        // Apply filters sequentially
+        var processedImage = ciImage
+
+        // 1. Convert to grayscale
+        if let grayscaleFilter = CIFilter(name: "CIColorControls") {
+            grayscaleFilter.setValue(processedImage, forKey: kCIInputImageKey)
+            grayscaleFilter.setValue(0.0, forKey: kCIInputSaturationKey)
+            if let output = grayscaleFilter.outputImage {
+                processedImage = output
+            }
+        }
+
+        // 2. Increase contrast moderately
+        if let contrastFilter = CIFilter(name: "CIColorControls") {
+            contrastFilter.setValue(processedImage, forKey: kCIInputImageKey)
+            contrastFilter.setValue(1.2, forKey: kCIInputContrastKey)  // Moderate contrast increase (1.0 is normal)
+            contrastFilter.setValue(0.05, forKey: kCIInputBrightnessKey) // Very slight brightness increase
+            if let output = contrastFilter.outputImage {
+                processedImage = output
+            }
+        }
+
+        // 3. Sharpen the image
+        if let sharpenFilter = CIFilter(name: "CISharpenLuminance") {
+            sharpenFilter.setValue(processedImage, forKey: kCIInputImageKey)
+            sharpenFilter.setValue(0.8, forKey: kCIInputSharpnessKey)
+            if let output = sharpenFilter.outputImage {
+                processedImage = output
+            }
+        }
+
+        // 4. Reduce noise
+        if let noiseReductionFilter = CIFilter(name: "CINoiseReduction") {
+            noiseReductionFilter.setValue(processedImage, forKey: kCIInputImageKey)
+            noiseReductionFilter.setValue(0.02, forKey: "inputNoiseLevel")
+            noiseReductionFilter.setValue(0.4, forKey: "inputSharpness")
+            if let output = noiseReductionFilter.outputImage {
+                processedImage = output
+            }
+        }
+
+        // 5. Apply moderate exposure adjustment
+        if let exposureFilter = CIFilter(name: "CIExposureAdjust") {
+            exposureFilter.setValue(processedImage, forKey: kCIInputImageKey)
+            exposureFilter.setValue(0.3, forKey: kCIInputEVKey) // Moderate exposure increase
+            if let output = exposureFilter.outputImage {
+                processedImage = output
+            }
+        }
+
+        // Convert back to UIImage
+        if let cgImage = context.createCGImage(processedImage, from: processedImage.extent) {
+            let finalImage = UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+            print("Image preprocessed: Original size \(image.size), Processed size \(finalImage.size)")
+            return finalImage
+        }
+
+        print("Image preprocessing failed, returning original")
+        return image
     }
 
     private func containsChinese(_ text: String) -> Bool {
