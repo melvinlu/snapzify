@@ -39,6 +39,7 @@ struct StandaloneChinesePopup: View {
         HStack(alignment: .center, spacing: 0) {
             // Pleco button
             Button {
+                print("🔵 StandalonePopup: Pleco button tapped")
                 openInPleco()
             } label: {
                 Image(systemName: "book")
@@ -69,6 +70,7 @@ struct StandaloneChinesePopup: View {
                 .fixedSize()
             } else {
                 Button {
+                    print("🔵 StandalonePopup: Audio button tapped")
                     playOrPauseAudio()
                 } label: {
                     Image(systemName: isPlaying ? "pause.fill" : "play.fill")
@@ -82,6 +84,7 @@ struct StandaloneChinesePopup: View {
 
             // ChatGPT button (with question mark icon like home page)
             Button {
+                print("🔵 StandalonePopup: ChatGPT embedded chat button tapped (questionmark icon)")
                 showChatInterface.toggle()
                 if showChatInterface {
                     isChatInputFocused = true
@@ -91,15 +94,30 @@ struct StandaloneChinesePopup: View {
                     .font(.system(size: 16))
             }
             .buttonStyle(StandalonePopupButtonStyle(isActive: showChatInterface))
-            
+
+            // Spacing after ChatGPT button
+            Spacer().frame(width: T.S.sm)
+
+            // Open in ChatGPT button
+            Button {
+                print("🔵 StandalonePopup: Open in ChatGPT app button tapped (arrow.up.forward.app icon)")
+                openInChatGPTApp()
+            } label: {
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 16))
+            }
+            .buttonStyle(StandalonePopupButtonStyle())
+
             // Removed All Characters button - automatic breakdown in prompt instead
-            
+
             // Push remaining space
             Spacer(minLength: 0)
         }
     }
     
     var body: some View {
+        let _ = print("🔵 StandalonePopup: Rendering popup for text: '\(chineseText)')")
+        let _ = print("🔵 StandalonePopup: Button bar should show: Pleco | Audio | ChatGPT(?) | OpenInChatGPT(arrow)")
         VStack(spacing: 0) {
             // Chinese text at top
             TappableCharactersView(
@@ -337,10 +355,43 @@ struct StandaloneChinesePopup: View {
     }
     
     // MARK: - Helper Methods
-    
+
     private func openInPleco() {
         if let encodedText = chineseText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
            let url = URL(string: "plecoapi://x-callback-url/s?q=\(encodedText)") {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private func openInChatGPTApp() {
+        // Build context string with current Chinese text and any loaded analysis
+        var prompt = "Please help me understand this Chinese text: \"\(chineseText)\""
+
+        if !chatGPTBreakdown.isEmpty {
+            prompt += "\n\nCurrent translation: \(chatGPTBreakdown)"
+        }
+
+        if !characterAnalyses.isEmpty {
+            prompt += "\n\nCharacter analyses:"
+            for (word, analysis) in characterAnalyses {
+                prompt += "\n\(word): \(analysis)"
+            }
+        }
+
+        // Add any existing chat conversation
+        if !chatResponse.isEmpty {
+            prompt += "\n\nPrevious conversation: \(chatResponse)"
+        }
+
+        let encodedPrompt = prompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+
+        // Try ChatGPT app first
+        if let url = URL(string: "chatgpt://message?prompt=\(encodedPrompt)"),
+           UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
+        // Fall back to web version
+        else if let url = URL(string: "https://chat.openai.com/?q=\(encodedPrompt)") {
             UIApplication.shared.open(url)
         }
     }

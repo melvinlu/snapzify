@@ -213,10 +213,52 @@ class HomeViewModel: ObservableObject {
                 return !trimmed.isEmpty && hasChinese && isInBounds
             }
 
-            print("\nFiltered Chinese lines: \(chineseOnlyLines.count)")
-            print("Image size: width=\(image.size.width), height=\(image.size.height)")
+            print("\n=== DETAILED OCR ANALYSIS ===")
+            print("Total Chinese lines detected: \(chineseOnlyLines.count)")
+            print("Image dimensions: width=\(image.size.width), height=\(image.size.height)")
+
+            print("\nRAW OCR OUTPUT (as detected):")
             for (index, line) in chineseOnlyLines.enumerated() {
-                print("Chinese line \(index): '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY)")
+                print("  Line \(index): '\(line.text)'")
+                print("    Position: x=\(line.bbox.minX), y=\(line.bbox.minY)")
+                print("    Size: width=\(line.bbox.width), height=\(line.bbox.height)")
+                print("    Character count: \(line.text.count)")
+                if line.text.contains(" ") {
+                    print("    ⚠️ Contains spaces - might be multiple words grouped!")
+                }
+            }
+
+            // Analyze Y-position distribution
+            let yPositions = chineseOnlyLines.map { $0.bbox.minY }.sorted()
+            print("\nY-POSITION ANALYSIS:")
+            print("  Y positions: \(yPositions)")
+            if yPositions.count > 1 {
+                for i in 1..<yPositions.count {
+                    let gap = yPositions[i] - yPositions[i-1]
+                    print("  Gap between line \(i-1) and \(i): \(gap) pixels")
+                }
+            }
+
+            // Group lines by Y position to show subtitle rows
+            var linesByRow: [CGFloat: [OCRLine]] = [:]
+            for line in chineseOnlyLines {
+                let roundedY = round(line.bbox.minY / 50) * 50  // Group lines within 50 pixels
+                if linesByRow[roundedY] == nil {
+                    linesByRow[roundedY] = []
+                }
+                linesByRow[roundedY]?.append(line)
+            }
+
+            print("\nINITIAL GROUPING BY Y (50px threshold):")
+            for y in linesByRow.keys.sorted() {
+                if let rowLines = linesByRow[y] {
+                    let sortedRow = rowLines.sorted { $0.bbox.minX < $1.bbox.minX }
+                    let rowText = sortedRow.map { $0.text }.joined(separator: " | ")
+                    print("  Row at Y≈\(y): '\(rowText)'")
+                    for line in sortedRow {
+                        print("    - '\(line.text)' at x:\(line.bbox.minX), y:\(line.bbox.minY)")
+                    }
+                }
             }
 
             guard !chineseOnlyLines.isEmpty else {
@@ -227,95 +269,179 @@ class HomeViewModel: ObservableObject {
                 return
             }
 
-            // Group text into likely subtitle blocks based on X position alignment
-            // Subtitles usually have similar X positions (vertically aligned)
-            var textGroups: [[OCRLine]] = []
-
-            for line in chineseOnlyLines {
-                var foundGroup = false
-
-                // Check if this line belongs to an existing group (similar X position)
-                for i in 0..<textGroups.count {
-                    if let firstInGroup = textGroups[i].first {
-                        // If X positions are within 100 pixels, consider them part of same subtitle column
-                        if abs(line.bbox.minX - firstInGroup.bbox.minX) < 100 {
-                            textGroups[i].append(line)
-                            foundGroup = true
-                            break
-                        }
-                    }
+            print("\nFILTERING PROCESS:")
+            // Filter out very small text and isolated characters
+            let filteredLines = chineseOnlyLines.filter { line in
+                print("  Checking line: '\(line.text)'")
+                // Filter out very small text (likely UI elements)
+                let minTextHeight: CGFloat = 15
+                if line.bbox.height < minTextHeight {
+                    print("  ⚠️ Filtered out small text: '\(line.text)' height=\(line.bbox.height)")
+                    return false
                 }
 
-                if !foundGroup {
-                    textGroups.append([line])
-                }
-            }
-
-            // Filter out noise groups and keep significant ones (more than 2 characters)
-            let significantGroups = textGroups.filter { group in
-                group.count > 2 || group.reduce(0, { $0 + $1.text.count }) > 2
-            }
-
-            print("\nFound \(textGroups.count) text groups:")
-            for (index, group) in textGroups.enumerated() {
-                let groupText = group.map { $0.text }.joined(separator: "")
-                print("  Group \(index) (\(group.count) items): '\(groupText)' at X≈\(group.first?.bbox.minX ?? 0)")
-            }
-            print("Processing \(significantGroups.count) significant groups")
-
-            // Process all significant groups
-            var allFilteredLines: [OCRLine] = []
-
-            for group in significantGroups {
-                let filteredGroup = group.filter { line in
-                    // Filter out very small text (likely UI elements)
-                    let minTextHeight: CGFloat = 15  // Lowered threshold
-                    if line.bbox.height < minTextHeight {
-                        print("  ⚠️ Filtered out small text: '\(line.text)' height=\(line.bbox.height)")
-                        return false
-                    }
-
-                    // For groups with many items (likely subtitles), keep all characters
-                    // Only filter single chars if the group is small (likely noise)
-                    if group.count < 5 && line.text.count == 1 {
-                        // Only filter if it's truly isolated
-                        let currentY = line.bbox.minY
-                        let hasNearbyText = group.contains { other in
-                            other.text != line.text && abs(other.bbox.minY - currentY) < 150
-                        }
-                        if !hasNearbyText {
-                            print("  ⚠️ Filtered out isolated single char: '\(line.text)'")
-                            return false
-                        }
-                    }
-
+                // Keep all multi-character text
+                if line.text.count > 1 {
                     return true
                 }
-                allFilteredLines.append(contentsOf: filteredGroup)
-            }
 
-            // Sort all lines by X position (for columns) then by Y position within each column
-            let sortedLines = allFilteredLines.sorted { line1, line2 in
-                // If X positions are significantly different (different columns), sort by X (right to left)
-                if abs(line1.bbox.minX - line2.bbox.minX) > 100 {
-                    return line1.bbox.minX > line2.bbox.minX  // Right to left for vertical Chinese
+                // For single characters, check if there are other characters nearby
+                let currentY = line.bbox.minY
+                let currentX = line.bbox.minX
+                let hasNearbyText = chineseOnlyLines.contains { other in
+                    if other.text == line.text { return false }
+                    let yDiff = abs(other.bbox.minY - currentY)
+                    let xDiff = abs(other.bbox.minX - currentX)
+                    // Check if there's text nearby (within reasonable subtitle distance)
+                    return (yDiff < 100 || xDiff < 200)
                 }
-                // Otherwise sort by Y position (top to bottom)
-                return line1.bbox.minY < line2.bbox.minY
+
+                if !hasNearbyText {
+                    print("  ⚠️ Filtered out isolated single char: '\(line.text)'")
+                    return false
+                }
+
+                print("    ✓ Keeping line: '\(line.text)'")
+                return true
             }
 
-            // For vertical text, reverse to get correct reading order
-            let finalLines = Array(sortedLines.reversed())
+            print("\nFILTERED LINES SUMMARY:")
+            print("  Before: \(chineseOnlyLines.count) lines")
+            print("  After: \(filteredLines.count) lines")
 
-            // Combine the text - no spaces for vertical Chinese text
-            let newText = finalLines.map { $0.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }.joined(separator: "")
+            // Split multi-word detections into individual words
+            print("\nSPLITTING MULTI-WORD DETECTIONS:")
+            var splitLines: [OCRLine] = []
+
+            for line in filteredLines {
+                // Check if line contains spaces (multiple words grouped)
+                if line.text.contains(" ") {
+                    print("  Splitting: '\(line.text)'")
+                    let words = line.text.split(separator: " ")
+
+                    // Estimate width per word based on total width
+                    let estimatedWidthPerWord = line.bbox.width / CGFloat(words.count)
+                    var currentX = line.bbox.minX
+
+                    for word in words {
+                        let wordText = String(word)
+                        if !wordText.isEmpty {
+                            let wordWidth = estimatedWidthPerWord * CGFloat(wordText.count) / CGFloat(words.map { $0.count }.reduce(0, +) / words.count)
+                            let wordLine = OCRLine(
+                                text: wordText,
+                                bbox: CGRect(x: currentX, y: line.bbox.minY, width: wordWidth, height: line.bbox.height),
+                                words: []
+                            )
+                            splitLines.append(wordLine)
+                            print("    → '\(wordText)' at estimated x=\(currentX)")
+                            currentX += wordWidth
+                        }
+                    }
+                } else {
+                    splitLines.append(line)
+                }
+            }
+
+            print("  Split result: \(filteredLines.count) lines → \(splitLines.count) lines")
+
+            // NEW APPROACH: Build comprehensive rows based on Y clustering
+            print("\nSUBTITLE TEXT RECONSTRUCTION:")
+
+            // Step 1: Cluster lines by Y position with tighter threshold for subtitles
+            var rowClusters: [[OCRLine]] = []
+            let sortedByY = splitLines.sorted { $0.bbox.minY < $1.bbox.minY }
+
+            for line in sortedByY {
+                var foundCluster = false
+
+                // Try to find a cluster with similar Y position
+                for i in 0..<rowClusters.count {
+                    let clusterAvgY = rowClusters[i].reduce(0.0) { $0 + $1.bbox.minY } / CGFloat(rowClusters[i].count)
+
+                    // Use tight threshold for subtitles (typically well-aligned)
+                    let threshold: CGFloat = 25
+
+                    if abs(line.bbox.minY - clusterAvgY) <= threshold {
+                        rowClusters[i].append(line)
+                        foundCluster = true
+                        break
+                    }
+                }
+
+                if !foundCluster {
+                    rowClusters.append([line])
+                }
+            }
+
+            print("  Found \(rowClusters.count) text row(s)")
+
+            // Step 2: Sort clusters by average Y position
+            rowClusters.sort { cluster1, cluster2 in
+                let avgY1 = cluster1.reduce(0.0) { $0 + $1.bbox.minY } / CGFloat(cluster1.count)
+                let avgY2 = cluster2.reduce(0.0) { $0 + $1.bbox.minY } / CGFloat(cluster2.count)
+                return avgY1 < avgY2
+            }
+
+            // Step 3: Within each cluster, sort by X position and reconstruct text
+            var allText: [String] = []
+
+            for (idx, cluster) in rowClusters.enumerated() {
+                // Sort by X position (left to right)
+                let sortedCluster = cluster.sorted { $0.bbox.minX < $1.bbox.minX }
+
+                print("\n  Row \(idx + 1):")
+                print("    Y range: \(sortedCluster.map { $0.bbox.minY }.min() ?? 0) - \(sortedCluster.map { $0.bbox.minY }.max() ?? 0)")
+                print("    Components:")
+
+                // Build row text with proper spacing detection
+                var rowComponents: [String] = []
+                var lastMaxX: CGFloat = -1
+
+                for (i, line) in sortedCluster.enumerated() {
+                    print("      \(i+1). '\(line.text)' at x=\(line.bbox.minX), y=\(line.bbox.minY), width=\(line.bbox.width)")
+
+                    // Clean the text
+                    let cleanText = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: " ", with: "")
+
+                    if !cleanText.isEmpty {
+                        // Check if there's a significant gap from previous word
+                        if lastMaxX > 0 {
+                            let gap = line.bbox.minX - lastMaxX
+                            let avgCharWidth = line.bbox.width / CGFloat(max(1, cleanText.count))
+
+                            // If gap is more than 2 character widths, might be separate phrase
+                            if gap > avgCharWidth * 2 {
+                                print("        (Large gap detected: \(gap) pixels)")
+                            }
+                        }
+
+                        rowComponents.append(cleanText)
+                        lastMaxX = line.bbox.maxX
+                    }
+                }
+
+                // Join components without spaces (Chinese doesn't use spaces)
+                let rowText = rowComponents.joined(separator: "")
+                print("    Reconstructed text: '\(rowText)'")
+
+                if !rowText.isEmpty {
+                    allText.append(rowText)
+                }
+            }
+
+            // Join all rows - you might want spaces between subtitle lines
+            let newText = allText.joined(separator: " ")
 
             // Append to previous text if in append mode
             let combinedText = appendMode ? previousText + newText : newText
 
-            print("\nFinal combined text: '\(combinedText)'")
+            print("\nFINAL RESULT:")
+            print("  Total rows: \(rowClusters.count)")
+            print("  All rows text: \(allText)")
+            print("  Combined text: '\(combinedText)'")
             if appendMode {
-                print("Appended to previous text: '\(previousText)'")
+                print("  (Appended to previous: '\(previousText)')")
             }
             print("=== End OCR Debug ===\n")
 

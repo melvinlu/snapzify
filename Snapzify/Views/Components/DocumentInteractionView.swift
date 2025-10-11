@@ -172,13 +172,25 @@ struct SelectedSentencePopup: View {
     @State private var chatGPTBreakdown = ""
     @State private var isLoadingBreakdown = false
     @State private var breakdownTask: Task<Void, Never>?
+    @State private var pinyinText = ""
+    @State private var isLoadingPinyin = false
+    @State private var pinyinTask: Task<Void, Never>?
+    @State private var tappedCharacterPosition: CGPoint?
+    @State private var tappedCharacterAnalysis: String = ""
     @State private var selectedWords: [String] = []
     @State private var characterAnalyses: [String: String] = [:]
     @State private var isLoadingCharacter = false
     @State private var characterTask: Task<Void, Never>?
     @State private var showAllBreakdowns = false
     @State private var isLoadingAllBreakdowns = false
-    
+    @State private var showChatInterface = false
+    @State private var chatInput = ""
+    @State private var chatResponse = ""
+    @State private var isLoadingChatResponse = false
+    @State private var chatTask: Task<Void, Never>?
+    @State private var chatHistory: [(role: String, content: String)] = []
+    @FocusState private var isChatInputFocused: Bool
+
     private let chatGPTService = ServiceContainer.shared.chatGPTService
     
     // Computed property for concatenated text
@@ -193,6 +205,50 @@ struct SelectedSentencePopup: View {
             return false
         }
         return currentIndex < allSentences.count - 1
+    }
+
+    // Character analysis popup view
+    @ViewBuilder
+    private var characterAnalysisPopup: some View {
+        if !selectedWords.isEmpty,
+           let word = selectedWords.last,
+           let analysis = characterAnalyses[word] {
+            VStack(alignment: .leading, spacing: 4) {
+                // Parse the analysis
+                let lines = analysis.split(separator: "\n")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+
+                if lines.count >= 2 {
+                    // Word with pinyin and definition
+                    Text("\(word): \(lines[0])")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(T.C.ink)
+                    Text(lines[1])
+                        .font(.system(size: 11))
+                        .foregroundStyle(T.C.ink2)
+
+                    // Additional lines if any
+                    if lines.count > 2 {
+                        ForEach(Array(lines.dropFirst(2)), id: \.self) { line in
+                            Text(line)
+                                .font(.system(size: 10))
+                                .foregroundStyle(T.C.ink2)
+                        }
+                    }
+                }
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(UIColor.systemBackground))
+                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+            )
+        }
     }
     
     @ViewBuilder
@@ -240,39 +296,23 @@ struct SelectedSentencePopup: View {
                 .buttonStyle(PopupButtonStyle(isActive: vm.isPlaying))
             }
             
-            // All Characters button (only show if ChatGPT is configured)
+            // ChatGPT inline button (only show if ChatGPT is configured)
             if chatGPTService.isConfigured() {
-                // Spacing before All button
+                // Spacing before ChatGPT button
                 Spacer().frame(width: T.S.sm)
-                
-                if isLoadingAllBreakdowns {
-                    HStack(spacing: 4) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: T.C.accent))
-                            .scaleEffect(0.6)
-                        Text("Load")
-                            .font(.caption)
-                            .foregroundStyle(T.C.ink2)
-                            .fixedSize()
+
+                Button {
+                    showChatInterface.toggle()
+                    if showChatInterface {
+                        isChatInputFocused = true
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(T.C.ink.opacity(0.1))
-                    )
-                    .fixedSize()
-                } else {
-                    Button {
-                        loadAllCharacterBreakdowns()
-                    } label: {
-                        Image(systemName: "text.badge.checkmark")
-                            .font(.system(size: 16))
-                    }
-                    .buttonStyle(PopupButtonStyle(isActive: showAllBreakdowns))
+                } label: {
+                    Image(systemName: showChatInterface ? "xmark.circle.fill" : "questionmark.circle")
+                        .font(.system(size: 16))
                 }
-                
-                // Spacing after All button
+                .buttonStyle(PopupButtonStyle(isActive: showChatInterface))
+
+                // Spacing after ChatGPT button
                 Spacer().frame(width: T.S.sm)
             }
             
@@ -325,9 +365,89 @@ struct SelectedSentencePopup: View {
             .padding(T.S.lg)
             
             // Scrollable middle section for translation and breakdowns
-            ScrollView(.vertical, showsIndicators: true) {
+            ScrollViewReader { mainScrollProxy in
+                ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: T.S.sm) {
-                    // Always show sentence translation first
+                    // Show pinyin if available
+                    if !pinyinText.isEmpty {
+                        Text(pinyinText)
+                            .font(.system(size: 12))
+                            .foregroundStyle(T.C.ink2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
+                    } else if isLoadingPinyin {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            Text("Loading pinyin...")
+                                .font(.system(size: 12))
+                                .foregroundStyle(T.C.ink2)
+                        }
+                        .padding(.horizontal, 4)
+                    }
+
+                    // Character/word breakdown - show most recent selection
+                    if !selectedWords.isEmpty,
+                       let lastWord = selectedWords.last,
+                       let analysis = characterAnalyses[lastWord] {
+                        VStack(alignment: .leading, spacing: 4) {
+                            // Parse the analysis
+                            let lines = analysis.split(separator: "\n")
+                                .map { $0.trimmingCharacters(in: .whitespaces) }
+                                .filter { !$0.isEmpty }
+
+                            if lines.count >= 2 {
+                                // Word with pinyin and definition
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text(lastWord)
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(T.C.ink)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(lines[0]) // Pinyin
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundStyle(T.C.ink2)
+                                        Text(lines[1]) // Definition
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(T.C.ink)
+                                    }
+                                }
+
+                                // Additional character breakdowns for multi-character words
+                                if lastWord.count > 1 && lines.count > 2 {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        ForEach(Array(lines.dropFirst(2)), id: \.self) { line in
+                                            Text(line)
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(T.C.ink2)
+                                        }
+                                    }
+                                    .padding(.leading, 8)
+                                }
+                            }
+                        }
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(T.C.ink.opacity(0.05))
+                        )
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 4)
+                    } else if isLoadingCharacter {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            Text("Analyzing character...")
+                                .font(.system(size: 12))
+                                .foregroundStyle(T.C.ink2)
+                        }
+                        .padding(.horizontal, 4)
+                    }
+
+                    Divider()
+                        .padding(.vertical, 4)
+
+                    // English translation
                     if chatGPTBreakdown.isEmpty && isLoadingBreakdown {
                         HStack {
                             ProgressView()
@@ -341,7 +461,7 @@ struct SelectedSentencePopup: View {
                     } else if !chatGPTBreakdown.isEmpty {
                         Text(chatGPTBreakdown)
                             .font(.system(size: 14))
-                            .foregroundStyle(T.C.ink2)
+                            .foregroundStyle(T.C.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
@@ -401,18 +521,95 @@ struct SelectedSentencePopup: View {
                             .padding(.horizontal, 4)
                         }
                     }
+
+                    // ChatGPT Interface
+                    if showChatInterface {
+                        Divider()
+                            .padding(.vertical, 4)
+                            .id("chatInterface")
+
+                        VStack(alignment: .leading, spacing: T.S.sm) {
+                            // Chat input
+                            HStack {
+                                TextField("Ask about this text...", text: $chatInput)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .focused($isChatInputFocused)
+                                    .onSubmit {
+                                        sendChatMessage()
+                                    }
+
+                                Button {
+                                    sendChatMessage()
+                                } label: {
+                                    Image(systemName: "paperplane.fill")
+                                        .font(.system(size: 14))
+                                }
+                                .disabled(chatInput.isEmpty || isLoadingChatResponse)
+                                .buttonStyle(PlainButtonStyle())
+                                .foregroundColor(chatInput.isEmpty || isLoadingChatResponse ? .gray : T.C.accent)
+                            }
+
+                            // Chat response area (no nested scroll)
+                            VStack(alignment: .leading, spacing: 8) {
+                                if !chatResponse.isEmpty {
+                                    Text(chatResponse)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(T.C.ink2)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(Color.gray.opacity(0.1))
+                                        )
+                                }
+
+                                if isLoadingChatResponse {
+                                    HStack {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Thinking...")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(T.C.ink2)
+                                    }
+                                    .padding(.horizontal, 4)
+                                }
+
+                                // Anchor for scrolling to bottom of response
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id("chatResponseBottom")
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, T.S.lg)
                 .padding(.vertical, T.S.sm)
+                    .onChange(of: isLoadingChatResponse) { loading in
+                        if loading {
+                            // Small delay to ensure UI updates
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    mainScrollProxy.scrollTo("chatResponseBottom", anchor: .bottom)
+                                }
+                            }
+                        }
+                    }
+                    .onChange(of: chatResponse) { _ in
+                        // Keep scrolling to bottom as response streams in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            mainScrollProxy.scrollTo("chatResponseBottom", anchor: .bottom)
+                        }
+                    }
+                }
+                .frame(maxHeight: .infinity)
+                .scrollIndicators(.visible, axes: .vertical)
             }
-            .frame(maxHeight: .infinity)
-            .scrollIndicators(.visible, axes: .vertical)
             
             // Action buttons anchored at bottom
             actionButtons
                 .padding(T.S.lg)
         }
-        .frame(minHeight: 60, maxHeight: 300)
+        .frame(minHeight: 250, maxHeight: 450)
         .frame(maxWidth: 340)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -424,13 +621,22 @@ struct SelectedSentencePopup: View {
             selectedWords.removeAll()
             characterAnalyses.removeAll()
             chatGPTBreakdown = ""
+            pinyinText = ""
             isLoadingCharacter = false
             showAllBreakdowns = false
             isLoadingAllBreakdowns = false
             characterTask?.cancel()
             breakdownTask?.cancel()
-            
-            // Load the sentence translation
+            pinyinTask?.cancel()
+            chatTask?.cancel()
+            showChatInterface = false
+            chatInput = ""
+            chatResponse = ""
+            chatHistory = []
+            isLoadingChatResponse = false
+
+            // Load both pinyin and translation in parallel
+            loadPinyin()
             loadChatGPTBreakdown()
         }
         .onChange(of: concatenatedText) { _ in
@@ -449,13 +655,21 @@ struct SelectedSentencePopup: View {
             // Clean up when popup disappears
             breakdownTask?.cancel()
             characterTask?.cancel()
+            pinyinTask?.cancel()
+            chatTask?.cancel()
             selectedWords.removeAll()
             characterAnalyses.removeAll()
             chatGPTBreakdown = ""
+            pinyinText = ""
             isLoadingCharacter = false
             isLoadingBreakdown = false
+            isLoadingPinyin = false
             showAllBreakdowns = false
             isLoadingAllBreakdowns = false
+            showChatInterface = false
+            chatInput = ""
+            chatResponse = ""
+            isLoadingChatResponse = false
         }
     }
     
@@ -544,9 +758,14 @@ struct SelectedSentencePopup: View {
     
     private func loadCharacterAnalysis(for character: String, at position: Int) {
         guard chatGPTService.isConfigured() else { return }
-        
+
+        // Clear previous selections for deterministic display
+        selectedWords.removeAll()
+        characterAnalyses.removeAll()
+        characterTask?.cancel()
+
         isLoadingCharacter = true
-        
+
         characterTask = Task {
             var isFirstLine = true
             var fullAnalysis = ""
@@ -663,17 +882,19 @@ struct SelectedSentencePopup: View {
     
     private func loadChatGPTBreakdown() {
         guard chatGPTService.isConfigured() else { return }
-        
-        print("📝 Loading ChatGPT breakdown for text: '\(concatenatedText)'")
-        print("📝 Number of sentences: \(sentences.count)")
-        
+
+        print("📝 Loading English translation for text: '\(concatenatedText)'")
+
         isLoadingBreakdown = true
         chatGPTBreakdown = ""
-        
+
+        // Request only the English translation
+        let translationPrompt = "Translate this Chinese text to English: \"\(concatenatedText)\"\n\nProvide only the natural English translation, nothing else."
+
         breakdownTask = Task {
             do {
                 var isFirstChunk = true
-                for try await chunk in chatGPTService.streamBreakdown(chineseText: concatenatedText, isStandalone: false) {
+                for try await chunk in chatGPTService.streamCustomPrompt(chineseText: "", userPrompt: translationPrompt) {
                     if !Task.isCancelled {
                         await MainActor.run {
                             if isFirstChunk {
@@ -686,8 +907,129 @@ struct SelectedSentencePopup: View {
                 }
             } catch {
                 await MainActor.run {
-                    chatGPTBreakdown = "Error loading breakdown"
+                    chatGPTBreakdown = "Error loading translation"
                     isLoadingBreakdown = false
+                }
+            }
+        }
+    }
+
+    private func loadPinyin() {
+        guard chatGPTService.isConfigured() else { return }
+
+        print("🎵 Loading pinyin for text: '\(concatenatedText)'")
+
+        isLoadingPinyin = true
+        pinyinText = ""
+
+        // Request pinyin for each character
+        let pinyinPrompt = """
+        Provide the pinyin for each character in this Chinese text: \"\(concatenatedText)\"
+
+        Output ONLY the pinyin syllables separated by spaces, one for each character.
+        Include tone marks (ā á ǎ à etc).
+        For punctuation or non-Chinese characters, output a dash (-).
+
+        Example: If the text is "你好吗？", output: "nǐ hǎo ma -"
+
+        Text: \"\(concatenatedText)\"
+        Pinyin:
+        """
+
+        pinyinTask = Task {
+            do {
+                var isFirstChunk = true
+                for try await chunk in chatGPTService.streamCustomPrompt(chineseText: "", userPrompt: pinyinPrompt) {
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            if isFirstChunk {
+                                isLoadingPinyin = false
+                                isFirstChunk = false
+                            }
+                            pinyinText += chunk
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    pinyinText = ""
+                    isLoadingPinyin = false
+                }
+            }
+        }
+    }
+
+    private func sendChatMessage() {
+        guard !chatInput.isEmpty, chatGPTService.isConfigured() else { return }
+
+        let userQuestion = chatInput
+        chatInput = ""
+        isLoadingChatResponse = true
+        chatResponse = ""
+
+        // Add user question to history
+        chatHistory.append((role: "user", content: userQuestion))
+
+        // Build context for the chat
+        var contextPrompt = "Context: The user is studying this Chinese text: \"\(concatenatedText)\""
+
+        if !chatGPTBreakdown.isEmpty {
+            contextPrompt += "\n\nTranslation: \(chatGPTBreakdown)"
+        }
+
+        if !characterAnalyses.isEmpty {
+            contextPrompt += "\n\nCharacter breakdowns:"
+            for (word, analysis) in characterAnalyses {
+                contextPrompt += "\n\(word): \(analysis)"
+            }
+        }
+
+        // Add conversation history for context
+        if chatHistory.count > 1 {
+            contextPrompt += "\n\nConversation history:"
+            for (index, message) in chatHistory.enumerated() {
+                if index < chatHistory.count - 1 {  // Don't duplicate the current question
+                    contextPrompt += "\n\(message.role == "user" ? "User" : "Assistant"): \(message.content)"
+                }
+            }
+        }
+
+        contextPrompt += "\n\nCurrent user question: \(userQuestion)"
+        contextPrompt += """
+
+        Please answer the user's question about this Chinese text, considering the conversation history.
+
+        IMPORTANT: Structure your response as follows:
+        1. First, provide your answer in Chinese (if the question is about Chinese language)
+        2. Then add one line break
+        3. Then provide the English translation of your Chinese response (no brackets or prefix, just the translation)
+        4. Then add one line break
+        5. Then provide the pinyin transcription of YOUR CHINESE RESPONSE ONLY (not the original text, but the Chinese answer you just gave)
+
+        Be concise and helpful. If your response doesn't include Chinese, just answer normally without the translation/pinyin.
+        """
+
+        chatTask = Task {
+            do {
+                var fullResponse = ""
+                for try await chunk in chatGPTService.streamCustomPrompt(chineseText: "", userPrompt: contextPrompt) {
+                    if !Task.isCancelled {
+                        fullResponse += chunk
+                        await MainActor.run {
+                            isLoadingChatResponse = false
+                            chatResponse = fullResponse
+                        }
+                    }
+                }
+
+                // Add assistant response to history
+                await MainActor.run {
+                    chatHistory.append((role: "assistant", content: fullResponse))
+                }
+            } catch {
+                await MainActor.run {
+                    chatResponse = "Error: Unable to get response"
+                    isLoadingChatResponse = false
                 }
             }
         }
