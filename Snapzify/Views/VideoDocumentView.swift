@@ -111,6 +111,7 @@ struct VideoDocumentView: View {
                     SelectedSentencePopup(
                         sentences: displaySentences,
                         allSentences: vm.document.sentences,
+                        documentContext: vm.document.additionalInfo,
                         vm: vm.createSentenceViewModel(for: sentence),
                         isShowing: $showingPopup,
                         position: tapLocation,

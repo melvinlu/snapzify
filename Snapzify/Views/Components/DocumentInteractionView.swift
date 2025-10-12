@@ -161,6 +161,7 @@ struct WrappingHStack: Layout {
 struct SelectedSentencePopup: View {
     let sentences: [Sentence]  // Changed to array to support extended sentences
     let allSentences: [Sentence]  // All sentences in document for finding next
+    let documentContext: String?  // Additional context about the document/image
     @ObservedObject var vm: SentenceViewModel
     @Binding var isShowing: Bool
     let position: CGPoint
@@ -175,8 +176,6 @@ struct SelectedSentencePopup: View {
     @State private var pinyinText = ""
     @State private var isLoadingPinyin = false
     @State private var pinyinTask: Task<Void, Never>?
-    @State private var tappedCharacterPosition: CGPoint?
-    @State private var tappedCharacterAnalysis: String = ""
     @State private var selectedWords: [String] = []
     @State private var characterAnalyses: [String: String] = [:]
     @State private var isLoadingCharacter = false
@@ -205,50 +204,6 @@ struct SelectedSentencePopup: View {
             return false
         }
         return currentIndex < allSentences.count - 1
-    }
-
-    // Character analysis popup view
-    @ViewBuilder
-    private var characterAnalysisPopup: some View {
-        if !selectedWords.isEmpty,
-           let word = selectedWords.last,
-           let analysis = characterAnalyses[word] {
-            VStack(alignment: .leading, spacing: 4) {
-                // Parse the analysis
-                let lines = analysis.split(separator: "\n")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
-
-                if lines.count >= 2 {
-                    // Word with pinyin and definition
-                    Text("\(word): \(lines[0])")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(T.C.ink)
-                    Text(lines[1])
-                        .font(.system(size: 11))
-                        .foregroundStyle(T.C.ink2)
-
-                    // Additional lines if any
-                    if lines.count > 2 {
-                        ForEach(Array(lines.dropFirst(2)), id: \.self) { line in
-                            Text(line)
-                                .font(.system(size: 10))
-                                .foregroundStyle(T.C.ink2)
-                        }
-                    }
-                }
-            }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(UIColor.systemBackground))
-                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-            )
-        }
     }
     
     @ViewBuilder
@@ -354,37 +309,82 @@ struct SelectedSentencePopup: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Chinese text at top
-            TappableCharactersView(
-                text: concatenatedText,
-                selectedWords: $selectedWords,
-                onCharacterTap: { char, position in
-                    loadCharacterAnalysis(for: char, at: position)
+            // Chinese text with pinyin directly below
+            VStack(alignment: .leading, spacing: 8) {
+                let pinyinArray = pinyinText.split(separator: " ").map { String($0) }
+                let characters = Array(concatenatedText)
+
+                // Use HStack with character-pinyin pairs
+                WrappingHStack(alignment: .top, spacing: 2) {
+                    ForEach(Array(characters.enumerated()), id: \.offset) { index, char in
+                        let charStr = String(char)
+                        let isHighlighted = selectedWords.contains(where: { $0.contains(charStr) })
+
+                        // Check character type
+                        let isChinese: Bool = {
+                            if let scalar = charStr.unicodeScalars.first {
+                                let value = scalar.value
+                                return (0x4E00...0x9FFF).contains(value) ||
+                                       (0x3400...0x4DBF).contains(value) ||
+                                       (0x20000...0x2A6DF).contains(value) ||
+                                       (0x2A700...0x2B73F).contains(value) ||
+                                       (0x2B740...0x2B81F).contains(value) ||
+                                       (0x2B820...0x2CEAF).contains(value) ||
+                                       (0xF900...0xFAFF).contains(value) ||
+                                       (0x2F800...0x2FA1F).contains(value)
+                            }
+                            return false
+                        }()
+
+                        let isSpace = charStr == " "
+                        let isPunctuation = "，。！？；：、）（【】《》".contains(charStr)
+
+                        VStack(spacing: 3) {
+                            // Character (tappable if Chinese)
+                            Text(charStr)
+                                .font(.system(size: isChinese ? 24 : 20, weight: .medium))
+                                .foregroundStyle(isHighlighted ? T.C.accent : T.C.ink)
+                                .onTapGesture {
+                                    if isChinese {
+                                        loadCharacterAnalysis(for: charStr, at: index)
+                                    }
+                                }
+
+                            // Pinyin or spacer below
+                            if isChinese && !pinyinText.isEmpty && index < pinyinArray.count {
+                                let pinyinSyllable = pinyinArray[index]
+                                if pinyinSyllable != "-" && !pinyinSyllable.isEmpty {
+                                    Text(pinyinSyllable)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(T.C.ink2)
+                                        .lineLimit(1)
+                                        .fixedSize(horizontal: true, vertical: false)
+                                } else {
+                                    // Empty space for alignment
+                                    Text(" ")
+                                        .font(.system(size: 10))
+                                        .opacity(0)
+                                }
+                            } else if isChinese && isLoadingPinyin && index == 0 {
+                                ProgressView()
+                                    .scaleEffect(0.4)
+                            } else {
+                                // Non-Chinese characters get empty space for alignment
+                                Text(" ")
+                                    .font(.system(size: 10))
+                                    .opacity(0)
+                            }
+                        }
+                        .frame(minWidth: isChinese ? 28 : (isSpace ? 12 : 16))
+                    }
                 }
-            )
+            }
             .padding(T.S.lg)
-            
+
             // Scrollable middle section for translation and breakdowns
             ScrollViewReader { mainScrollProxy in
                 ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: T.S.sm) {
-                    // Show pinyin if available
-                    if !pinyinText.isEmpty {
-                        Text(pinyinText)
-                            .font(.system(size: 12))
-                            .foregroundStyle(T.C.ink2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 4)
-                    } else if isLoadingPinyin {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                            Text("Loading pinyin...")
-                                .font(.system(size: 12))
-                                .foregroundStyle(T.C.ink2)
-                        }
-                        .padding(.horizontal, 4)
-                    }
 
                     // Character/word breakdown - show most recent selection
                     if !selectedWords.isEmpty,
@@ -467,60 +467,6 @@ struct SelectedSentencePopup: View {
                             .padding(.vertical, 2)
                     }
                     
-                    // Show character/word analyses below if any characters are selected
-                    if !selectedWords.isEmpty || isLoadingCharacter {
-                        Divider()
-                            .padding(.vertical, 4)
-                        
-                        // Character analyses
-                        ForEach(selectedWords, id: \.self) { word in
-                            if let analysis = characterAnalyses[word] {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    // Parse the analysis
-                                    let lines = analysis.split(separator: "\n")
-                                        .map { $0.trimmingCharacters(in: .whitespaces) }
-                                        .filter { !$0.isEmpty }
-                                    
-                                    // Format main word/character breakdown
-                                    if lines.count >= 2 {
-                                        // Main word: pinyin, definition with role
-                                        let mainText = "\(word): \(lines[0]), \(lines[1])"
-                                        Text(mainText)
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(T.C.ink)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        
-                                        // Only show individual character breakdowns for multi-character words
-                                        if word.count > 1 && lines.count > 2 {
-                                            ForEach(Array(lines.dropFirst(2)), id: \.self) { charLine in
-                                                CharacterBreakdownLineView(charLine: charLine)
-                                            }
-                                        }
-                                    } else {
-                                        // Fallback for single line or unexpected format
-                                        Text("\(word): \(analysis)")
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(T.C.ink2)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                }
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                            }
-                        }
-                        
-                        // Show loading indicator if analyzing
-                        if isLoadingCharacter {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Analyzing...")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(T.C.ink2)
-                            }
-                            .padding(.horizontal, 4)
-                        }
-                    }
 
                     // ChatGPT Interface
                     if showChatInterface {
@@ -924,16 +870,26 @@ struct SelectedSentencePopup: View {
 
         // Request pinyin for each character
         let pinyinPrompt = """
-        Provide the pinyin for each character in this Chinese text: \"\(concatenatedText)\"
+        Provide the pinyin for EACH character in this text: \"\(concatenatedText)\"
 
-        Output ONLY the pinyin syllables separated by spaces, one for each character.
-        Include tone marks (ā á ǎ à etc).
-        For punctuation or non-Chinese characters, output a dash (-).
+        CRITICAL RULES:
+        1. Output pinyin for EVERY character position, separated by spaces
+        2. For Chinese characters: provide pinyin with tone marks (ā á ǎ à)
+        3. For English letters/words: output dash (-) for EACH letter
+        4. For spaces: output dash (-)
+        5. For punctuation: output dash (-)
+        6. For numbers: output dash (-)
 
-        Example: If the text is "你好吗？", output: "nǐ hǎo ma -"
+        The number of pinyin syllables/dashes must EXACTLY match the number of characters.
+
+        Examples:
+        - "你好" → "nǐ hǎo"
+        - "你好World" → "nǐ hǎo - - - - -" (5 dashes for W-o-r-l-d)
+        - "我爱 iOS" → "wǒ ài - - - -" (space + i + O + S = 4 dashes)
+        - "今天，好！" → "jīn tiān - hǎo -"
 
         Text: \"\(concatenatedText)\"
-        Pinyin:
+        Pinyin (\(concatenatedText.count) items):
         """
 
         pinyinTask = Task {
@@ -1155,6 +1111,7 @@ struct DocumentInteractionView: View {
                         SelectedSentencePopup(
                             sentences: displaySentences,
                             allSentences: vm.document.sentences,
+                            documentContext: vm.document.additionalInfo,
                             vm: vm.createSentenceViewModel(for: sentence),
                             isShowing: $showingPopup,
                             position: tapLocation,
