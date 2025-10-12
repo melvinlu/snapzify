@@ -205,6 +205,79 @@ struct SelectedSentencePopup: View {
         }
         return currentIndex < allSentences.count - 1
     }
+
+    // Text segment for parsing mixed content
+    private struct TextSegment {
+        let text: String
+        let isChinese: Bool
+        let startIndex: Int
+    }
+
+    // Parse text into segments of Chinese characters and non-Chinese groups
+    private func parseTextIntoSegments(_ text: String) -> [TextSegment] {
+        var segments: [TextSegment] = []
+        var currentSegment = ""
+        var isCurrentChinese: Bool? = nil
+        var startIndex = 0
+        var currentIndex = 0
+
+        for char in text {
+            let charStr = String(char)
+            let charIsChinese = isChineseCharacter(charStr)
+
+            if let currentType = isCurrentChinese {
+                if currentType == charIsChinese {
+                    // Same type, continue building segment
+                    currentSegment += charStr
+                } else {
+                    // Type changed, save current segment and start new one
+                    segments.append(TextSegment(text: currentSegment, isChinese: currentType, startIndex: startIndex))
+                    currentSegment = charStr
+                    isCurrentChinese = charIsChinese
+                    startIndex = currentIndex
+                }
+            } else {
+                // First character
+                currentSegment = charStr
+                isCurrentChinese = charIsChinese
+                startIndex = 0
+            }
+            currentIndex += 1
+        }
+
+        // Add final segment
+        if !currentSegment.isEmpty, let currentType = isCurrentChinese {
+            segments.append(TextSegment(text: currentSegment, isChinese: currentType, startIndex: startIndex))
+        }
+
+        return segments
+    }
+
+    // Check if a character is Chinese
+    private func isChineseCharacter(_ char: String) -> Bool {
+        if let scalar = char.unicodeScalars.first {
+            let value = scalar.value
+            return (0x4E00...0x9FFF).contains(value) ||
+                   (0x3400...0x4DBF).contains(value) ||
+                   (0x20000...0x2A6DF).contains(value) ||
+                   (0x2A700...0x2B73F).contains(value) ||
+                   (0x2B740...0x2B81F).contains(value) ||
+                   (0x2B820...0x2CEAF).contains(value) ||
+                   (0xF900...0xFAFF).contains(value) ||
+                   (0x2F800...0x2FA1F).contains(value)
+        }
+        return false
+    }
+
+    // Get absolute character index for tap handling
+    private func getAbsoluteIndex(for segmentIndex: Int, charIndex: Int, in segments: [TextSegment]) -> Int {
+        var absoluteIndex = 0
+        for i in 0..<segmentIndex {
+            absoluteIndex += segments[i].text.count
+        }
+        absoluteIndex += charIndex
+        return absoluteIndex
+    }
     
     @ViewBuilder
     private var actionButtons: some View {
@@ -311,71 +384,71 @@ struct SelectedSentencePopup: View {
         VStack(spacing: 0) {
             // Chinese text with pinyin directly below
             VStack(alignment: .leading, spacing: 8) {
+                // Parse text into segments and pinyin
+                let segments = parseTextIntoSegments(concatenatedText)
                 let pinyinArray = pinyinText.split(separator: " ").map { String($0) }
-                let characters = Array(concatenatedText)
 
-                // Use HStack with character-pinyin pairs
-                WrappingHStack(alignment: .top, spacing: 2) {
-                    ForEach(Array(characters.enumerated()), id: \.offset) { index, char in
-                        let charStr = String(char)
-                        let isHighlighted = selectedWords.contains(where: { $0.contains(charStr) })
+                // Match pinyin to Chinese characters only
+                var pinyinIndex = 0
 
-                        // Check character type
-                        let isChinese: Bool = {
-                            if let scalar = charStr.unicodeScalars.first {
-                                let value = scalar.value
-                                return (0x4E00...0x9FFF).contains(value) ||
-                                       (0x3400...0x4DBF).contains(value) ||
-                                       (0x20000...0x2A6DF).contains(value) ||
-                                       (0x2A700...0x2B73F).contains(value) ||
-                                       (0x2B740...0x2B81F).contains(value) ||
-                                       (0x2B820...0x2CEAF).contains(value) ||
-                                       (0xF900...0xFAFF).contains(value) ||
-                                       (0x2F800...0x2FA1F).contains(value)
-                            }
-                            return false
-                        }()
+                // Use HStack with text segments
+                WrappingHStack(alignment: .top, spacing: 1) {
+                    ForEach(Array(segments.enumerated()), id: \.offset) { segmentIndex, segment in
+                        let isHighlighted = selectedWords.contains(where: { $0.contains(segment.text) })
 
-                        let isSpace = charStr == " "
-                        let isPunctuation = "，。！？；：、）（【】《》".contains(charStr)
+                        if segment.isChinese {
+                            // Chinese characters - show each with pinyin
+                            ForEach(Array(segment.text.enumerated()), id: \.offset) { charIndex, char in
+                                let charStr = String(char)
+                                let charIsHighlighted = selectedWords.contains(where: { $0.contains(charStr) })
 
-                        VStack(spacing: 3) {
-                            // Character (tappable if Chinese)
-                            Text(charStr)
-                                .font(.system(size: isChinese ? 24 : 20, weight: .medium))
-                                .foregroundStyle(isHighlighted ? T.C.accent : T.C.ink)
-                                .onTapGesture {
-                                    if isChinese {
-                                        loadCharacterAnalysis(for: charStr, at: index)
+                                VStack(spacing: 3) {
+                                    // Chinese character (tappable)
+                                    Text(charStr)
+                                        .font(.system(size: 24, weight: .medium))
+                                        .foregroundStyle(charIsHighlighted ? T.C.accent : T.C.ink)
+                                        .onTapGesture {
+                                            // Find absolute position in original text
+                                            let absoluteIndex = getAbsoluteIndex(for: segmentIndex, charIndex: charIndex, in: segments)
+                                            loadCharacterAnalysis(for: charStr, at: absoluteIndex)
+                                        }
+
+                                    // Pinyin below
+                                    if !pinyinText.isEmpty && pinyinIndex < pinyinArray.count {
+                                        let pinyinSyllable = pinyinArray[pinyinIndex]
+                                        Text(pinyinSyllable)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(T.C.ink2)
+                                            .lineLimit(1)
+                                            .fixedSize(horizontal: true, vertical: false)
+                                        // Increment pinyin index for next Chinese character
+                                        let _ = { pinyinIndex += 1 }()
+                                    } else if isLoadingPinyin && pinyinIndex == 0 {
+                                        ProgressView()
+                                            .scaleEffect(0.4)
+                                    } else {
+                                        Text(" ")
+                                            .font(.system(size: 10))
+                                            .opacity(0)
                                     }
                                 }
+                                .frame(minWidth: 28)
+                            }
+                        } else {
+                            // Non-Chinese segment - display as a unit without pinyin
+                            VStack(spacing: 3) {
+                                Text(segment.text)
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(T.C.ink)
 
-                            // Pinyin or spacer below
-                            if isChinese && !pinyinText.isEmpty && index < pinyinArray.count {
-                                let pinyinSyllable = pinyinArray[index]
-                                if pinyinSyllable != "-" && !pinyinSyllable.isEmpty {
-                                    Text(pinyinSyllable)
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(T.C.ink2)
-                                        .lineLimit(1)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                } else {
-                                    // Empty space for alignment
-                                    Text(" ")
-                                        .font(.system(size: 10))
-                                        .opacity(0)
-                                }
-                            } else if isChinese && isLoadingPinyin && index == 0 {
-                                ProgressView()
-                                    .scaleEffect(0.4)
-                            } else {
-                                // Non-Chinese characters get empty space for alignment
+                                // Empty space for alignment
                                 Text(" ")
                                     .font(.system(size: 10))
                                     .opacity(0)
                             }
+                            // Adjust width based on content
+                            .padding(.horizontal, segment.text == " " ? 0 : 2)
                         }
-                        .frame(minWidth: isChinese ? 28 : (isSpace ? 12 : 16))
                     }
                 }
             }
@@ -868,28 +941,37 @@ struct SelectedSentencePopup: View {
         isLoadingPinyin = true
         pinyinText = ""
 
-        // Request pinyin for each character
+        // Extract only Chinese characters for pinyin
+        var chineseCharacters: [String] = []
+        for char in concatenatedText {
+            let charStr = String(char)
+            if isChineseCharacter(charStr) {
+                chineseCharacters.append(charStr)
+            }
+        }
+
+        // If no Chinese characters, return early
+        guard !chineseCharacters.isEmpty else {
+            isLoadingPinyin = false
+            return
+        }
+
+        let chineseText = chineseCharacters.joined()
+
+        // Request pinyin ONLY for Chinese characters
         let pinyinPrompt = """
-        Provide the pinyin for EACH character in this text: \"\(concatenatedText)\"
+        Provide the pinyin for these Chinese characters: \"\(chineseText)\"
 
-        CRITICAL RULES:
-        1. Output pinyin for EVERY character position, separated by spaces
-        2. For Chinese characters: provide pinyin with tone marks (ā á ǎ à)
-        3. For English letters/words: output dash (-) for EACH letter
-        4. For spaces: output dash (-)
-        5. For punctuation: output dash (-)
-        6. For numbers: output dash (-)
-
-        The number of pinyin syllables/dashes must EXACTLY match the number of characters.
+        Output ONLY the pinyin syllables with tone marks (ā á ǎ à), separated by spaces.
+        One pinyin syllable for each Chinese character.
 
         Examples:
         - "你好" → "nǐ hǎo"
-        - "你好World" → "nǐ hǎo - - - - -" (5 dashes for W-o-r-l-d)
-        - "我爱 iOS" → "wǒ ài - - - -" (space + i + O + S = 4 dashes)
-        - "今天，好！" → "jīn tiān - hǎo -"
+        - "我爱中国" → "wǒ ài zhōng guó"
+        - "今天好" → "jīn tiān hǎo"
 
-        Text: \"\(concatenatedText)\"
-        Pinyin (\(concatenatedText.count) items):
+        Chinese characters: \"\(chineseText)\"
+        Pinyin (\(chineseCharacters.count) syllables):
         """
 
         pinyinTask = Task {
